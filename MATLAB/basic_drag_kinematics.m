@@ -24,7 +24,7 @@ x0   = [
     ];
 
 
-[t, y] = ode45(@(t, y) particle_model(t, y), 0:0.1:50, x0);
+[t, y] = ode45(@(t, y) particle_model(t, y), 0:0.1:20, x0);
 
 %% Plotting
 
@@ -61,16 +61,18 @@ plot(t, y(:, 1), 'DisplayName', 'X'); hold on;
 plot(t, y(:, 2), 'DisplayName', 'Y');
 plot(t, y(:, 3), 'DisplayName', 'Z');
 
+plot(t, vecnorm(y(:,1:3), 2, 2), 'LineWidth', 3, 'DisplayName', 'Speed')
+
 legend;
 title("Body Frame Velocity vs. Time");
 
-function x_dot = particle_model(t, x_curr)
+function x_dot = particle_model(~, x_curr)
 % ======================
 % --- Current States ---
 % ======================
 
 V_b     = x_curr(1:3);   % Body axis velocity     [m   s^-1]
-w_b = x_curr(4:6);       % Body angular rates     [rad s^-1]
+w_b     = x_curr(4:6);   % Body angular rates     [rad s^-1]
 e       = x_curr(7:10);  % Orientation quaternion []
 P       = x_curr(11:13); % ECEF Position          [m]
 
@@ -82,6 +84,11 @@ g_vec_e = [0; 0; -g];  % Gravity vector in ECEF     [m s^-2]
 
 m = 10;  % Object mass             [kg]
 R = 0.5; % Object spherical radius [m]
+
+S = 4*pi*R^2; % Cross-sectional area of a sphere
+Cd = 0.07;    % Drag coefficient of a sphere
+
+rho = 1.225;  % Density of air % [kg m^-3]
 
 % ===============
 % --- Inertia ---
@@ -115,7 +122,14 @@ g_vec_b = C_BE * g_vec_e; % Gravity vector in Body Frame
 % --- Equations of Motion ---
 % ===========================
 
-F_b = g_vec_b * m; % Body forces [N]
+V = norm(V_b); % Speed of object;
+Q = 1/2*rho*V^2; % Aerodynamic pressure;
+
+F_d = -Q*Cd * V_b/max(V, 0.00001);
+
+F_g = g_vec_b * m; % Force of gravity
+
+F_b = F_g + F_d; % Body forces [N]
 M_b = [0; 0; 0];   % Body moments [N m]
 
 % ===========================

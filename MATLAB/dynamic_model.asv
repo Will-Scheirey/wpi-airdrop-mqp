@@ -8,6 +8,7 @@ function x_dot = dynamic_model(t, x_curr)
     q     = x_curr(5); % Body axis pitch
     r     = x_curr(6); % Body axis yaw
 
+    
     e0    = x_curr(7); % Quaternion 0
     e1    = x_curr(8); % Quaternion 1
     e2    = x_curr(9); % Quaternion 2
@@ -41,7 +42,7 @@ function x_dot = dynamic_model(t, x_curr)
     alpha = atan(abs(w/u)); % Angle of attack
     beta = asin(abs(v/V));  % Side slip angle
    
-    C_BE = ecef2body_rotm([e0, e1, e2, e3]);
+    C_BE = ecef2body_rotm(e0, e1, e2, e3);
 
     C_WB = C1_rotm(0) * C2_rotm(alpha) * C3_rotm(-beta);
     C_BW = inv(C_WB);
