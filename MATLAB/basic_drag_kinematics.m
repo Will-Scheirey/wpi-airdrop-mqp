@@ -85,7 +85,7 @@ g_vec_e = [0; 0; -g];  % Gravity vector in ECEF     [m s^-2]
 m = 10;  % Object mass             [kg]
 R = 0.5; % Object spherical radius [m]
 
-S = 4*pi*R^2; % Cross-sectional area of a sphere
+S =  pi*R^2;  % Cross-sectional area of a sphere
 Cd = 0.07;    % Drag coefficient of a sphere
 
 rho = 1.225;  % Density of air % [kg m^-3]

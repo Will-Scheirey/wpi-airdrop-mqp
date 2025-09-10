@@ -5,7 +5,7 @@ addpath("Utils")
 % --- Initial Conditions ---
 % ==========================
 
-initial_angle = pi/6;
+initial_angle = pi/4;
 quat = quaternion([cos(initial_angle), 0, -sin(initial_angle), 0]);
 
 q0   = compact(quat)';   % Quaternion parts

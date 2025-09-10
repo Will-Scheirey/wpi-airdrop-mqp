@@ -50,8 +50,6 @@ function x_dot = dynamic_model(t, x_curr)
     C_GE = C_GW * C_WE;
     gamma = asin(-C_GE(1,3)) - pi/2;
 
-    C_BE = C_BE';
-
     rho = 1.225; % CALCULATE BASED ON ALTITUDE!
 
     % --- Riser Force ---
