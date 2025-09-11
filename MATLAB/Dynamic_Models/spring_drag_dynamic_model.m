@@ -27,7 +27,7 @@ R       = 0.5;        % Object spherical radius          [m]
 S       = pi*R^2;     % Cross-sectional area of a sphere [m^2]
 Cd      = 0.07;       % Drag coefficient of a sphere     []
 
-l0     = 2;        % Parachute offset length          [m]
+l0     = 3;        % Parachute offset length          [m]
 l_r     = 2;          % Riser length                     [m]
 
 rho     = 1.225;      % Density of air                   [kg m^-3]
@@ -36,7 +36,6 @@ rho     = 1.225;      % Density of air                   [kg m^-3]
 % --- Preliminary ---
 % ===================
 Q = 1/2*rho*V^2; % Dynamic pressure
-
 
 % =================
 % --- Rotations ---
@@ -48,14 +47,12 @@ alpha = atan(abs(w / u));                     % Angle of attack
 beta  = asin(abs(v/V));                       % Side slip angle
 gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
 
-% ==========================
-% --- Parachute Dynamics ---
-% ==========================
+% ==============================
+% --- Spring Characteristics ---
+% ==============================
 
-% [k, c] = parachute_spring_coefficients();
-
-k = 1;
-c = 0.5;
+k = 5;
+c = 5;
 
 % ===============
 % --- Inertia ---
