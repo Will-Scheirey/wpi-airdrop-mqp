@@ -21,7 +21,7 @@ P       = x_curr(11:13); % ECEF Position               [m]
 g       = 9.81;       % Gravitational acceleration       [m  s^-2]
 g_vec_e = [0; 0; -g]; % Gravity vector in ECEF           [m  s^-2]
 
-m       = 1;         % Object mass                      [kg]
+m       = 10;         % Object mass                      [kg]
 R       = 0.5;        % Object spherical radius          [m]
 
 S       = pi*R^2;     % Cross-sectional area of a sphere [m^2]
@@ -31,6 +31,8 @@ l0     = 3;        % Parachute offset length          [m]
 l_r     = 2;          % Riser length                     [m]
 
 rho     = 1.225;      % Density of air                   [kg m^-3]
+
+P_a = [R; 0; 0]; % Attachment point of spring to object, in the body frame
 
 % ===================
 % --- Preliminary ---
@@ -51,8 +53,8 @@ gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
 % --- Spring Characteristics ---
 % ==============================
 
-k = 5;
-c = 5;
+k = 100;
+c = 500;
 
 % ===============
 % --- Inertia ---
@@ -81,26 +83,38 @@ I = [
 
 F_g = C_BE*g_vec_e * m; % Force of gravity
 
-F_d = -Q*S*Cd * V_b/V;
+F_d = -1/2 * rho * Cd * S * V * V_b;
 
-P_R_P = P0 - P; % Position of payload relative to the riser
-V_R_P = C_BE' * -V_b;  % Velocity of riser relative to the payload
+V_e = C_BE' * V_b;
 
-e_spring = P_R_P / norm(P_R_P); % Unit vector along spring axis
+% --- Attachment Point ---
+r_attach_e = C_BE' * P_a;   % Attach vector from CG in ECEF
+P_attach_e = P + r_attach_e;  % Position of attach point in ECEF
 
-x_spring = P_R_P - l0 * e_spring;
-x_dot_spring = (e_spring' * V_R_P) * e_spring;
+% --- Angular Velocity ---
+omega_e = C_BE' * w_b;  % Angular rate in ECEF
 
-F_spring = k * x_spring + c * x_dot_spring;
+% --- Velocity of attachment point ---
+V_attach_e = V_e + cross(omega_e, r_attach_e);
 
-F_spring_b = C_BE * F_spring;
+% --- Vector from Riser to Attachment (ECEF) ---
+r_p_r_vec = P_attach_e - P0;
+r_p_r = norm(r_p_r_vec);
+e_p_r = r_p_r_vec / r_p_r;
+
+extension = r_p_r - l0; % Extension of riser from nominal
+
+v_p_r_vec = V_attach_e; % Velocity of attachment point relative to riser
+v_p_r_radial = dot(v_p_r_vec, e_p_r); % Velocity of attachment point along radial spring direction
+
+F_spring = -(k * extension + c * v_p_r_radial) * e_p_r; % Force of the spring
+
+F_spring_b = C_BE * F_spring; % Force of the spring in the body frame
 
 % --- Body Moments ---
 
-M = [0; 0; 0];
-
 F_b = F_g + F_d + F_spring_b; % Body forces [N]
-M_b = M;   % Body moments [N m]
+M_b = cross(P_a, F_spring_b);   % Body moments [N m]
 
 % ===========================
 % --- Kinematics ---

@@ -23,18 +23,18 @@ x0   = [
     P0 + [3; -1; -3];
     ];
 
-[t, y] = ode113(@(t, y) spring_drag_dynamic_model(t, y, P0), 0:0.01:100, x0);
+[t, y] = ode45(@(t, y) spring_drag_dynamic_model(t, y, P0), 0:0.05:100, x0);
 
 %% Plotting
 
-plot_data(t, y, false)
+plot_data(t, y, true)
 
 function plot_data(t, y, do_animation)
 
 if do_animation
 figure(1)
 clf
-run_animation(t, y, 50, 10)
+run_animation(t, y, 10, 1)
 end
 
 figure(2)
@@ -71,6 +71,17 @@ title("ECEF Trajectory")
 xlabel("X")
 ylabel("Y")
 zlabel("Z")
+
+figure(5)
+plot(t, y(:, 4), 'DisplayName', 'P', 'LineWidth', 1.5); hold on;
+plot(t, y(:, 5), 'DisplayName', 'Q', 'LineWidth', 1.5)
+plot(t, y(:, 6), 'DisplayName', 'R', 'LineWidth', 1.5)
+
+xlabel("Time (s)")
+ylabel("Angular Rate (rad/s)")
+title("Angular Velocities vs. Time")
+legend
+
 end
 
 function run_animation(t, y, step, substep)
@@ -89,7 +100,7 @@ for i = 2:step:numsteps - step
         pos = [y(j, 11), y(j, 12), y(j, 13)];
     
         set(patch, Orientation=quat, Position=pos); hold on
-        plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 10); hold on
+        plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 1); hold on
     end
 
     xlim([-10, 10]*2);
