@@ -1,4 +1,4 @@
-function x_dot = dynamic_model_new(~, x_curr, P0)
+function x_dot = parachute_dynamic_model(~, x_curr, P0)
 % ======================
 % --- Current States ---
 % ======================
@@ -13,13 +13,14 @@ p = w_b(1); q = w_b(2); r = w_b(3);
 e       = x_curr(7:10);  % Orientation quaternion      []
 P       = x_curr(11:13); % ECEF Position               [m]
 sp      = x_curr(14);    % Parachute distance traveled [m]
-V_p      = x_curr(15);   % Parachute velocity          [m   s^-1]
+V_p     = x_curr(15);    % Parachute velocity          [m   s^-1]
 
 
 % ==========================
 % --- Physical Constants ---
 % ==========================
 g       = 9.81;       % Gravitational acceleration       [m  s^-2]
+% g = 0;
 g_vec_e = [0; 0; -g]; % Gravity vector in ECEF           [m  s^-2]
 
 m       = 10;         % Object mass                      [kg]
@@ -36,6 +37,7 @@ l_0     = 0.5;        % Parachute offset length          [m]
 l_r     = 2;          % Riser length                     [m]
 
 rho     = 1.225;      % Density of air                   [kg m^-3]
+% rho = 0;
 
 % =================
 % --- Rotations ---
@@ -83,37 +85,37 @@ I = [
 % --- Aerodynamic Coefficients ---
 % ================================
 % --- Coefficients of Force ---
-C_xq = 0;
+C_xq = -0.1;
 C_yr = 0;
 C_zq = 0;
 
-C_x = 1;
-C_y = 0;
-C_z = 0;
+C_x = -1;
+C_y = -1;
+C_z = -1;
 
 % --- Coefficients of Moment ---
 C_Lp = -0.03;
 C_Mq = -0.1;
 C_Nr = -0.1;
 
-C_L = 0;
-C_M = 0;
+C_L = -0.1;
+C_M = 0.1;
 C_N = 0;
 
 % ===========================
 % --- Equations of Motion ---
 % ===========================
 
-Q = 1/2*rho*V^2*S; % Dynamic pressure
+Q = 1/2*rho*V^2; % Dynamic pressure
 Q1 = 1/2*rho*V*S;
 
 F_R_b = F_R * [
     cos(alpha)*cos(beta);
-    sin(beta);
+    -sin(beta);
     sin(alpha)*cos(beta);
 ];
 
-F_d = -Q*Cd * V_b/max(V, 0.00001);
+F_d = -Q*S*Cd * V_b/max(V, 0.00001);
 
 % --- Body Moments ---
 L = Q1 * d*(V*C_L + C_Lp * p*d);
@@ -128,8 +130,7 @@ F_b = F_g + F_d + F_R_b; % Body forces [N]
 M_b = M;   % Body moments [N m]
 
 sp_dot = V_p; % Parachute velocity
-V_p_dot = (F_R - D_P - m_p * sin(gamma))/(m_p + m_a); % Parachute acceleration
-
+V_p_dot = (F_R - D_P - m_p * g * sin(gamma))/(m_p + m_a); % Parachute acceleration
 
 % ===========================
 % --- Kinematics ---

@@ -1,20 +1,19 @@
-function x_dot = dynamic_model_new(~, x_curr, P0)
+function x_dot = spring_drag_dynamic_model(~, x_curr, P0)
 % ======================
 % --- Current States ---
 % ======================
 
 V_b     = x_curr(1:3);   % Body axis velocity          [m   s^-1]
 u = V_b(1); v = V_b(2); w = V_b(3);
-
 V = norm(V_b);
+V = max(V, 1e-20); % Avoid undefined 
 
 w_b     = x_curr(4:6);   % Body angular rates          [rad s^-1]
+p = w_b(1); q = w_b(2); r = w_b(3);
+
 e       = x_curr(7:10);  % Orientation quaternion      []
 P       = x_curr(11:13); % ECEF Position               [m]
-sp      = x_curr(14);    % Parachute distance traveled [m]
-V_p      = x_curr(15);   % Parachute velocity          [m   s^-1]
 
-p = w_b(1); q = w_b(2); r = w_b(3);
 
 % ==========================
 % --- Physical Constants ---
@@ -22,20 +21,22 @@ p = w_b(1); q = w_b(2); r = w_b(3);
 g       = 9.81;       % Gravitational acceleration       [m  s^-2]
 g_vec_e = [0; 0; -g]; % Gravity vector in ECEF           [m  s^-2]
 
-m       = 10;         % Object mass                      [kg]
+m       = 1;         % Object mass                      [kg]
 R       = 0.5;        % Object spherical radius          [m]
 
 S       = pi*R^2;     % Cross-sectional area of a sphere [m^2]
 Cd      = 0.07;       % Drag coefficient of a sphere     []
 
-m_p     = 1;          % Mass of the parachute            [kg]
-R_p     = 1;          % Parachute inflated radius        [m]
-h_p     = 0.5;        % Parachute inflated height        [m]
-d       = R*2;        % Parachute diameter               [m]
-l_0     = 0.5;        % Parachute offset length          [m]
+l0     = 2;        % Parachute offset length          [m]
 l_r     = 2;          % Riser length                     [m]
 
 rho     = 1.225;      % Density of air                   [kg m^-3]
+
+% ===================
+% --- Preliminary ---
+% ===================
+Q = 1/2*rho*V^2; % Dynamic pressure
+
 
 % =================
 % --- Rotations ---
@@ -51,14 +52,10 @@ gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
 % --- Parachute Dynamics ---
 % ==========================
 
-D_P    = parachute_drag(R_p, rho, V_p);
+% [k, c] = parachute_spring_coefficients();
 
-m_a    = parachute_added_mass(rho, R_p, h_p);
-[k, c] = parachute_spring_coefficients();
-
-sc     = norm(P - P0);
-
-F_R    = riser_force(sc, sp, l_0, l_r, V, V_p, k, c);
+k = 1;
+c = 0.5;
 
 % ===============
 % --- Inertia ---
@@ -79,57 +76,34 @@ I = [
     -I_XZ, -I_YZ, I_ZZ;
     ];
 
-% ================================
-% --- Aerodynamic Coefficients ---
-% ================================
-% --- Coefficients of Force ---
-C_xq = 0;
-C_yr = 0;
-C_zq = 0;
-
-C_x = 1;
-C_y = 0;
-C_z = 0;
-
-% --- Coefficients of Moment ---
-C_Lp = -0.03;
-C_Mq = -0.1;
-C_Nr = -0.1;
-
-C_L = 0;
-C_M = 0;
-C_N = 0;
-
 % ===========================
 % --- Equations of Motion ---
 % ===========================
 
-Q = 1/2*rho*V^2; % Dynamic pressure
-Q1 = 1/2*rho*V*S;
-
-F_R_b = F_R * [
-    cos(alpha)*cos(beta);
-    sin(beta);
-    sin(alpha)*cos(beta);
-];
-
-F_d = -Q*Cd * V_b/max(V, 0.00001);
-
-% --- Body Moments ---
-L = Q1 * d*(V*C_L + C_Lp * p*d);
-M = Q1 * d*(V*C_M + C_Mq * q*d);
-N = Q1 * d*(V*C_N + C_Nr * r*d);
-
-M = [L; M; N];
+% --- Body Forces ---
 
 F_g = C_BE*g_vec_e * m; % Force of gravity
 
-F_b = F_g + F_d + F_R_b; % Body forces [N]
+F_d = -Q*S*Cd * V_b/V;
+
+P_R_P = P0 - P; % Position of payload relative to the riser
+V_R_P = C_BE' * -V_b;  % Velocity of riser relative to the payload
+
+e_spring = P_R_P / norm(P_R_P); % Unit vector along spring axis
+
+x_spring = P_R_P - l0 * e_spring;
+x_dot_spring = (e_spring' * V_R_P) * e_spring;
+
+F_spring = k * x_spring + c * x_dot_spring;
+
+F_spring_b = C_BE * F_spring;
+
+% --- Body Moments ---
+
+M = [0; 0; 0];
+
+F_b = F_g + F_d + F_spring_b; % Body forces [N]
 M_b = M;   % Body moments [N m]
-
-sp_dot = V_p; % Parachute velocity
-V_p_dot = (F_R - D_P - m_p * sin(gamma))/(m_p + m_a); % Parachute acceleration
-
 
 % ===========================
 % --- Kinematics ---
@@ -138,7 +112,7 @@ V_p_dot = (F_R - D_P - m_p * sin(gamma))/(m_p + m_a); % Parachute acceleration
 [a_b, alpha_b] = particle_model([V_b; w_b], m, I, F_b, M_b);
 
 e_dot   = -1/2 * quat_kinematic_matrix(w_b) * e; % Quaternion rates
-V_e     = C_EB' * V_b;                           % Velocity in ECEF
+V_e     = C_BE' * V_b;                           % Velocity in ECEF
 
 % ==============
 % --- States ---
@@ -151,8 +125,5 @@ x_dot = [
     e_dot;
 
     V_e;
-
-    sp_dot;
-    V_p_dot
     ];
 end
