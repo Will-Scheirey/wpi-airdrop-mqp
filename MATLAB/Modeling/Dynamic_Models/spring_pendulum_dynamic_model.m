@@ -53,8 +53,8 @@ gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
 % --- Spring Characteristics ---
 % ==============================
 
-k = 100;
-c = 500;
+k = 10;
+c = 100;
 
 % ===============
 % --- Inertia ---
