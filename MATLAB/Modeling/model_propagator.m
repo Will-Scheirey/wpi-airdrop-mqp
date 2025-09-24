@@ -8,6 +8,8 @@ clear; clc; close all;
 V_b0 = [0; 0; 0];       % Body velocities    [m   s^-1]
 w_b0 = [0; 0; 0];     % Body angular rates [rad s^-1]
 P0   = [0; 0; 0];    % ECEF Position      [m]
+P0_c = [0; 0; 3];
+V_c0 = [0; 0; 0];    % Canopy ECEF body velocity
 
 x0   = [
     P0 + [0; 0; 0];
@@ -16,10 +18,14 @@ x0   = [
     0;
     0;
     0;
+
     w_b0;
+
+    P0_c;
+    V_c0
     ];
 
-[t, y] = ode45(@(t, y) spring_pendulum_dynamic_model(t, y, P0), 0:0.01:100, x0);
+[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y), 0:0.01:20, x0);
 
 %% Plotting
 
@@ -63,6 +69,12 @@ legend
 figure(4)
 clf
 plot3(y(:, 1), y(:, 2), y(:, 3))
+
+lim = [-1,1]*40;
+
+xlim(lim);
+ylim(lim);
+zlim(lim);
 
 title("ECEF Trajectory")
 xlabel("X")
@@ -109,7 +121,7 @@ for i = 2:step:numsteps - step
 
     xlim([-1, 1]*10);
     ylim([-1, 1]*10);
-    zlim([-5, 1]*5);
+    zlim([-5, 1]*10);
 
     set(gca,'ZDir','normal')  
     title(sprintf("t = %0.2f", t(i)))
