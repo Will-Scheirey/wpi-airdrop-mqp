@@ -3,16 +3,24 @@ function x_dot = spring_drag_dynamic_model(~, x_curr, P0)
 % --- Current States ---
 % ======================
 
-V_b     = x_curr(1:3);   % Body axis velocity          [m   s^-1]
+P       = x_curr(1:3);   % ECEF Position               [m]
+
+V_b     = x_curr(4:6);   % Body axis velocity          [m   s^-1]
 u = V_b(1); v = V_b(2); w = V_b(3);
 V = norm(V_b);
 V = max(V, 1e-20); % Avoid undefined 
 
-w_b     = x_curr(4:6);   % Body angular rates          [rad s^-1]
-p = w_b(1); q = w_b(2); r = w_b(3);
+eul = x_curr(7:9);
+% --- unpack Euler (assumed: [phi; theta; psi] = [roll; pitch; yaw])
+phi   = eul(1);
+theta = eul(2);
+psi   = eul(3);
 
-e       = x_curr(7:10);  % Orientation quaternion      []
-P       = x_curr(11:13); % ECEF Position               [m]
+% --- Rotation matrix: ensure eul2rotm gets [yaw pitch roll] for MATLAB default ZYX
+C_BE = eul2rotm([psi, theta, phi])';  % ECEF -> body (body from ECEF)
+
+w_b     = x_curr(10:12);   % Body angular rates          [rad s^-1]
+p = w_b(1); q = w_b(2); r = w_b(3);
 
 
 % ==========================
@@ -43,7 +51,7 @@ Q = 1/2*rho*V^2; % Dynamic pressure
 % --- Rotations ---
 % =================
 
-C_BE  = ecef2body_rotm(e);                    % ROTM to Body from ECEF
+% C_BE  = eul2rotm(eul');                    % ROTM to Body from ECEF
 
 alpha = atan(abs(w / u));                     % Angle of attack
 beta  = asin(abs(v/V));                       % Side slip angle
@@ -53,8 +61,8 @@ gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
 % --- Spring Characteristics ---
 % ==============================
 
-k = 100;
-c = 500;
+k = 10;
+c = 100;
 
 % ===============
 % --- Inertia ---
@@ -121,20 +129,35 @@ M_b = cross(P_a, F_spring_b);   % Body moments [N m]
 % ===========================
 
 [a_b, alpha_b] = particle_model([V_b; w_b], m, I, F_b, M_b);
-
-e_dot   = -1/2 * quat_kinematic_matrix(w_b) * e; % Quaternion rates
 V_e     = C_BE' * V_b;                           % Velocity in ECEF
+
+% --- Euler-angle kinematics: convert body rates to Euler rates
+% Avoid singularity near cos(theta) = 0
+ct = cos(theta); st = sin(theta);
+sp = sin(phi); cp = cos(phi);
+
+if abs(ct) < 1e-6
+    % handle near-singularity: you can saturate or use alternative representation
+    warning('theta near +-pi/2: Euler kinematics near singularity');
+    ct = sign(ct)*1e-6;
+end
+
+% Transform body rates [p;q;r] to Euler rates [phi_dot;theta_dot;psi_dot]
+T = [ 1, sp.*tan(theta),   cp.*tan(theta);
+      0,        cp,           -sp;
+      0, sp./ct,        cp./ct ];
+
+eul_dot = T * w_b;   % [phi_dot; theta_dot; psi_dot]
 
 % ==============
 % --- States ---
 % ==============
 x_dot = [
+    V_e;
     a_b;
 
+    eul_dot;
+
     alpha_b;
-
-    e_dot;
-
-    V_e;
     ];
 end
