@@ -160,7 +160,7 @@ for i = 2:step:numsteps - step
 
     set(gca,'ZDir','normal')  
     title(sprintf("t = %0.2f", t(i)))
-    % drawnow
+    drawnow
 
     if save_video
     frame = getframe(gcf); % captures the current figure (gcf)
