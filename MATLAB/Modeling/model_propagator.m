@@ -1,12 +1,21 @@
 clear; clc; close all;
-% addpath("Dynamic_Models", "Kinematics", "Parachute_Utils");
+addpath("Dynamic_Models", "Kinematics", "Parachute_Utils", "Objects");
+
+% ========================
+% --- Physical Objects ---
+% ========================
+
+payload = SphereObject(10, 0.5);
+
+% --- Parachute ---
+
 
 % ==========================
 % --- Initial Conditions ---
 % ==========================
 
-V_b0 = [0; 0; 0];       % Body velocities    [m   s^-1]
-w_b0 = [0; 0; 0];     % Body angular rates [rad s^-1]
+V_b0 = [3; 0; 0];       % Body velocities    [m   s^-1]
+w_b0 = [3; 3; 3];     % Body angular rates [rad s^-1]
 P0   = [0; 0; 0];    % ECEF Position      [m]
 P0_c = [0; 0; 3];
 V_c0 = [0; 0; 0];    % Canopy ECEF body velocity
@@ -25,7 +34,7 @@ x0   = [
     V_c0
     ];
 
-[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y), 0:0.01:20, x0);
+[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y, payload), 0:0.01:20, x0);
 
 %% Plotting
 
@@ -36,7 +45,7 @@ function plot_data(t, y, do_animation, save_video)
 if do_animation
 figure(1)
 clf
-run_animation(t, y, 3, 1, save_video)
+run_animation(t, y, 4, 1, save_video)
 end
 
 figure(2)
