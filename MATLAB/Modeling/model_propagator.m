@@ -5,8 +5,8 @@ addpath("Parachute_Utils/", "Objects/", "Kinematics/", "Dynamic_Models/")
 % --- Physical Objects ---
 % ========================
 
-payload = SphereObject(10, 0.5);
-parachute = Parachute_Rigid_Hemi(2, 2, 1.225, 1);
+payload = SphereObject(1000, 0.5);
+parachute = Parachute_Rigid_Hemi(7, 2, 1.225, 3);
 
 % --- Parachute ---
 
@@ -15,18 +15,18 @@ parachute = Parachute_Rigid_Hemi(2, 2, 1.225, 1);
 % --- Initial Conditions ---
 % ==========================
 
-P0   = [0; 0; 1000];    % ECEF Position      [m]
-V_b0 = [0; 0; 0];       % Body velocities    [m   s^-1]
+P0   = [0; 0; 10000];    % ECEF Position      [m]
+V_b0 = [10; 0; 0];       % Body velocities    [m   s^-1]
 % eul_b0 = [0; 0; 0];
-e_b0 = [1; 0; 0; 0];
+e_b0 = eul2quat([0, pi, 0])';
 w_b0 = [0; 0; 0];     % Body angular rates [rad s^-1]
 
 
-P0_c = P0 + [3; 0; 3];
-V_c0 = [0; 0; 0];    % Canopy ECEF body velocity
+P0_c = P0 + [-5; 0; 0];
+V_c0 = [-100; 0; 0];    % Canopy ECEF body velocity
 % eul_c0 = [0; 0; 0];
 e_c0 = [1; 0; 0; 0];
-w_c0 = [0; 0; 0];
+w_c0 = [3; 0; 0];
 
 x0   = [
     P0 + [0; 0; 0];
@@ -44,7 +44,7 @@ x0   = [
     w_c0;
     ];
 
-[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.005:20, x0);
+[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.01:100, x0);
 
 %% Plotting
 
@@ -55,7 +55,7 @@ function plot_data(t, y, do_animation, save_video)
 if do_animation
 figure(1)
 clf
-run_animation(t, y, 4, 1, save_video)
+run_animation(t, y, 10, 10, save_video)
 end
 
 figure(2)
@@ -88,12 +88,6 @@ legend
 figure(4)
 clf
 plot3(y(:, 1), y(:, 2), y(:, 3))
-
-lim = [-1,1]*40;
-
-% xlim(y(1,1) + lim);
-% ylim(y(1,2) + lim);
-% zlim(y(1,3) + lim);
 
 title("ECEF Trajectory")
 xlabel("X")
@@ -155,16 +149,18 @@ for i = 2:step:numsteps - step
     
         set(patch, Orientation=quat, Position=pos); hold on
         set(patch1, Orientation=quaternion(y(j, 20:23)), Position=y(j, 14:16));
+
+        legend("Payload", "Parachute")
         % plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 1); hold on
     end
 
-    xlim(y(1,1) + [-1, 1]*10);
-    ylim(y(1,2) + [-1, 1]*10);
-    zlim(y(1,3) + [-5, 1]*10);
+    xlim(y(j,1) + [-1, 1]*20);
+    ylim(y(j,2) + [-1, 1]*20);
+    zlim(y(j,3) + [-1, 1]*20);
 
     set(gca,'ZDir','normal')  
     title(sprintf("t = %0.2f", t(i)))
-    drawnow
+    % drawnow
 
     if save_video
     frame = getframe(gcf); % captures the current figure (gcf)

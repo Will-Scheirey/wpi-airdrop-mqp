@@ -59,7 +59,7 @@ gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
 % --- Spring Characteristics ---
 % ==============================
 
-k = 100;
+k = 10000;
 c = 1000;
 
 % ===========================
@@ -106,10 +106,10 @@ F_spring_c = C_BE_c * -F_spring_e;
 % --- Body Moments ---
 
 F_p = F_g_p + F_d_p + F_spring_p; % Body forces [N]
-M_p = cross(payload.P_attach_B, F_spring_p); % Body moments [N m]
+M_p = cross(payload.P_attach_B, F_spring_p) + -0.05*w_p; % Body moments [N m]
 
 F_c = F_g_c + F_d_c + F_spring_c;
-M_c = cross(parachute.P_attach_B, F_spring_c);
+M_c = cross(parachute.P_attach_B, F_spring_c) + -0.05*w_c;
 
 % ===========================
 % --- Kinematics ---
