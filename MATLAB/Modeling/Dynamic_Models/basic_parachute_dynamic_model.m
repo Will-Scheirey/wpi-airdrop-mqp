@@ -1,4 +1,4 @@
-function x_dot = basic_parachute_dynamic_model(t, x_curr, payload, parachute)
+function x_dot = basic_parachute_dynamic_model(~, x_curr, payload, parachute)
 % ======================
 % --- Current States ---
 % ======================
@@ -45,22 +45,22 @@ rho     = StandardAtmosphereModel.Density(h); % Density of air  [kg m^-3]
 % =================
 
 % [yaw pitch roll] for MATLAB default ZYX
-% C_BE   = eul2rotm([psi, theta, phi])';  % ECEF -> body (body from ECEF)
-% C_BE_c = eul2rotm([psi_c, theta_c, phi_c])'; % ECEF -> body (body from ECEF)
+% C_EB   = eul2rotm([psi, theta, phi])';  % ECEF -> body (body from ECEF)
+% C_EB_c = eul2rotm([psi_c, theta_c, phi_c])'; % ECEF -> body (body from ECEF)
 
-C_BE   = ecef2body_rotm(e_p);                    % ROTM to Body from ECEF
-C_BE_c = ecef2body_rotm(e_c);                    % ROTM to Body from ECEF
+C_EB   = ecef2body_rotm(e_p);                    % ROTM from ECEF to Body
+C_EB_c = ecef2body_rotm(e_c);                    % ROTM from ECEF to Body
 
 alpha = atan(abs(w / u));                     % Angle of attack
 beta  = asin(abs(v/V));                       % Side slip angle
-gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
+gamma = flight_path_angle(C_EB, alpha, beta); % Flight path angle
 
 % ==============================
 % --- Spring Characteristics ---
 % ==============================
 
 k = 10000;
-c = 1000;
+c = 10000;
 
 % ===========================
 % --- Equations of Motion ---
@@ -68,30 +68,30 @@ c = 1000;
 
 % --- Body Forces ---
 
-F_g_p = C_BE   * g_vec_e * payload.mass; % Force of gravity
-F_g_c = C_BE_c * g_vec_e * parachute.mass; % Force of gravity
+F_g_p = C_EB   * g_vec_e * payload.mass; % Force of gravity
+F_g_c = C_EB_c * g_vec_e * parachute.mass; % Force of gravity
 
 F_d_p = -1/2 * rho * payload.CdS(0) * V * V_p;
 F_d_c = -1/2 * rho * parachute.CdS(0) * norm(V_c) * V_c;
 
-V_p_e = C_BE'   * V_p;
-V_c_e = C_BE_c' * V_c;
+V_p_e = C_EB'   * V_p;
+V_c_e = C_EB_c' * V_c;
 
 % --- Velocity of attachment point ---
 % compute relative attach vectors (ECEF)
-r_attach_p_e = C_BE' * payload.P_attach_B;   % vector from payload COM -> attach (in ECEF)
-r_attach_c_e = C_BE_c' * parachute.P_attach_B;
+r_attach_p_e = C_EB' * payload.P_attach_B;   % vector from payload COM -> attach (in ECEF)
+r_attach_c_e = C_EB_c' * parachute.P_attach_B;
 
 obj1 = struct( ...
     'V', V_p_e, ...                   % COM velocity, ECEF
-    'omega', C_BE' * w_p, ...         % omega in ECEF
+    'omega', C_EB' * w_p, ...         % omega in ECEF
     'P_attach_rel', r_attach_p_e, ... % relative vector COM->attach in ECEF
     'P_attach', P + r_attach_p_e ...  % absolute attach pos in ECEF
     );
 
 obj2 = struct( ...
     'V', V_c_e, ...
-    'omega', C_BE_c' * w_c, ...
+    'omega', C_EB_c' * w_c, ...
     'P_attach_rel', r_attach_c_e, ...
     'P_attach', P_c + r_attach_c_e ...
     );
@@ -100,16 +100,16 @@ spring = struct('l0', parachute.l0, 'k', k, 'c', c);
 
 F_spring_e = spring_force(obj1, obj2, spring);
 
-F_spring_p = C_BE   *  F_spring_e; % Force of the spring in the body frame
-F_spring_c = C_BE_c * -F_spring_e;
+F_spring_p = C_EB   *  F_spring_e; % Force of the spring in the body frame
+F_spring_c = C_EB_c * -F_spring_e;
 
 % --- Body Moments ---
 
 F_p = F_g_p + F_d_p + F_spring_p; % Body forces [N]
-M_p = cross(payload.P_attach_B, F_spring_p) + -0.05*w_p; % Body moments [N m]
+M_p = cross(payload.P_attach_B, F_spring_p) + -100*w_p; % Body moments [N m]
 
 F_c = F_g_c + F_d_c + F_spring_c;
-M_c = cross(parachute.P_attach_B, F_spring_c) + -0.05*w_c;
+M_c = cross(parachute.P_attach_B, F_spring_c) + -100*w_c;
 
 % ===========================
 % --- Kinematics ---

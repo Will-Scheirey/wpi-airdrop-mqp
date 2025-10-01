@@ -18,18 +18,18 @@ parachute = Parachute_Rigid_Hemi(7, 2, 1.225, 3);
 P0   = [0; 0; 10000];    % ECEF Position      [m]
 V_b0 = [10; 0; 0];       % Body velocities    [m   s^-1]
 % eul_b0 = [0; 0; 0];
-e_b0 = eul2quat([0, pi, 0])';
+e_b0 = eul2quat([0, pi, pi/10])';
 w_b0 = [0; 0; 0];     % Body angular rates [rad s^-1]
 
 
-P0_c = P0 + [-5; 0; 0];
-V_c0 = [-100; 0; 0];    % Canopy ECEF body velocity
+P0_c = P0 + [0; 0; 0];
+V_c0 = [-10; 0; 0];    % Canopy ECEF body velocity
 % eul_c0 = [0; 0; 0];
 e_c0 = [1; 0; 0; 0];
-w_c0 = [3; 0; 0];
+w_c0 = [0; 0; 0];
 
 x0   = [
-    P0 + [0; 0; 0];
+    P0;
     V_b0;
 
     % eul_b0;
@@ -44,11 +44,11 @@ x0   = [
     w_c0;
     ];
 
-[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.01:100, x0);
+[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.01:30, x0);
 
 %% Plotting
 
-plot_data(t, y, true, false)
+plot_data(t, y, false, false)
 
 function plot_data(t, y, do_animation, save_video)
 
