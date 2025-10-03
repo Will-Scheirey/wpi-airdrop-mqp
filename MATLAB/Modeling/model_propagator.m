@@ -1,50 +1,69 @@
 clear; clc; close all;
-% addpath("Dynamic_Models", "Kinematics", "Parachute_Utils");
+addpath("Parachute_Utils/", "Objects/", "Kinematics/", "Dynamic_Models/")
+
+% ========================
+% --- Physical Objects ---
+% ========================
+
+payload = SphereObject(1000, 0.5);
+parachute = Parachute_Rigid_Hemi(7, 2, 1.225, 3);
+
+% --- Parachute ---
+
 
 % ==========================
 % --- Initial Conditions ---
 % ==========================
 
-V_b0 = [0; 0; 0];       % Body velocities    [m   s^-1]
+P0   = [0; 0; 10000];    % ECEF Position      [m]
+V_b0 = [10; 0; 0];       % Body velocities    [m   s^-1]
+% eul_b0 = [0; 0; 0];
+e_b0 = eul2quat([0, pi, pi/10])';
 w_b0 = [0; 0; 0];     % Body angular rates [rad s^-1]
-P0   = [0; 0; 0];    % ECEF Position      [m]
-P0_c = [0; 0; 3];
-V_c0 = [0; 0; 0];    % Canopy ECEF body velocity
+
+
+P0_c = P0 + [0; 0; 0];
+V_c0 = [-10; 0; 0];    % Canopy ECEF body velocity
+% eul_c0 = [0; 0; 0];
+e_c0 = [1; 0; 0; 0];
+w_c0 = [0; 0; 0];
 
 x0   = [
-    P0 + [0; 0; 0];
+    P0;
     V_b0;
 
-    0;
-    0;
-    0;
-
+    % eul_b0;
+    e_b0;
     w_b0;
 
     P0_c;
-    V_c0
+    V_c0;
+
+    % eul_c0;
+    e_c0;
+    w_c0;
     ];
 
-[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y), 0:0.01:20, x0);
+[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.01:30, x0);
 
 %% Plotting
 
-plot_data(t, y, true, false)
+plot_data(t, y, false, false)
 
 function plot_data(t, y, do_animation, save_video)
 
 if do_animation
 figure(1)
 clf
-run_animation(t, y, 3, 1, save_video)
+run_animation(t, y, 10, 10, save_video)
 end
 
 figure(2)
 clf
-plot(t, y(:, 3), 'DisplayName', 'X', 'LineWidth', 1.5); hold on;
-plot(t, y(:, 4), 'DisplayName', 'Y', 'LineWidth', 1.5);
-plot(t, y(:, 5), 'DisplayName', 'Z', 'LineWidth', 1.5);
-plot(t, vecnorm(y(:,1:3), 2, 2), 'LineWidth', 3, 'DisplayName', 'Speed')
+plot(t, y(:, 4), 'DisplayName', 'X', 'LineWidth', 1.5); hold on;
+plot(t, y(:, 5), 'DisplayName', 'Y', 'LineWidth', 1.5);
+plot(t, y(:, 6), 'DisplayName', 'Z', 'LineWidth', 1.5);
+plot(t, vecnorm(y(:,4:6), 2, 2), 'LineWidth', 3, 'DisplayName', 'Speed')
 
 legend;
 title("Body Frame Velocity vs. Time");
@@ -70,12 +89,6 @@ figure(4)
 clf
 plot3(y(:, 1), y(:, 2), y(:, 3))
 
-lim = [-1,1]*40;
-
-xlim(lim);
-ylim(lim);
-zlim(lim);
-
 title("ECEF Trajectory")
 xlabel("X")
 ylabel("Y")
@@ -92,13 +105,32 @@ ylabel("Angular Rate (rad/s)")
 title("Angular Velocities vs. Time")
 legend
 
+figure(6)
+clf
+plot(t, wrapToPi(y(:, 7)), 'DisplayName', '\phi', 'LineWidth', 1.5); hold on;
+plot(t, wrapToPi(y(:, 8)), 'DisplayName', '\theta', 'LineWidth', 1.5)
+plot(t, wrapToPi(y(:, 9)), 'DisplayName', '\psi', 'LineWidth', 1.5)
+
+xlabel("Time (s)")
+ylabel("Angular Position (rad)")
+title("Angular Position vs. Time")
+legend
+
+figure(7)
+clf
+plot(t, y(:, 3), 'DisplayName', 'Payload Height'); hold on;
+plot(t, y(:, 16), 'DisplayName', 'Parachute Height'); hold on;
+% xlim([0, 2])
+legend
+
 end
 
 function run_animation(t, y, step, substep, save_video)
 numsteps = height(y);
 
-quat = quaternion(eul2quat(y(1, 7:9)));
-patch = poseplot(quat);
+quat = quaternion(y(1, 7:10));
+patch = poseplot(quat); hold on
+patch1 = poseplot(quaternion(y(1, 20:23)));
 
 % patch.ScaleFactor = 50;
 xlabel("X")
@@ -112,16 +144,19 @@ end
 
 for i = 2:step:numsteps - step
     for j=i:substep:i+step
-        quat = quaternion(eul2quat(y(j, 7:9)));
+        quat = quaternion(y(j, 7:10));
         pos = y(j, 1:3);
     
         set(patch, Orientation=quat, Position=pos); hold on
-        plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 1); hold on
+        set(patch1, Orientation=quaternion(y(j, 20:23)), Position=y(j, 14:16));
+
+        legend("Payload", "Parachute")
+        % plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 1); hold on
     end
 
-    xlim([-1, 1]*10);
-    ylim([-1, 1]*10);
-    zlim([-5, 1]*10);
+    xlim(y(j,1) + [-1, 1]*20);
+    ylim(y(j,2) + [-1, 1]*20);
+    zlim(y(j,3) + [-1, 1]*20);
 
     set(gca,'ZDir','normal')  
     title(sprintf("t = %0.2f", t(i)))

@@ -4,7 +4,7 @@ std_dev_accel = 1e-3;
 std_dev_pos = 1;
 
 dt = 0.1; % Timestep [s]
-num_steps = 100;
+num_steps = 1000;
 
 % Process Noise
 Q = [
@@ -77,16 +77,18 @@ for i=1:num_steps
     kf.stepFilter(measurements(:, i));
 end
 
-%{
+
 % Estimate and plot errors and covariance
 state_err = x_estimates(state_idx, 2:end) - values(state_idx, 1:end-1);
 
 plot(state_err, '-r', 'DisplayName', 'Error', 'LineWidth', 1.5); hold on;
-plot(sqrt(covariances), '-b', 'DisplayName', 'Covariance', 'LineWidth', 1.5);
-plot(-sqrt(covariances), '-b', 'HandleVisibility', 'off', 'LineWidth', 1.5);
+plot(sqrt(covariances), '--b', 'DisplayName', 'Covariance', 'LineWidth', 1);
+plot(-sqrt(covariances), '--b', 'HandleVisibility', 'off', 'LineWidth', 1);
 
 legend;
-%}
+title("Error and Covariance vs. Time")
+xlabel("Time (s)")
+ylabel("Error (m)")
 
-plot(x_estimates(1, 2:end)); hold on
-plot(values(1, 1:end-1));
+% plot(x_estimates(1, 2:end)); hold on
+% plot(values(1, 1:end-1));
