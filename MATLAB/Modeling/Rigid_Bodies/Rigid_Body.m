@@ -1,4 +1,4 @@
-classdef RigidBody
+classdef Rigid_Body
     %AERODYNAMICOBJECT Class for a rigidbody experiencing aerodynamics
     %   This class defines the most basic physical object that experiences
     %   aerodynamic forces and moments.
@@ -10,7 +10,7 @@ classdef RigidBody
     end
 
     methods
-        function obj = RigidBody(mass, I)
+        function obj = Rigid_Body(mass, I)
             if nargin < 2
                 obj.mass = 0;
                 obj.inertia_tensor = 0;

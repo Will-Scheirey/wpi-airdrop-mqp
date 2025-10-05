@@ -1,4 +1,4 @@
-classdef Parachute < RigidBody
+classdef Parachute < Rigid_Body
     %PARACHUTE_RIGID_HEMI Summary of this class goes here
     %   Detailed explanation goes here
 
@@ -21,7 +21,7 @@ classdef Parachute < RigidBody
 
     methods
         function obj = Parachute(R, mc, l0, k, c, eta, porosity, drag, variable_ma)
-            obj = obj@RigidBody();
+            obj = obj@Rigid_Body();
             obj.R = R;
             obj.A = pi*R^2;
             obj.V = 2/3*pi*R^3;

@@ -1,4 +1,4 @@
-classdef Sphere < RigidBody
+classdef Sphere < Rigid_Body
     %SPHEREOBJECT Summary of this class goes here
     %   Detailed explanation goes here
 
@@ -25,7 +25,7 @@ classdef Sphere < RigidBody
             -I_XY,  I_YY, -I_YZ;
             -I_XZ, -I_YZ,  I_ZZ;
             ];
-            obj = obj@RigidBody(m, I);
+            obj = obj@Rigid_Body(m, I);
             obj.R = R;
             obj.A = pi*R^2;
 

@@ -1,5 +1,4 @@
 clear; clc; close all;
-addpath("Parachute_Utils/", "RigidBodies/", "Kinematics/", "Dynamic_Models/")
 
 % ========================
 % --- Physical Objects ---
@@ -8,52 +7,48 @@ addpath("Parachute_Utils/", "RigidBodies/", "Kinematics/", "Dynamic_Models/")
 k = 10000;
 c = 10;
 
-payload = Sphere(1000, 0.5, true);
+% payload = Sphere(1000, 0.5, true);
+payload = Box(in2m(48), in2m(83), in2m(48), lb2kg(2200), true);
 parachute = Parachute(7, 2, 10, k, c, 1, 0.2, true, true);
-
-% --- Parachute ---
-
 
 % ==========================
 % --- Initial Conditions ---
 % ==========================
 
-P0   = [0; 0; 10000];    % ECEF Position      [m]
-V_p0 = [0; 0; 0];       % Body velocities    [m   s^-1]
-% eul_p0 = [0; 0; 0];
-e_p0 = eul2quat([0, -pi/2, 0])';
-w_p0 = [0; 0; 0];     % Body angular rates [rad s^-1]
+% --- Payload ---
+P0   = [0; 0; 10000];            % ECEF position      [m]
+V_p0 = [0; 0; 0];                % Body velocity      [m   s^-1]
+e_p0 = eul2quat([0, -pi/2, 0])'; % Orientation
+w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
 
-P0_c = P0 + [3; 5; 8];
-V_c0 = [0; 0; 0];    % Canopy ECEF body velocity
-% eul_c0 = [0; 0; 0];
-e_c0 = eul2quat([0, pi/2, 0])';
-w_c0 = [0; 0; 0];
+% --- Parachute ---
+P0_c = P0 + [3; 0; 0];           % ECEF Position      [m]
+V_c0 = [100; 0; 0];                % Body velocity      [m   s^-1]
+e_c0 = eul2quat([0, 0, 0])';  % Orientation
+w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
 
 x0   = [
     P0;
     V_p0;
 
-    % eul_p0;
     e_p0;
     w_p0;
 
     P0_c;
     V_c0;
 
-    % eul_c0;
     e_c0;
     w_c0;
     ];
 
-options = odeset('RelTol', 1e-12);
-[t, y] = ode89(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.1:700, x0, options);
+options = odeset('RelTol', 1e-12); % Set solver tolerance
+[t, y] = ode89(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.001:10, x0, options);
 
 %% Plotting
 
-plot_data(t, y, false, false, payload, parachute)
+plot_data(t, y, true, false)
 
-function plot_data(t, y, do_animation, save_video, payload, parachute)
+function plot_data(t, y, do_animation, save_video)
 
 if do_animation
 figure(1)
