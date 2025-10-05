@@ -15,11 +15,14 @@ function F_s1 = spring_force(obj1, obj2, spring)
     end
     e_r = r_vec / r;
     
-    % extension: choose cable or spring behavior
-    extension = max(r - spring.l0, 0); % cable (no compression)
+    extension = r - spring.l0;
+    % extension = max(r - spring.l0, 0); % cable (no compression)
     
     v_vec = V_attach_1 - V_attach_2;
     v_radial = dot(v_vec, e_r);
+
+    force_damping = spring.c * v_radial;
+    force_extension = spring.k * extension;
     
-    F_s1 = -(spring.k * extension + spring.c * v_radial) * e_r;
+    F_s1 = -(force_damping + force_extension) * e_r;
 end
