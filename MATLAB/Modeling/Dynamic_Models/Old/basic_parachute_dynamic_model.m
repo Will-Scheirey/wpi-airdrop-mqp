@@ -102,7 +102,6 @@ M_c = cross(parachute.P_attach_B, F_spring_c);
 % ===========================
 
 [a_p, alpha_p] = particle_model([V_p; w_p], payload.m(), payload.I(), F_p, M_p);
-
 [a_c, alpha_c] = particle_model([V_c; w_c], parachute.m(rho), parachute.I(rho), F_c, M_c);
 
 e_p_dot   = -1/2 * quat_kinematic_matrix(w_p) * e_p; % Quaternion rates

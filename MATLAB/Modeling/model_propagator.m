@@ -41,8 +41,9 @@ x0   = [
     w_c0;
     ];
 
-options = odeset('RelTol', 1e-12); % Set solver tolerance
-[t, y] = ode89(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.001:10, x0, options);
+tspan = linspace(0, 100, 1000);
+model = Parachute_Model_Simple(payload, parachute, x0);
+[t, y] = model.run_model(x0, tspan);
 
 %% Plotting
 
