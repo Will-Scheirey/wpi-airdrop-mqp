@@ -149,9 +149,6 @@ classdef Parachute_Model_Simple < Dynamic_Model
             aoa_p = flight_angles(obj.V_p, obj.C_EB_p);
             aoa_c = flight_angles(obj.V_c, obj.C_EB_c);
 
-            aoa_p = 0;
-            aoa_c = 0;
-
             f_p = -0.5 * obj.rho * obj.payload.CdS(aoa_p)   * obj.V_p * norm(obj.V_p);
             f_c = -0.5 * obj.rho * obj.parachute.CdS(aoa_c) * obj.V_c * norm(obj.V_c);
 

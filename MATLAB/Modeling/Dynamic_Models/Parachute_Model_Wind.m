@@ -3,14 +3,17 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
     %   Detailed explanation goes here
 
     properties
-        Property1
+        
     end
 
     methods
-        function obj = Parachute_Model_Wind(inputArg1,inputArg2)
-            %PARACHUTE_MODEL_WIND Construct an instance of this class
+        function obj = Parachute_Model_Wind(payload, parachute, x0)
+            %PARACHUTE_MODEL_SIMPLE Construct an instance of this class
             %   Detailed explanation goes here
-            obj.Property1 = inputArg1 + inputArg2;
+            obj = obj@Parachute_Model_Simple(payload, parachute, x0);
+
+            obj.parachute = parachute;
+            obj.payload   = payload;
         end
 
         function outputArg = method1(obj,inputArg)
