@@ -4,12 +4,40 @@ clear; clc; close all;
 % --- Physical Objects ---
 % ========================
 
-k = 10000;
-c = 10;
+use_drag = true;
 
-% payload = Sphere(1000, 0.5, true);
-payload = Box(in2m(48), in2m(83), in2m(48), lb2kg(2200), true);
-parachute = Parachute(7, 2, 10, k, c, 1, 0.2, true, true);
+% --- Payload ---
+a22_width  = in2m(48);    % [m]
+a22_length = in2m(83);    % [m]
+a22_height = in2m(43);    % [m]
+a22_mass   = lb2kg(2200); % [kg]
+
+payload = Box(a22_width, ...
+    a22_length, ...
+    a22_height, ...
+    a22_mass, ...
+    use_drag);
+
+% --- Parachute ---
+canopy_radius = in2m(100);       % [m]
+canopy_mass = 2;         % [kg]
+
+riser_length = 10;       % [m] (resting riser length)
+riser_k = 10000;         % [N/m]       Riser stiffness
+riser_c = 1000;            % [kg s^-1]   Riser damping coefficient
+
+canopy_efficiency = 1;   % []
+canopy_porosity =   0.2; % []
+
+parachute = Parachute(canopy_radius, ...
+    canopy_mass, ...
+    riser_length, ...
+    riser_k, ...
+    riser_c, ...
+    canopy_efficiency, ...
+    canopy_porosity, ...
+    use_drag, ...
+    true);
 
 % ==========================
 % --- Initial Conditions ---
@@ -22,9 +50,9 @@ e_p0 = eul2quat([0, -pi/2, 0])'; % Orientation
 w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
 
 % --- Parachute ---
-P0_c = P0 + [3; 0; 0];           % ECEF Position      [m]
-V_c0 = [100; 0; 0];                % Body velocity      [m   s^-1]
-e_c0 = eul2quat([0, 0, 0])';  % Orientation
+P0_c = P0 + [2; 2; 5];           % ECEF Position      [m]
+V_c0 = [0; 0; 0];                % Body velocity      [m   s^-1]
+e_c0 = eul2quat([0, pi/2, 0])';  % Orientation
 w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
 
 x0   = [
@@ -41,9 +69,34 @@ x0   = [
     w_c0;
     ];
 
-tspan = linspace(0, 100, 1000);
+tspan = linspace(0, 10, 1000);
 model = Parachute_Model_Simple(payload, parachute, x0);
 [t, y] = model.run_model(x0, tspan);
+
+%% Intermediate Values
+
+for i = 1:length(t)
+    model.ode_fcn(t(i), y(i, :)');
+    f_drag_c(i, :) = model.drag_force_c;
+    f_drag_p(i, :) = model.drag_force_p;
+
+    aoa_c(i)       = model.aoa_c_curr;
+    aoa_p(i)       = model.aoa_p_curr;
+end
+
+figure(1)
+clf
+plot(t, vecnorm(f_drag_c, 2, 2), 'DisplayName', 'Canopy Drag'); hold on
+plot(t, vecnorm(f_drag_p, 2, 2), 'DisplayName', 'Payload Drag')
+legend
+
+figure(2)
+clf
+plot(t, aoa_c, 'DisplayName', 'Canopy AOA'); hold on
+plot(t, aoa_p, 'DisplayName', 'Payload AOA')
+legend
+
+
 
 %% Plotting
 
@@ -154,13 +207,15 @@ for i = 2:step:numsteps - step
         % plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 1); hold on
     end
 
+    set(gca,'ZDir','normal')  
+    title(sprintf("t = %0.2f", t(i)))
+
+
     lim = 25;
     xlim(y(j,1) + [-1, 1]*lim);
     ylim(y(j,2) + [-1, 1]*lim);
     zlim(y(j,3) + [-1, 1]*lim);
 
-    set(gca,'ZDir','normal')  
-    title(sprintf("t = %0.2f", t(i)))
     drawnow
 
     if save_video

@@ -1,4 +1,4 @@
-function F_s1 = spring_force(obj1, obj2, spring)
+function F_s1 = spring_force(obj1, obj2, spring, cable)
     % obj.V, obj.omega, obj.P_attach (absolute), obj.P_attach_rel (COM->attach)
     % All vectors must be expressed in the same frame (here: ECEF)
     
@@ -16,7 +16,9 @@ function F_s1 = spring_force(obj1, obj2, spring)
     e_r = r_vec / r;
     
     extension = r - spring.l0;
-    % extension = max(r - spring.l0, 0); % cable (no compression)
+    if nargin == 4 && cable
+        extension = max(r - spring.l0, 0); % cable (no compression)
+    end
     
     v_vec = V_attach_1 - V_attach_2;
     v_radial = dot(v_vec, e_r);

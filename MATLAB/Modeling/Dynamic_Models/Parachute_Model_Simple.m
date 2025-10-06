@@ -25,6 +25,11 @@ classdef Parachute_Model_Simple < Dynamic_Model
         C_EB_c
 
         rho
+
+        drag_force_p
+        drag_force_c
+        aoa_p_curr
+        aoa_c_curr
     end
 
     methods
@@ -41,10 +46,15 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
             obj.get_states(x);
 
+            [F_p, F_c, M_p, M_c] = obj.equations_of_motion();
+
+            x_dot = obj.dxdt(F_p, F_c, M_p, M_c);
+        end
+
+        function [F_p, F_c, M_p, M_c] = equations_of_motion(obj)
             % ===========================
             % --- Equations of Motion ---
             % ===========================
-
             % --- Body Forces ---
 
             [F_g_p, F_g_c] = obj.calc_gravity();
@@ -58,6 +68,10 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
             M_p = cross(obj.payload.  P_attach_B, F_r_p); % Payload body moments   [N m]
             M_c = cross(obj.parachute.P_attach_B, F_r_c); % Parachute body moments [N m]
+
+        end
+
+        function x_dot = dxdt(obj, F_p, F_c, M_p, M_c)
 
             % ===========================
             % --- Kinematics ---
@@ -86,7 +100,7 @@ classdef Parachute_Model_Simple < Dynamic_Model
                 alpha_c;
                 ];
         end
-
+            
         function get_states(obj, x)
             % ======================
             % --- Current States ---
@@ -135,6 +149,9 @@ classdef Parachute_Model_Simple < Dynamic_Model
             aoa_p = flight_angles(obj.V_p, obj.C_EB_p);
             aoa_c = flight_angles(obj.V_c, obj.C_EB_c);
 
+            aoa_p = 0;
+            aoa_c = 0;
+
             f_p = -0.5 * obj.rho * obj.payload.CdS(aoa_p)   * obj.V_p * norm(obj.V_p);
             f_c = -0.5 * obj.rho * obj.parachute.CdS(aoa_c) * obj.V_c * norm(obj.V_c);
 
@@ -144,6 +161,12 @@ classdef Parachute_Model_Simple < Dynamic_Model
             if any(isnan(f_c))
                 f_c = [0; 0; 0];
             end
+
+            obj.aoa_p_curr = aoa_p;
+            obj.aoa_c_curr = aoa_c;
+
+            obj.drag_force_p = f_p;
+            obj.drag_force_c = f_c;
         end
 
         function [f_p, f_c] = calc_riser_force(obj)
@@ -170,7 +193,7 @@ classdef Parachute_Model_Simple < Dynamic_Model
                 'k', obj.parachute.k_riser, ...
                 'c', obj.parachute.c_riser);
 
-            F_spring_e = spring_force(obj1, obj2, spring);
+            F_spring_e = spring_force(obj1, obj2, spring, true);
 
             f_p = obj.C_EB_p   *  F_spring_e; % Force of the spring in the body frame
             f_c = obj.C_EB_c * -F_spring_e;

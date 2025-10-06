@@ -41,17 +41,14 @@ classdef Dynamic_Model < handle
             obj.state_history = y;
         end
 
-        function x_dot = ode_fcn(obj, t, x_curr)
-            x_dot = zeros(size(x_curr));
-        end
-
-        function get_states(obj, x)
-            % Extract any necessary states
-        end
-
         function [a_b, alpha_b] = calc_accel(~, V_b, w_b, m, I, F_b, M_b)
             a_b     = F_b/m - cross(w_b, V_b);       % Body accelerations
             alpha_b = I \ (M_b - cross(w_b, I*w_b)); % Angular accelerations
         end
+
+    end
+    methods (Abstract)
+        get_states(obj, x);
+        x_dot = ode_fcn(obj, t2, x_curr);
     end
 end
