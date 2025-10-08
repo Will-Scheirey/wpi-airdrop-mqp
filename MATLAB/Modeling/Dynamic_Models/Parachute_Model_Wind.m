@@ -30,7 +30,7 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             % --- Body Moments ---
 
             F_p = F_g_p + F_d_p + F_r_p + F_w_p; % Payload body forces [N]
-            F_c = F_g_c + F_d_c + F_r_c _ F_w_c; % Parachute body forces [N]
+            F_c = F_g_c + F_d_c + F_r_c + F_w_c; % Parachute body forces [N]
 
             M_p = cross(obj.payload.  P_attach_B, F_r_p); % Payload body moments   [N m]
             M_c = cross(obj.parachute.P_attach_B, F_r_c); % Parachute body moments [N m]
