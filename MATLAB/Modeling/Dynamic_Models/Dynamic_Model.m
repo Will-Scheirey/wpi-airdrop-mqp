@@ -1,4 +1,4 @@
-classdef Dynamic_Model < handle
+classdef Dynamic_Model < matlab.System
     %DYNAMIC_MODEL Summary of this class goes here
     %   Detailed explanation goes here
 
@@ -49,6 +49,14 @@ classdef Dynamic_Model < handle
     end
     methods (Abstract)
         get_states(obj, x);
-        x_dot = ode_fcn(obj, t2, x_curr);
+        x_dot = ode_fcn(obj, t, x_curr);
+    end
+
+    methods (Access = protected)
+        function y = stepImpl(obj,u)
+            % Implement algorithm. Calculate y as a function of input u and
+            % internal states.
+            y = u;
+        end
     end
 end
