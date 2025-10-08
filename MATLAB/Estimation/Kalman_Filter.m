@@ -29,18 +29,31 @@ classdef Kalman_Filter < handle
             obj.I = eye(size(F));
         end
 
-        function stepFilter(obj, y)
-            % Prediction Step
+        function [x_pred, P_pred] = predict(obj)
             x_pred = obj.F * obj.x_curr; % State prediction
             P_pred = obj.F * obj.P_curr * obj.F' + obj.Q; % Covariance prediction
-            
+        end
+
+        function [innovation, K] = update(obj, x_pred, y, P_pred)
             % Update Step
             y_pred = obj.H * x_pred; % Measurement prediction
             innovation = y - y_pred; % Innovation
             K = P_pred * obj.H' / (obj.H * P_pred * obj.H' + obj.R); % Kalman Gain
-            
+        end
+
+        function update_states(obj, x_pred, K, innovation, P_pred)
             obj.x_curr = x_pred + K * innovation; % Update state estimate
             obj.P_curr = (obj.I - K*obj.H) * P_pred; % Update covariance
+        end
+
+        function step_filter(obj, y)
+            % Prediction Step
+            [x_pred, P_pred] = obj.predict();
+
+            % Update Step
+            [innovation, K] = obj.update(x_pred, y, P_pred);
+
+            obj.update_states(x_pred, K, innovation, P_pred);
         end
     end
 end
