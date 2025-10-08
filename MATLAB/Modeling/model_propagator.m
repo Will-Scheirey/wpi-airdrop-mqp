@@ -44,34 +44,53 @@ parachute = Parachute(canopy_radius, ...
 % ==========================
 
 % --- Payload ---
-P0   = [0; 0; 10000];            % ECEF position      [m]
-V_p0 = [0; 0; 0];                % Body velocity      [m   s^-1]
-e_p0 = eul2quat([0, -pi/2, 0])'; % Orientation
+P0   = [0; 0; 3000];              % ENU position      [m]
+V_p0 = [300; 0; 0];                % ENU velocity      [m   s^-1]
+e_p0 = eul2quat([0, 0, 0])'; % Orientation
 w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
 
 % --- Parachute ---
-P0_c = P0 + [2; 2; 5];           % ECEF Position      [m]
-V_c0 = [0; 0; 0];                % Body velocity      [m   s^-1]
-e_c0 = eul2quat([0, pi/2, 0])';  % Orientation
+P0_c = P0 + [0; 2; 10];           % ENU Position      [m]
+V_c0 = [280; 0; 0];                % ENU velocity      [m   s^-1]
+e_c0 = eul2quat([0, 0, 0])';  % Orientation
 w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
 
 x0   = [
     P0;
-    V_p0;
+    ecef2body_rotm(e_p0) * V_p0;
 
     e_p0;
     w_p0;
 
-    P0_c;
-    V_c0;
+    P0_c
+    ecef2body_rotm(e_c0) * V_c0;
 
     e_c0;
     w_c0;
     ];
 
-tspan = linspace(0, 10, 1000);
+tspan = linspace(0, 20, 1000);
 model = Parachute_Model_Simple(payload, parachute, x0);
 [t, y] = model.run_model(x0, tspan);
+
+%{
+%% Send to FlightGear
+
+lat0  = 42.273836;  % [deg]
+long0 = -71.809809; % [deg]
+h0    = 168.48;       % [m]
+
+[lla_p] = enu2lla([y(:, 1:3)], [lat0, long0, h0], 'flat');
+[heading, pitch, roll] = quat2angle(y(:, 7:10));
+
+lla_p(:, 1:2) = deg2rad(lla_p(:, 1:2));
+
+t_new = t * 5;
+
+fg_sim(t_new, lla_p, [roll, pitch, heading]);
+
+return
+%}
 
 %% Intermediate Values
 
