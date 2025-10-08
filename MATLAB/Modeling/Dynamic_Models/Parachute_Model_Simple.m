@@ -28,6 +28,13 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
         drag_force_p
         drag_force_c
+
+        a_p_curr
+        a_c_curr
+
+        alpha_p_curr
+        alpha_c_curr
+
         aoa_p_curr
         aoa_c_curr
     end
@@ -78,6 +85,12 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
             [a_p, alpha_p] = obj.calc_accel(obj.V_p, obj.w_p, obj.m_payload,   obj.payload.I(obj.rho),   F_p, M_p);
             [a_c, alpha_c] = obj.calc_accel(obj.V_c, obj.w_c, obj.m_parachute, obj.parachute.I(obj.rho), F_c, M_c);
+
+            obj.a_p_curr = a_p;
+            obj.a_c_curr = a_c;
+
+            obj.alpha_p_curr = alpha_p;
+            obj.alpha_c_curr = alpha_c;
 
             e_p_dot   = -1/2 * quat_kinematic_matrix(obj.w_p) * obj.e_p; % Quaternion rates
             e_c_dot   = -1/2 * quat_kinematic_matrix(obj.w_c) * obj.e_c; % Quaternion rates
