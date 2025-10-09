@@ -1,7 +1,7 @@
 clear; clc; close all
 
-num_sec = 10;
-meas_freq = 100; % Number of measurements per second
+num_sec = 100;
+meas_freq = 20; % Number of measurements per second
 tspan = linspace(0, num_sec, num_sec * meas_freq);
 [t, y, model] = propagate_model('tspan', tspan);
 
@@ -21,7 +21,9 @@ a_meas = sensor_noise_white(a_meas, accel_std_dev);
 
 w_meas = sensor_noise_white(w_p, gyro_std_dev);
 
-measurements = [a_meas, w_meas]';
+p_meas = sensor_noise_white(y(:, 1:3), 3);
+
+measurements = [a_meas, w_meas, p_meas]';
 
 num_steps = numel(t);
 
@@ -36,20 +38,17 @@ x0 = [
     0;
 ];
 
-R = eye(6) * 1e-7;
+R = eye(9) * 1e-7;
 Q = eye(19) * 10;
 
 P0 = eye(19) * 1e-6;
 
-
 % The Kalman Filter
-kf = Basic_Parachute_EKF(R, Q, x0, 0, P0, t(2) - t(1));
+kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
 
-% For historical dat
+% For historical data
 x_estimates = zeros(19, num_steps);
 covariances = zeros(19, num_steps);
-
-% The state we want to track
 
 % Kalman Filter propagation
 for i=1:num_steps
@@ -67,7 +66,7 @@ e = x_estimates(10:13, :);
 
 figure(1)
 clf
-plot3(p(1, :), p(2, :), p(3, :), 'DisplayName', 'Integrated', 'LineWidth', 1.5); hold on
+plot3(p(1, :), p(2, :), p(3, :), 'DisplayName', 'Estimated', 'LineWidth', 1.5); hold on
 plot3(y(:, 1), y(:, 2), y(:, 3), 'DisplayName', 'Actual', 'LineWidth', 1.5);
 
 legend
@@ -75,19 +74,19 @@ legend
 figure(1)
 clf
 subplot(3, 1, 1)
-plot(t, p(1, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, p(1, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 1), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("P_0")
 legend
 
 subplot(3, 1, 2)
-plot(t, p(2, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, p(2, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("P_1")
 legend
 
 subplot(3, 1, 3)
-plot(t, p(3, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, p(3, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 3), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("P_2")
 
@@ -96,19 +95,19 @@ legend
 figure(2)
 clf
 subplot(3, 1, 1)
-plot(t, v(1, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, v(1, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 4), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Vb_0")
 legend
 
 subplot(3, 1, 2)
-plot(t, v(2, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, v(2, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 5), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Vb_1")
 legend
 
 subplot(3, 1, 3)
-plot(t, v(3, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, v(3, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 6), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Vb_2")
 
@@ -118,25 +117,57 @@ figure(3)
 
 clf
 subplot(2, 2, 1)
-plot(t, e(1, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, e(1, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 7), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("e_0")
 legend
 
 subplot(2, 2, 2)
-plot(t, e(2, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, e(2, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 8), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("e_1")
 legend
 
 subplot(2, 2, 3)
-plot(t, e(3, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, e(3, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 9), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("e_2")
 
 subplot(2, 2, 4)
-plot(t, e(4, :), 'DisplayName', 'Integrated', 'LineWidth', 3); hold on
+plot(t, e(4, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, y(:, 10), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("e_3")
+
+legend
+
+V_e_e = zeros(num_steps, 3);
+V_e_r = zeros(num_steps, 3);
+
+for i = 1:num_steps
+    e_e = x_estimates(10:13, i);
+    V_e_e(i, :) = ecef2body_rotm(e_e)' * x_estimates(4:6, i);
+
+    e_r = y(i, 7:10);
+    V_e_r(i, :) = ecef2body_rotm(e_r)' * y(i, 4:6)';
+end
+
+figure(4)
+clf
+subplot(3, 1, 1)
+plot(t, V_e_e(:, 1), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
+plot(t, V_e_r(:, 1), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
+title("Ve_0")
+legend
+
+subplot(3, 1, 2)
+plot(t, V_e_e(:, 2), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
+plot(t, V_e_r(:, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
+title("Ve_1")
+legend
+
+subplot(3, 1, 3)
+plot(t, V_e_e(:, 3), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
+plot(t, V_e_r(:, 3), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
+title("Ve_2")
 
 legend
