@@ -24,38 +24,6 @@ w_meas = sensor_noise_white(w_p, gyro_std_dev);
 measurements = [a_meas, w_meas]';
 
 num_steps = numel(t);
-%{
-%% Integrate Sensor Measurements
-
-e = zeros(4, num_steps);
-v   = zeros(3, num_steps);
-p   = zeros(3, num_steps);
-
-e(:,1)  = y(1,7:10)';
-p(:, 1) = y(1,1:3)';
-v(:, 1) = y(1,4:6)';
-
-g_vec_e = [0; 0; -9.8];
-
-for i = 2:num_steps
-    dt = t(i) - t(i-1);
-    
-    w = w_meas(i, :);
-    a = a_meas(i, :);
-
-    e_dot   = -1/2 * quat_kinematic_matrix(w) * e(:, i-1); % Quaternion rates
-    e(:,i) = e(:,i-1) + e_dot*dt;
-    e(:,i) = e(:, i) / norm(e(:, i));
-
-    C_EB = ecef2body_rotm(e(:, i));
-
-    v_dot   = a' + C_EB * g_vec_e;
-    p_dot   = C_EB' * v(:, i-1);
-
-    v(:, i)   = v  (:, i-1) + v_dot   * dt; % integrate raw accel
-    p(:, i)   = p  (:, i-1) + p_dot   * dt; % integrate vel
-end
-%}
 
 x0 = [
     y(1, 1:6)';
@@ -68,10 +36,10 @@ x0 = [
     0;
 ];
 
-R = eye(6) * 0.01;
-Q = eye(19) * 1;
+R = eye(6) * 1e-7;
+Q = eye(19) * 10;
 
-P0 = eye(19) * 10;
+P0 = eye(19) * 1e-6;
 
 
 % The Kalman Filter
