@@ -1,6 +1,6 @@
 clear; clc; close all
 
-num_sec = 100;
+num_sec = 10;
 meas_freq = 100; % Number of measurements per second
 tspan = linspace(0, num_sec, num_sec * meas_freq);
 [t, y, model] = propagate_model('tspan', tspan);
@@ -14,16 +14,18 @@ e_p     = get_model_property(t, y, model, 'e_p');
 
 %% Create Sensor Measurements
 accel_std_dev = 1;
-gyro_std_dev = 1;
+gyro_std_dev = 0.1;
 
 a_meas = correct_meas_accel(a_p, w_p, e_p, alpha_p);
 a_meas = sensor_noise_white(a_meas, accel_std_dev);
 
 w_meas = sensor_noise_white(w_p, gyro_std_dev);
 
-%% Integrate Sensor Measurements
+measurements = [a_meas, w_meas]';
 
 num_steps = numel(t);
+%{
+%% Integrate Sensor Measurements
 
 e = zeros(4, num_steps);
 v   = zeros(3, num_steps);
@@ -53,6 +55,45 @@ for i = 2:num_steps
     v(:, i)   = v  (:, i-1) + v_dot   * dt; % integrate raw accel
     p(:, i)   = p  (:, i-1) + p_dot   * dt; % integrate vel
 end
+%}
+
+x0 = [
+    y(1, 1:6)';
+    0;
+    0;
+    0;
+    y(1, 7:13)';
+    0;
+    0;
+    0;
+];
+
+R = eye(6) * 0.01;
+Q = eye(19) * 1;
+
+P0 = eye(19) * 10;
+
+
+% The Kalman Filter
+kf = Basic_Parachute_EKF(R, Q, x0, 0, P0, t(2) - t(1));
+
+% For historical dat
+x_estimates = zeros(19, num_steps);
+covariances = zeros(19, num_steps);
+
+% The state we want to track
+
+% Kalman Filter propagation
+for i=1:num_steps
+    x_estimates(:, i) = kf.x_curr;
+    covariances(:, i) = diag(kf.P_curr);
+
+    kf.step_filter(measurements(:, i));
+end
+
+p = x_estimates(1:3, :);
+v = x_estimates(4:6, :);
+e = x_estimates(10:13, :);
 
 %% Plot
 

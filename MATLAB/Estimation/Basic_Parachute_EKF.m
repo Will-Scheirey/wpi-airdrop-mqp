@@ -1,0 +1,83 @@
+classdef Basic_Parachute_EKF < Extended_Kalman_Filter
+    %BASIC_PARACHUTE_KF Summary of this class goes here
+    %   Detailed explanation goes here
+
+    properties
+
+    end
+
+    methods
+        function obj = Basic_Parachute_EKF(R, Q, x0, H0, P0, dt)
+            obj = obj@Extended_Kalman_Filter(R, Q, H0, x0, P0, dt);
+
+            obj.H = obj.calc_H();
+        end
+
+        function step_filter(obj, y)
+            step_filter@Extended_Kalman_Filter(obj, y);
+            obj.x_curr(10:13) = obj.x_curr(10:13) / norm(obj.x_curr(10:13));
+
+            obj.P_curr(10:13, 10:13) = obj.P_curr(10:13, 10:13) / norm(obj.P_curr(10:13, 10:13));
+        end
+
+        function predict(obj)
+            predict@Extended_Kalman_Filter(obj);
+
+            obj.x_curr(10:13) = obj.x_curr(10:13) / norm(obj.x_curr(10:13));
+        end
+
+        function dfdx = f_jacobian_states(obj)
+            % P_e = obj.x_curr(1:3);
+            % V_b = obj.x_curr(4:6);
+
+            e   = obj.x_curr(10:13);
+            w_b = obj.x_curr(14:16);
+
+            e_dot = -1/2 * quat_kinematic_matrix(w_b);
+
+            C_BE = ecef2body_rotm(e)';
+
+            V = C_BE;
+            A = 0.5 * C_BE * 0;
+
+            E = e_dot;
+
+            dfdx = [
+                0, 0, 0, V(1,1), V(1,2), V(1,3), A(1,1), A(1,2), A(1,3), 0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, V(2,1), V(2,2), V(2,3), A(2,1), A(2,2), A(2,3), 0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, V(3,1), V(3,2), V(3,3), A(3,1), A(3,2), A(3,3), 0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      1,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      1,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      1,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      E(1,1), E(1,2), E(1,3), E(1,4), 0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      E(2,1), E(2,2), E(2,3), E(2,4), 0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      E(3,1), E(3,2), E(3,3), E(3,4), 0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      E(4,1), E(4,2), E(4,3), E(4,4), 0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+                0, 0, 0, 0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0, 0, 0;
+            ];
+        end
+
+        function dhdx = h_jacobian_states(obj)
+            dhdx = obj.calc_H();
+        end
+
+        function H_out = calc_H(~)
+            H_out = [
+                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+            ];
+        end
+    end
+end
