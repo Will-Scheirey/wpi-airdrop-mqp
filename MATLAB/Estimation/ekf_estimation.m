@@ -23,7 +23,9 @@ w_meas = sensor_noise_white(w_p, gyro_std_dev);
 
 p_meas = sensor_noise_white(y(:, 1:3), 3);
 
-measurements = [a_meas, w_meas, p_meas]';
+e_meas = sensor_noise_white(e_p, 0.01);
+
+measurements = [p_meas, a_meas, e_meas, w_meas]';
 
 num_steps = numel(t);
 
@@ -38,8 +40,8 @@ x0 = [
     0;
 ];
 
-R = eye(9) * 1e-7;
-Q = eye(19) * 10;
+R = eye(13) * 1;
+Q = eye(19) * 1000;
 
 P0 = eye(19) * 1e-6;
 
