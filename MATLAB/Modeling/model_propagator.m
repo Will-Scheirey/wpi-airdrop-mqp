@@ -1,77 +1,25 @@
 clear; clc; close all;
 
-% ========================
-% --- Physical Objects ---
-% ========================
+[t, y, model] = propagate_model();
 
-use_drag = true;
+%{
+%% Send to FlightGear
 
-% --- Payload ---
-a22_width  = in2m(48);    % [m]
-a22_length = in2m(83);    % [m]
-a22_height = in2m(43);    % [m]
-a22_mass   = lb2kg(2200); % [kg]
+lat0  = 42.273836;  % [deg]
+long0 = -71.809809; % [deg]
+h0    = 168.48;       % [m]
 
-payload = Box(a22_width, ...
-    a22_length, ...
-    a22_height, ...
-    a22_mass, ...
-    use_drag);
+[lla_p] = enu2lla([y(:, 1:3)], [lat0, long0, h0], 'flat');
+[heading, pitch, roll] = quat2angle(y(:, 7:10));
 
-% --- Parachute ---
-canopy_radius = in2m(100);       % [m]
-canopy_mass = 2;         % [kg]
+lla_p(:, 1:2) = deg2rad(lla_p(:, 1:2));
 
-riser_length = 10;       % [m] (resting riser length)
-riser_k = 10000;         % [N/m]       Riser stiffness
-riser_c = 1000;            % [kg s^-1]   Riser damping coefficient
+t_new = t * 5;
 
-canopy_efficiency = 1;   % []
-canopy_porosity =   0.2; % []
+fg_sim(t_new, lla_p, [roll, pitch, heading]);
 
-parachute = Parachute(canopy_radius, ...
-    canopy_mass, ...
-    riser_length, ...
-    riser_k, ...
-    riser_c, ...
-    canopy_efficiency, ...
-    canopy_porosity, ...
-    use_drag, ...
-    true);
-
-% ==========================
-% --- Initial Conditions ---
-% ==========================
-
-% --- Payload ---
-P0   = [0; 0; 10000];            % ECEF position      [m]
-V_p0 = [0; 0; 0];                % Body velocity      [m   s^-1]
-e_p0 = eul2quat([0, -pi/2, 0])'; % Orientation
-w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
-
-% --- Parachute ---
-P0_c = P0 + [2; 2; 5];           % ECEF Position      [m]
-V_c0 = [0; 0; 0];                % Body velocity      [m   s^-1]
-e_c0 = eul2quat([0, pi/2, 0])';  % Orientation
-w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
-
-x0   = [
-    P0;
-    V_p0;
-
-    e_p0;
-    w_p0;
-
-    P0_c;
-    V_c0;
-
-    e_c0;
-    w_c0;
-    ];
-
-tspan = linspace(0, 10, 1000);
-model = Parachute_Model_Simple(payload, parachute, x0);
-[t, y] = model.run_model(x0, tspan);
+return
+%}
 
 %% Intermediate Values
 
