@@ -1,4 +1,4 @@
-classdef KalmanFilter < handle
+classdef Kalman_Filter < handle
     %KALMANFILTER Summary of this class goes here
     %   Detailed explanation goes here
 
@@ -17,7 +17,7 @@ classdef KalmanFilter < handle
     end
 
     methods
-        function obj = KalmanFilter(R, Q, H, F, x0, P0)
+        function obj = Kalman_Filter(R, Q, H, F, x0, P0)
             obj.R = R;
             obj.Q = Q;
             obj.H = H;

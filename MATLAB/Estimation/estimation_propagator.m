@@ -60,7 +60,7 @@ measurements(1, :) = values(3, :) + noise_accel;
 measurements(2, :) = values(1, :) + noise_pos;
 
 % The Kalman Filter
-kf = KalmanFilter(R, Q, H, F, x0, P0);
+kf = Kalman_Filter(R, Q, H, F, x0, P0);
 
 % For historical dat
 x_estimates = zeros(3, num_steps);

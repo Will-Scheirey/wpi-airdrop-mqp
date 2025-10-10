@@ -1,54 +1,106 @@
 clear; clc; close all;
-addpath("Parachute_Utils/", "Objects/", "Kinematics/", "Dynamic_Models/")
 
 % ========================
 % --- Physical Objects ---
 % ========================
 
-payload = SphereObject(1000, 0.5);
-parachute = Parachute_Rigid_Hemi(7, 2, 1.225, 3);
+use_drag = true;
+
+% --- Payload ---
+a22_width  = in2m(48);    % [m]
+a22_length = in2m(83);    % [m]
+a22_height = in2m(43);    % [m]
+a22_mass   = lb2kg(2200); % [kg]
+
+payload = Box(a22_width, ...
+    a22_length, ...
+    a22_height, ...
+    a22_mass, ...
+    use_drag);
 
 % --- Parachute ---
+canopy_radius = in2m(100);       % [m]
+canopy_mass = 2;         % [kg]
 
+riser_length = 10;       % [m] (resting riser length)
+riser_k = 10000;         % [N/m]       Riser stiffness
+riser_c = 1000;            % [kg s^-1]   Riser damping coefficient
+
+canopy_efficiency = 1;   % []
+canopy_porosity =   0.2; % []
+
+parachute = Parachute(canopy_radius, ...
+    canopy_mass, ...
+    riser_length, ...
+    riser_k, ...
+    riser_c, ...
+    canopy_efficiency, ...
+    canopy_porosity, ...
+    use_drag, ...
+    true);
 
 % ==========================
 % --- Initial Conditions ---
 % ==========================
 
-P0   = [0; 0; 10000];    % ECEF Position      [m]
-V_b0 = [10; 0; 0];       % Body velocities    [m   s^-1]
-% eul_b0 = [0; 0; 0];
-e_b0 = eul2quat([0, pi, pi/10])';
-w_b0 = [0; 0; 0];     % Body angular rates [rad s^-1]
+% --- Payload ---
+P0   = [0; 0; 10000];            % ECEF position      [m]
+V_p0 = [0; 0; 0];                % Body velocity      [m   s^-1]
+e_p0 = eul2quat([0, -pi/2, 0])'; % Orientation
+w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
 
-
-P0_c = P0 + [0; 0; 0];
-V_c0 = [-10; 0; 0];    % Canopy ECEF body velocity
-% eul_c0 = [0; 0; 0];
-e_c0 = [1; 0; 0; 0];
-w_c0 = [0; 0; 0];
+% --- Parachute ---
+P0_c = P0 + [2; 2; 5];           % ECEF Position      [m]
+V_c0 = [0; 0; 0];                % Body velocity      [m   s^-1]
+e_c0 = eul2quat([0, pi/2, 0])';  % Orientation
+w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
 
 x0   = [
     P0;
-    V_b0;
+    V_p0;
 
-    % eul_b0;
-    e_b0;
-    w_b0;
+    e_p0;
+    w_p0;
 
     P0_c;
     V_c0;
 
-    % eul_c0;
     e_c0;
     w_c0;
     ];
 
-[t, y] = ode45(@(t, y) basic_parachute_dynamic_model(t, y, payload, parachute), 0:0.01:30, x0);
+tspan = linspace(0, 10, 1000);
+model = Parachute_Model_Simple(payload, parachute, x0);
+[t, y] = model.run_model(x0, tspan);
+
+%% Intermediate Values
+
+for i = 1:length(t)
+    model.ode_fcn(t(i), y(i, :)');
+    f_drag_c(i, :) = model.drag_force_c;
+    f_drag_p(i, :) = model.drag_force_p;
+
+    aoa_c(i)       = model.aoa_c_curr;
+    aoa_p(i)       = model.aoa_p_curr;
+end
+
+figure(1)
+clf
+plot(t, vecnorm(f_drag_c, 2, 2), 'DisplayName', 'Canopy Drag'); hold on
+plot(t, vecnorm(f_drag_p, 2, 2), 'DisplayName', 'Payload Drag')
+legend
+
+figure(2)
+clf
+plot(t, aoa_c, 'DisplayName', 'Canopy AOA'); hold on
+plot(t, aoa_p, 'DisplayName', 'Payload AOA')
+legend
+
+
 
 %% Plotting
 
-plot_data(t, y, false, false)
+plot_data(t, y, true, false)
 
 function plot_data(t, y, do_animation, save_video)
 
@@ -121,6 +173,7 @@ clf
 plot(t, y(:, 3), 'DisplayName', 'Payload Height'); hold on;
 plot(t, y(:, 16), 'DisplayName', 'Parachute Height'); hold on;
 % xlim([0, 2])
+
 legend
 
 end
@@ -154,12 +207,15 @@ for i = 2:step:numsteps - step
         % plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 1); hold on
     end
 
-    xlim(y(j,1) + [-1, 1]*20);
-    ylim(y(j,2) + [-1, 1]*20);
-    zlim(y(j,3) + [-1, 1]*20);
-
     set(gca,'ZDir','normal')  
     title(sprintf("t = %0.2f", t(i)))
+
+
+    lim = 25;
+    xlim(y(j,1) + [-1, 1]*lim);
+    ylim(y(j,2) + [-1, 1]*lim);
+    zlim(y(j,3) + [-1, 1]*lim);
+
     drawnow
 
     if save_video
@@ -173,4 +229,72 @@ end
 if save_video
 close(outputVideo)
 end
+end
+
+function plot_energy(t, y, payload, parachute)
+    payload_kinetic_energy = 0.5 *payload.m()*vecnorm(y(:,4:6), 2, 2).^2;
+    parachute_kinetic_energy = 0.5 *parachute.m()*vecnorm(y(:,17:19), 2, 2).^2;
+    
+    omega = y(:, 11:13);
+    payload_rotational_energy = 0.5 * abs(sum((omega * payload.I()) .* omega, 2));
+    
+    omega_p = y(:, 24:26);
+    parachute_rotational_energy = 0.5 * abs(sum((omega_p * parachute.I()) .* omega_p, 2));
+    
+    payload_potential_energy =   9.81 * payload.m() *y(:,3);
+    parachute_potential_energy = 9.81 *parachute.m()*y(:,16);
+    
+    spring_length = zeros(height(y), 1);
+    
+    for idx = 1:height(y)
+        e_p = y(idx, 7:10);
+        rotm_p = ecef2body_rotm(e_p);
+        P_a_p = y(idx,1:3)' + rotm_p' * payload.P_attach_B;
+    
+        e_c = y(idx, 20:23);
+        rotm_c = ecef2body_rotm(e_c);
+        P_a_c = y(idx,14:16)' + rotm_c' * parachute.P_attach_B;
+    
+        dist =  norm(P_a_p - P_a_c);
+        extension = dist - parachute.l0;
+    
+        spring_length(idx) = extension;
+    end
+    
+    spring_potential_energy = 0.5 * parachute.k_riser*spring_length.^2;
+    
+    payload_total = payload_kinetic_energy + payload_rotational_energy + payload_potential_energy;
+    parachute_total = parachute_kinetic_energy + parachute_rotational_energy + parachute_potential_energy;
+    
+    figure(8)
+    clf
+    % plot(t, payload_kinetic_energy, 'DisplayName', 'Payload Kinetic Energy', 'LineWidth', 1.5); hold on
+    % plot(t, parachute_kinetic_energy, 'DisplayName', 'Parachute Kinetic Energy', 'LineWidth', 1.5)
+    hold on
+    % plot(t, payload_rotational_energy, 'DisplayName', 'Payload Rotational Energy', 'LineWidth', 1.5)
+    % plot(t, parachute_rotational_energy, 'DisplayName', 'Parachute Rotational Energy', 'LineWidth', 1.5)
+    % plot(t, payload_rotational_energy + parachute_rotational_energy, 'DisplayName', 'Total Rotational Energy', 'LineWidth', 1.5)
+    
+    % figure(9)
+    % clf
+    total = payload_total + parachute_total + spring_potential_energy;
+    % plot(t, payload_total, 'DisplayName', 'Payload Total Energy', 'LineWidth', 1.5); hold on
+    % plot(t, parachute_total, 'DisplayName', 'Parachute Total Energy', 'LineWidth', 1.5)
+    plot(t, total(1) - total, 'DisplayName', 'Total Lost Energy', 'LineWidth', 1.5); hold on
+    % plot(t, spring_potential_energy, 'DisplayName', 'Spring Potential Energy', 'LineWidth', 1.5)
+    
+    legend
+    
+    figure(9)
+    clf
+    plot(t, spring_length, 'DisplayName', 'Riser Length', 'LineWidth', 1.5)
+    
+    %{
+    figure(9)
+    clf
+    plot(t, vecnorm(y(:, 7:10), 2, 2), 'DisplayName', 'Payload Quaternion Norm', 'LineWidth', 1.5); hold on
+    plot(t, vecnorm(y(:, 20:23), 2, 2), 'DisplayName', 'Parachute Quaternion Norm', 'LineWidth', 1.5)
+    
+    legend
+    %}
 end

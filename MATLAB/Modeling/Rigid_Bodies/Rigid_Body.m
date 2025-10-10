@@ -1,22 +1,31 @@
-classdef AerodynamicObject
-    %AERODYNAMICOBJECT Class for an object experiencing aerodynamics
+classdef Rigid_Body
+    %AERODYNAMICOBJECT Class for a rigidbody experiencing aerodynamics
     %   This class defines the most basic physical object that experiences
     %   aerodynamic forces and moments.
 
     properties
         % --- Mass and Inertia ---
         mass % Object mass           [kg]
-        I    % Object inertia tensor [N m]
+        inertia_tensor    % Object inertia tensor [N m]
     end
 
     methods
-        function obj = AerodynamicObject(mass, I)
-            obj.mass = mass;
-            obj.I = I;
+        function obj = Rigid_Body(mass, I)
+            if nargin < 2
+                obj.mass = 0;
+                obj.inertia_tensor = 0;
+            else
+                obj.mass = mass;
+                obj.inertia_tensor = I;
+            end
         end
     end
 
     methods
+        % --- Basic Properties ---
+        function m_out = m(obj, rho); m_out = obj.mass; end
+        function I_out = I(obj, rho); I_out = obj.inertia_tensor; end
+        
         % --- Basic Aerodynamic Properties ---
         function S_out = S(obj, aoa); S_out = 0; end
         function Cd_out = Cd(obj, aoa); Cd_out = 0; end
