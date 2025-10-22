@@ -51,7 +51,7 @@ fclose(fid);
 
 % --------------------------------------------------------------
 
-system('bash runfg.sh &');
+% system('bash runfg.sh &');
 pause(5);
 play(h);
 

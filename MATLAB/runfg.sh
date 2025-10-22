@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-cd /Applications/FlightGear.app/Contents/Resources/data
+cd /Applications/FlightGear.app/Contents/Resources
 
 export FG_ROOT=/Applications/FlightGear.app
 

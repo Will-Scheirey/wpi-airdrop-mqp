@@ -97,7 +97,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'tspan')
         tspan = NameValueArgs.tspan;
     else
-        tspan = linspace(0, 20, 1000);
+        tspan = linspace(0, 1000, 50000);
     end
 
     if isfield(NameValueArgs, 'model')
