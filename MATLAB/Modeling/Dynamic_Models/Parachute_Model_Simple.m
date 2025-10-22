@@ -135,7 +135,9 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
             % --- Additional States ---
 
-            obj.rho = StandardAtmosphereModel.Density(obj.P_p(3)); % Density of air  [kg m^-3]
+            h = obj.P_p(3);
+            % h = 0;
+            obj.rho = StandardAtmosphereModel.Density(h); % Density of air  [kg m^-3]
 
             obj.m_payload   = obj.payload.  m(obj.rho);
             obj.m_parachute = obj.parachute.m(obj.rho);

@@ -24,10 +24,10 @@ h.DisableShaders = true;
 h.TimeScaling = 5;
 
 get(h)
-
-GenerateRunScript(h)
-
-system('runfg.bat &');
+% 
+% GenerateRunScript(h)
+% 
+% system('runfg.bat &');
 
 play(h)
 end

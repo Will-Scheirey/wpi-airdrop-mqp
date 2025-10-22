@@ -1,8 +1,8 @@
 clear; clc; close all;
 
-[t, y, model] = propagate_model();
+[t, y, model] = propagate_model('tspan');
 
-%{
+
 %% Send to FlightGear
 
 lat0  = 42.273836;  % [deg]
@@ -19,7 +19,7 @@ t_new = t * 5;
 fg_sim(t_new, lla_p, [roll, pitch, heading]);
 
 return
-%}
+
 
 %% Intermediate Values
 

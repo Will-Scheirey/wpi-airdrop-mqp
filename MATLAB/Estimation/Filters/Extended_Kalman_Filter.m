@@ -17,26 +17,32 @@ classdef Extended_Kalman_Filter < Kalman_Filter
         end            
 
         function predict(obj)
-            obj.F = obj.f_jacobian_states();
-            
-            obj.x_curr = obj.x_curr + obj.dt * obj.F * obj.x_curr;
-
-            obj.P_curr = obj.F * obj.P_curr * obj.F' + obj.Q;
+            A   = obj.f_jacobian_states();
+            Phi = eye(size(A)) + obj.dt * A';
+            % Phi = expm(obj.dt * A);
+        
+            % If your Q is continuous-time spectral density, discretize it.
+            % Minimal quick fix if Q is already tuned as discrete:
+            Qd = obj.Q;
+        
+            % Nonlinear state propagation (yours):
+            obj.x_curr = obj.x_curr + obj.dt * obj.f();
+        
+            % Discrete covariance propagation:
+            obj.P_curr = Phi * obj.P_curr * Phi' + Qd;
         end
 
         function [innovation, K] = update(obj, y)
-            y_pred = obj.H * obj.x_curr; % Measurement prediction
+            y_pred = obj.h(); % Measurement prediction
             innovation = y - y_pred; % Innovation
 
-            h = obj.h_jacobian_states();
+            H = obj.h_jacobian_states();
 
-            term1 = obj.R + h*obj.P_curr*h';
-
-            K = obj.P_curr * h' / term1;
+            K = obj.P_curr * H' / (obj.R + H*obj.P_curr*H');
 
             obj.x_curr = obj.x_curr + K * innovation;
 
-            obj.P_curr = (obj.I - K*h) * obj.P_curr * (obj.I - K*h)' + K*obj.R*K'; % Update covariance            
+            obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*obj.R*K'; % Update covariance            
         end
 
         function step_filter(obj, y)
@@ -48,5 +54,7 @@ classdef Extended_Kalman_Filter < Kalman_Filter
     methods (Abstract)
         dfdx = f_jacobian_states(obj);
         dhdx = h_jacobian_states(obj);
+        y    = h(obj);
+        dxdt = f(obj);
     end
 end
