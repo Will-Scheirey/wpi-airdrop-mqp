@@ -5,6 +5,21 @@ meas_freq = 20; % Number of measurements per second
 tspan = linspace(0, num_sec, num_sec * meas_freq + 1);
 [t, y, model] = propagate_model('tspan', tspan);
 
+kf_inds = struct( ...
+    'p',      1:3,...
+    'v',      4:6,...
+    'a',      7:9,...
+    'e',     10:13,...
+    'w',     14:16,...
+    'alpha', 17:19 ...
+    );
+
+model_inds = struct(...
+    'p', 1:3,...
+    'v', 4:6,...
+    'e', 7:10 ...
+    );
+
 %% Extract Model Properties
 
 [p_p, a_p, alpha_p, w_p, e_p] = get_model_property(t, y, model, 'P_p', 'a_p_curr', 'alpha_p_curr', 'w_p', 'e_p');
@@ -51,12 +66,12 @@ R = blkdiag( ...
     );
 
 Q = blkdiag(...
-    1e-1 * eye(3),... % P
-    1e0  * eye(3),... % V
-    1e-3 * eye(3),... % a
-    1e-6 * eye(3),... % w
-    1e-4 * eye(4),... % e
-    1e-1 * eye(3)...  % alpha
+    1e1 * eye(3),... % P
+    1e6  * eye(3),... % V
+    1e-1 * eye(3),... % a
+    1e-3 * eye(3),... % w
+    1e-1 * eye(4),... % e
+    1e2 * eye(3)...  % alpha
     );
 
 P0 = blkdiag( ...
@@ -72,23 +87,20 @@ P0 = blkdiag( ...
 % The Kalman Filter
 kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
 
-% For historical data
-x_estimates = zeros(19, num_steps);
-covariances = zeros(19, num_steps);
+kf.run_filter(measurements, num_steps);
 
-% Kalman Filter propagation
-for i=1:num_steps
-    x_estimates(:, i) = kf.x_curr;
-    covariances(:, i) = diag(kf.P_curr);
-
-    kf.step_filter(measurements(:, i));
-end
+x_estimates = kf.x_hist;
+covariances = kf.P_hist;
 
 p = x_estimates(1:3, :);
 v = x_estimates(4:6, :);
 a = x_estimates(7:9, :);
 e = x_estimates(10:13, :);
 w = x_estimates(14:16, :);
+
+% y = y';
+
+% errors = x_estimates - y;
 
 %% Plot
 

@@ -14,6 +14,10 @@ classdef Kalman_Filter < handle
         P_curr
 
         I
+
+        P_hist
+        x_hist
+
     end
 
     methods
@@ -54,6 +58,20 @@ classdef Kalman_Filter < handle
             [innovation, K] = obj.update(x_pred, y, P_pred);
 
             obj.update_states(x_pred, K, innovation, P_pred);
+        end
+
+        function run_filter(obj, y_all, num_steps)
+
+            obj.x_hist = zeros(numel(obj.x_curr), num_steps);
+            obj.P_hist = zeros(numel(obj.x_curr), numel(obj.x_curr), num_steps);
+            
+            for i=1:num_steps
+                obj.x_hist(:, i) = obj.x_curr;
+                obj.P_hist(:, :, i) = obj.P_curr;
+            
+                obj.step_filter(y_all(:, i));
+            end
+            
         end
     end
 end
