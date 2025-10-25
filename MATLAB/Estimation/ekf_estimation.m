@@ -1,6 +1,6 @@
 clear; clc; close all
 
-num_sec = 20;
+num_sec = 100;
 meas_freq = 20; % Number of measurements per second
 tspan = linspace(0, num_sec, num_sec * meas_freq + 1);
 [t, y, model] = propagate_model('tspan', tspan);
@@ -42,61 +42,49 @@ p_meas = sensor_noise_white(p_p, p_std_dev);
 
 e_meas = sensor_noise_white(e_p, e_std_dev);
 
-measurements = [p_meas, a_meas, e_meas, w_meas]';
+measurements = [p_meas, e_meas, w_meas]';
 
 %% Set up the Kalman Filter
 num_steps = numel(t);
 
 x0 = [
     y(1, 1:6)';
-    0;
-    0;
-    0;
     y(1, 7:13)';
-    0;
-    0;
-    0;
 ];
 
 R = blkdiag( ...
     (p_std_dev^2) * eye(3), ...
-    (a_std_dev^2) * eye(3), ...
     (e_std_dev^2) * eye(4), ...
     (w_std_dev^2) * eye(3)  ...
     );
 
 Q = blkdiag(...
-    1e1 * eye(3),... % P
-    1e6  * eye(3),... % V
-    1e-1 * eye(3),... % a
+    1e-1 * eye(3),... % P
+    1e0 * eye(3),... % V
     1e-3 * eye(3),... % w
-    1e-1 * eye(4),... % e
-    1e2 * eye(3)...  % alpha
+    1e-1 * eye(4) ... % e
     );
 
 P0 = blkdiag( ...
     (p_std_dev^2) * eye(3), ...
     Q(4:6, 4:6), ...
-    (a_std_dev^2) * eye(3), ...
     (e_std_dev^2) * eye(4), ...
-    (w_std_dev^2) * eye(3),  ...
-    Q(17:19, 17:19)...
+    (w_std_dev^2) * eye(3)  ...
     );
 
 %% Run the Kalman Filter
 % The Kalman Filter
 kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
 
-kf.run_filter(measurements, num_steps);
+kf.run_filter(measurements, a_meas', num_steps);
 
 x_estimates = kf.x_hist;
 covariances = kf.P_hist;
 
 p = x_estimates(1:3, :);
 v = x_estimates(4:6, :);
-a = x_estimates(7:9, :);
-e = x_estimates(10:13, :);
-w = x_estimates(14:16, :);
+e = x_estimates(7:10, :);
+w = x_estimates(11:13, :);
 
 % y = y';
 
@@ -184,7 +172,7 @@ V_e_e = zeros(num_steps, 3);
 V_e_r = zeros(num_steps, 3);
 
 for i = 1:num_steps
-    e_e = x_estimates(10:13, i);
+    e_e = x_estimates(7:10, i);
     V_e_e(i, :) = ecef2body_rotm(e_e)' * x_estimates(4:6, i);
 
     e_r = y(i, 7:10);
@@ -217,30 +205,6 @@ clf
 plot(t, vecnorm(v(:, :), 2, 1), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
 plot(t, vecnorm(y(:, 4:6), 2, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Velocity Norm")
-
-figure(6)
-clf
-subplot(3, 1, 1)
-plot(t, a(1, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
-plot(t, a_meas(:, 1), 'DisplayName', 'Measurement', 'LineWidth', 3);
-plot(t, a_p(:, 1), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
-title("ab_0")
-legend
-
-subplot(3, 1, 2)
-plot(t, a(2, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
-plot(t, a_meas(:, 2), 'DisplayName', 'Measurement', 'LineWidth', 3);
-plot(t, a_p(:, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
-title("ab_1")
-legend
-
-subplot(3, 1, 3)
-plot(t, a(3, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
-plot(t, a_meas(:, 3), 'DisplayName', 'Measurement', 'LineWidth', 3);
-plot(t, a_p(:, 3), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
-title("ab_2")
-
-legend
 
 figure(7)
 clf
