@@ -1,24 +1,20 @@
-classdef EKF_No_Dynamics < Extended_Kalman_Filter
+classdef EKF_Basic_Kinematics < EKF_No_Dynamics
     %BASIC_PARACHUTE_KF Summary of this class goes here
     %   Detailed explanation goes here
 
     properties
-
+    J
+    g_vec_e = [0; 0; -9.81]
     end
 
     methods
-        function obj = EKF_No_Dynamics(R, Q, x0, H0, P0, dt)
+        function obj = EKF_Basic_Kinematics(R, Q, x0, H0, P0, dt, J)
 
-            x_inds_ = struct(  ...
-                'P_E', (1:3)', ...
-                'V_B', (4:6)', ...
-                'e',   (7:10)', ...
-                'w_b', (11:13)' ...
-                );
-
-            obj = obj@Extended_Kalman_Filter(R, Q, H0, x0, P0, dt, x_inds_);
+            obj = obj@EKF_No_Dynamics(R, Q, x0, H0, P0, dt);
 
             obj.H = obj.h_jacobian_states();
+
+            obj.J = J;
         end
 
         function P_E_out = get_P_E(obj)
@@ -65,13 +61,14 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
 
             a_b = u(1:3);
 
-            C_EB = ecef2body_rotm(e)'; % Body to ECEF
+            C_BE = ecef2body_rotm(e);
+            C_EB = C_BE'; % Body to ECEF
 
             dP_dt = C_EB * V_b;
-            dV_dt = a_b;
+            dV_dt = C_BE * obj.g_vec_e - cross(w_b, V_b) + a_b;
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
-            dw_dt = [0; 0; 0];
+            dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
 
             dxdt = [dP_dt; dV_dt; de_dt; dw_dt];
         end
@@ -87,6 +84,13 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
 
             w_b = obj.get_w_b();
             w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
+
+            % Why does this work????
+            g = -obj.g_vec_e(3);
+
+            J11 = obj.J(1,1);
+            J22 = obj.J(2,2);
+            J33 = obj.J(3,3);
 
             dx0dx = [
                 zeros(3,1);
@@ -136,26 +140,50 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
             dx3dx = [
                 zeros(3, 1);
                 0;
+                -w2;
+                w1;
+
+                -2*e2*g;
+                2*e3*g;
+                -2*e0*g;
+                2*e1*g;
+
                 0;
-                0;
-                zeros(7, 1);
+                v2;
+                -v1
             ]';
 
             dx4dx = [
-                zeros(3, 1);
+              zeros(3, 1);
+                w2;
                 0;
+                -w0;
+
+                2*e1*g;
+                2*e0*g;
+                2*e3*g;
+                2*e2*g;
+
+                -v2;
                 0;
-                0;
-                zeros(7, 1);
+                v0;
             ]';
 
 
             dx5dx = [
                 zeros(3, 1);
+                -w1;
+                w0;
+                0
+
+                2*e0*g;
+                -2*e1*g;
+                -2*e2*g;
+                2*e3*g;
+
+                v1;
+                -v0;
                 0;
-                0;
-                0;
-                zeros(7, 1);
             ]';
 
             dx6dx = [
@@ -213,21 +241,21 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
             dx10dx = [
                 zeros(10, 1);
                 0;
-                0;
-                0;
+                w2 * (J22 - J33) / J11;
+                w1 * (J22 - J33) / J11;
             ]';
 
             dx11dx = [
                 zeros(10, 1);
+                w2 * (J33 - J11) / J22
                 0;
-                0;
-                0;
+                w0 * (J33 - J11) / J22
             ]';
 
             dx12dx = [
                 zeros(10, 1);
-                0;
-                0;
+                w1 * (J11 - J22) / J33;
+                w0 * (J11 - J22) / J33;
                 0;
             ]';
 

@@ -16,7 +16,6 @@ classdef Extended_Kalman_Filter < Kalman_Filter
             obj.x_inds = x_inds;
 
             obj.dt = dt;
-            obj.F = obj.f_jacobian_states([0; 0; 0]);
         end            
 
         function predict(obj, u)
@@ -48,21 +47,23 @@ classdef Extended_Kalman_Filter < Kalman_Filter
             obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*obj.R*K'; % Update covariance            
         end
 
-        function step_filter(obj, y, u)
+        function innovation = step_filter(obj, y, u)
             obj.predict(u);
-            obj.update(y);
+            innovation = obj.update(y);
         end
 
         function run_filter(obj, y_all, u_all, num_steps)
 
             obj.x_hist = zeros(numel(obj.x_curr), num_steps);
             obj.P_hist = zeros(numel(obj.x_curr), numel(obj.x_curr), num_steps);
+            obj.inno_hist = zeros(size(y_all));
             
             for i=1:num_steps
                 obj.x_hist(:, i) = obj.x_curr;
                 obj.P_hist(:, :, i) = obj.P_curr;
             
-                obj.step_filter(y_all(:, i), u_all(:, i));
+                innovation = obj.step_filter(y_all(:, i), u_all(:, i));
+                obj.inno_hist(:, i) = innovation;
             end
             
         end

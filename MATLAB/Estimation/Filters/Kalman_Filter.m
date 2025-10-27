@@ -18,6 +18,8 @@ classdef Kalman_Filter < handle
         P_hist
         x_hist
 
+        inno_hist
+
     end
 
     methods

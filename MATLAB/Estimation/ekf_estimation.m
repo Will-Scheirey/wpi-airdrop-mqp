@@ -1,9 +1,9 @@
 clear; clc; close all
 
-num_sec = 100;
+num_sec = 20;
 meas_freq = 20; % Number of measurements per second
 tspan = linspace(0, num_sec, num_sec * meas_freq + 1);
-[t, y, model] = propagate_model('tspan', tspan);
+[t, y, model] = propagate_model('tspan', tspan, 'riser', true);
 x_actual = y(1:end-1, :);
 
 model_inds = struct(...
@@ -23,10 +23,10 @@ a_std_dev = sensor.accel_std_dev;
 w_std_dev = sensor.gyro_std_dev;
 e_std_dev = sensor.mag_std_dev;
 
-% a_corr = correct_meas_accel(a_actual, w_actual, e_actual, alpha_actual);
-% a_meas = sensor_noise_white(a_corr, a_std_dev);
+a_corr = correct_meas_accel(a_actual, w_actual, e_actual, alpha_actual);
+a_meas = sensor_noise_white(a_corr, a_std_dev);
 
-a_meas = sensor_noise_white(a_actual, a_std_dev);
+% a_meas = sensor_noise_white(a_actual, a_std_dev);
 
 w_meas = sensor_noise_white(w_actual, w_std_dev);
 
@@ -39,10 +39,7 @@ measurements = [p_meas, e_meas, w_meas]';
 %% Set up the Kalman Filter
 num_steps = numel(t);
 
-x0 = [
-    y(1, 1:6)';
-    y(1, 7:13)';
-];
+x0 = y(1, 1:13)';
 
 R = blkdiag( ...
     (p_std_dev^2) * eye(3), ...
@@ -51,22 +48,23 @@ R = blkdiag( ...
     );
 
 Q = blkdiag(...
-    1e-1 * eye(3),... % P
-    1e0 * eye(3),... % V
-    1e-3 * eye(3),... % w
-    1e-1 * eye(4) ... % e
+    1e0 * eye(3),... % P
+    1e5 * eye(3),... % V
+    1e0 * eye(4), ... % e
+    1e0 * eye(3)... % w
     );
 
 P0 = blkdiag( ...
-    (p_std_dev^2) * eye(3), ...
-    Q(4:6, 4:6), ...
-    (e_std_dev^2) * eye(4), ...
-    (w_std_dev^2) * eye(3)  ...
+    1e1 * eye(3), ...
+    1e1 * eye(3), ...
+    1e1 * eye(4), ...
+    1e1 * eye(3)  ...
     );
 
 %% Run the Kalman Filter
 % The Kalman Filter
-kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
+kf = EKF_Basic_Kinematics(R, Q, x0, 0, P0, t(2) - t(1), model.payload.I());
+% kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
 
 kf.run_filter(measurements, a_meas', num_steps);
 
@@ -90,10 +88,10 @@ p_err = p_est - p_truth;
 v_err = v_est - v_truth;
 e_err = e_est - e_truth;
 w_err = w_est - w_truth;
+
 x_err = [p_err, v_err, e_err, w_err];
 
 t_plot = t(1:end-1);
-
 
 %% Plot Values
 figure(1)
@@ -128,7 +126,7 @@ xlabel("Time (s)")
 ylabel("Error (rad/s)")
 title("Body Angular Velocity Error vs. Time")
 
-state_idx = 1;
+state_idx = 3;
 
 figure(5)
 clf
@@ -140,11 +138,19 @@ function plot_cov(err, cov, t)
     plot(t, -sqrt(cov), '--r', 'LineWidth', 1, 'HandleVisibility', 'off');
 end
 
-% return
 figure(6)
 clf
-plot3(p_est(:, 1), p_est(:, 2), p_est(:, 3), 'DisplayName', 'Estimated', 'LineWidth', 1.5); hold on
-plot3(p_actual(:, 1), p_actual(:, 2), p_actual(:, 3), 'DisplayName', 'Actual', 'LineWidth', 1.5);
+plot(t_plot, v_est(:, 1)); hold on
+plot(t_plot, v_truth(:, 1))
+
+figure(7)
+plot(kf.inno_hist(1, :))
+
+return
+figure(6)
+clf
+plot3(p_est(:, 1), p_est(:, 2), p_est(:, 3), '.b', 'DisplayName', 'Estimated', 'LineWidth', 1.5); hold on
+plot3(p_actual(:, 1), p_actual(:, 2), p_actual(:, 3), '.r', 'DisplayName', 'Actual', 'LineWidth', 1.5);
 
 
 legend
