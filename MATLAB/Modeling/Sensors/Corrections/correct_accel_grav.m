@@ -8,6 +8,7 @@ function accel_out = correct_accel_grav(accel_list, e_list)
 
     for i = 1:num_steps
         C_BE = ecef2body_rotm(e_list(i, :)');
+        
         g_b = C_BE * g_e;
 
         accel_out(i, :) = accel_list(i, :) - g_b';

@@ -62,9 +62,8 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             a_b = u(1:3);
 
             C_BE = ecef2body_rotm(e);
-            C_EB = C_BE'; % Body to ECEF
 
-            dP_dt = C_EB * V_b;
+            dP_dt = C_BE' * V_b;
             dV_dt = C_BE * obj.g_vec_e - cross(w_b, V_b) + a_b;
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
@@ -85,7 +84,6 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             w_b = obj.get_w_b();
             w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
 
-            % Why does this work????
             g = -obj.g_vec_e(3);
 
             J11 = obj.J(1,1);

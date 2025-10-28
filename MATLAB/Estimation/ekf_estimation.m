@@ -1,6 +1,6 @@
 clear; clc; close all
 
-num_sec = 20;
+num_sec = 100;
 meas_freq = 20; % Number of measurements per second
 tspan = linspace(0, num_sec, num_sec * meas_freq + 1);
 [t, y, model] = propagate_model('tspan', tspan, 'riser', true);
@@ -23,10 +23,8 @@ a_std_dev = sensor.accel_std_dev;
 w_std_dev = sensor.gyro_std_dev;
 e_std_dev = sensor.mag_std_dev;
 
-a_corr = correct_meas_accel(a_actual, w_actual, e_actual, alpha_actual);
+a_corr = correct_meas_accel(a_actual, v_actual, w_actual, e_actual, alpha_actual);
 a_meas = sensor_noise_white(a_corr, a_std_dev);
-
-% a_meas = sensor_noise_white(a_actual, a_std_dev);
 
 w_meas = sensor_noise_white(w_actual, w_std_dev);
 
@@ -47,18 +45,30 @@ R = blkdiag( ...
     (w_std_dev^2) * eye(3)  ...
     );
 
+Q_P = [
+    1e-1, 0,    0;
+    0,    1e-1, 0;
+    0,    0,    1e-1
+];
+
+Q_V = [
+    1e-3, 0,    0;
+    0,    1e-3, 0;
+    0,    0,    1e-3
+];
+
 Q = blkdiag(...
-    1e0 * eye(3),... % P
-    1e5 * eye(3),... % V
-    1e0 * eye(4), ... % e
-    1e0 * eye(3)... % w
+    Q_P,... % P
+    Q_V,... % V
+    1e-3 * eye(4), ... % e
+    1e-1 * eye(3)... % w
     );
 
 P0 = blkdiag( ...
-    1e1 * eye(3), ...
-    1e1 * eye(3), ...
-    1e1 * eye(4), ...
-    1e1 * eye(3)  ...
+    1e-3 * eye(3), ...
+    1e-3 * eye(3), ...
+    1e-3 * eye(4), ...
+    1e-3 * eye(3)  ...
     );
 
 %% Run the Kalman Filter
@@ -140,11 +150,9 @@ end
 
 figure(6)
 clf
-plot(t_plot, v_est(:, 1)); hold on
-plot(t_plot, v_truth(:, 1))
-
-figure(7)
-plot(kf.inno_hist(1, :))
+plot(t_plot, p_est(:, 3), 'DisplayName', 'Estimate'); hold on
+plot(t_plot, p_truth(:, 3), 'DisplayName', 'Actual')
+legend
 
 return
 figure(6)
@@ -231,8 +239,8 @@ for i = 1:num_steps
     e_e = e_est(:, i);
     V_e_e(i, :) = ecef2body_rotm(e_e)' * v_est(:, i);
 
-    e_r = e_actual(i, :);
-    V_e_r(i, :) = ecef2body_rotm(e_r)' * v_actual(i, :)';
+    e_r = e_truth(i, :);
+    V_e_r(i, :) = ecef2body_rotm(e_r)' * v_truth(i, :)';
 end
 
 figure(4)

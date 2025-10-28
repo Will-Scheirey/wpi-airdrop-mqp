@@ -60,10 +60,10 @@ classdef Extended_Kalman_Filter < Kalman_Filter
             
             for i=1:num_steps
                 obj.x_hist(:, i) = obj.x_curr;
-                obj.P_hist(:, :, i) = obj.P_curr;
             
                 innovation = obj.step_filter(y_all(:, i), u_all(:, i));
                 obj.inno_hist(:, i) = innovation;
+                obj.P_hist(:, :, i) = obj.P_curr;
             end
             
         end
