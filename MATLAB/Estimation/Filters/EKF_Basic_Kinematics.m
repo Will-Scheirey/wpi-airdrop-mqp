@@ -5,16 +5,21 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
     properties
     J
     g_vec_e = [0; 0; -9.81]
+    tau_d
     end
 
     methods
-        function obj = EKF_Basic_Kinematics(R, Q, x0, H0, P0, dt, J)
+        function obj = EKF_Basic_Kinematics(R, Q, x0, H0, P0, dt, J, tau_d)
 
             obj = obj@EKF_No_Dynamics(R, Q, x0, H0, P0, dt);
 
             obj.H = obj.h_jacobian_states();
 
             obj.J = J;
+
+            obj.x_inds.d_a = 14:16;
+
+            obj.tau_d = tau_d;
         end
 
         function P_E_out = get_P_E(obj)
@@ -31,6 +36,10 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
 
         function w_b_out = get_w_b(obj)
             w_b_out  = obj.x_curr(obj.x_inds.w_b);
+        end
+
+        function d_a_out = get_d_a(obj)
+            d_a_out = obj.x_curr(obj.x_inds.d_a);
         end
 
         function normalize_quat(obj)
@@ -58,18 +67,21 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             V_b = obj.get_V_B();
             e   = obj.get_e();
             w_b = obj.get_w_b();
+            d_a = obj.get_d_a();
 
             a_b = u(1:3);
 
             C_BE = ecef2body_rotm(e);
 
             dP_dt = C_BE' * V_b;
-            dV_dt = C_BE * obj.g_vec_e - cross(w_b, V_b) + a_b;
+            dV_dt = a_b + d_a + C_BE * obj.g_vec_e - cross(w_b, V_b);
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
             dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
 
-            dxdt = [dP_dt; dV_dt; de_dt; dw_dt];
+            dd_dt = -(1/obj.tau_d) * d_a;
+
+            dxdt = [dP_dt; dV_dt; de_dt; dw_dt; dd_dt];
         end
 
         function dfdx = f_jacobian_states(obj, u)
@@ -97,12 +109,12 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 2*(e1*e2 - e0*e3);
                 2*(e1*e3 + e0*e2);
 
-                 2*e0*v0 - 2*e3*v1 + 2*e2*v2;
-                 2*e1*v0 + 2*e2*v1 + 2*e3*v2;
+                2*e0*v0 - 2*e3*v1 + 2*e2*v2;
+                2*e1*v0 + 2*e2*v1 + 2*e3*v2;
                 -2*e2*v0 + 2*e1*v1 + 2*e0*v2;
                 -2*e3*v0 - 2*e0*v1 + 2*e1*v2;
 
-                zeros(3,1)
+                zeros(6,1)
                 ]';
 
             dx1dx = [
@@ -117,7 +129,7 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 -2*e1*v0 + 2*e2*v1 + 2*e3*v2;
                 -2*e0*v0 - 2*e3*v1 + 2*e2*v2;
 
-                zeros(3,1)
+                zeros(6,1)
                 ]';
 
             dx2dx = [
@@ -128,11 +140,11 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 e0^2 - e1^2 - e2^2 + e3^2;
 
                 -2*e2*v0 + 2*e1*v1 + 2*e0*v2;
-                 2*e3*v0 + 2*e0*v1 - 2*e1*v2;
+                2*e3*v0 + 2*e0*v1 - 2*e1*v2;
                 -2*e0*v0 + 2*e3*v1 - 2*e2*v2;
-                 2*e1*v0 - 2*e2*v1 + 2*e3*v2;
+                2*e1*v0 - 2*e2*v1 + 2*e3*v2;
 
-                zeros(3,1)
+                zeros(6,1)
                 ]';
 
             dx3dx = [
@@ -148,11 +160,15 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
 
                 0;
                 v2;
-                -v1
-            ]';
+                -v1;
+
+                1;
+                0;
+                0
+                ]';
 
             dx4dx = [
-              zeros(3, 1);
+                zeros(3, 1);
                 w2;
                 0;
                 -w0;
@@ -165,7 +181,11 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 -v2;
                 0;
                 v0;
-            ]';
+
+                0;
+                1;
+                0;
+                ]';
 
 
             dx5dx = [
@@ -182,12 +202,16 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 v1;
                 -v0;
                 0;
-            ]';
+
+                0;
+                0;
+                1;
+                ]';
 
             dx6dx = [
                 zeros(6, 1);
 
-                 0;
+                0;
                 -1/2*w0;
                 -1/2*w1;
                 -1/2*w2;
@@ -195,67 +219,101 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 -1/2*e1;
                 -1/2*e2;
                 -1/2*e3;
-            ]';
+
+                zeros(3,1);
+                ]';
 
             dx7dx = [
                 zeros(6, 1);
 
-                 1/2*w0;
-                 0;
-                 1/2*w2;
+                1/2*w0;
+                0;
+                1/2*w2;
                 -1/2*w1;
 
-                 1/2*e0;
+                1/2*e0;
                 -1/2*e3;
-                 1/2*e2;
-            ]';
+                1/2*e2;
+
+                zeros(3,1);
+                ]';
 
             dx8dx = [
                 zeros(6, 1);
 
-                 1/2*w1;
+                1/2*w1;
                 -1/2*w2;
-                 0;
-                 1/2*w0;
+                0;
+                1/2*w0;
 
-                 1/2*e3;
-                 1/2*e0;
+                1/2*e3;
+                1/2*e0;
                 -1/2*e1;
+
+                zeros(3,1);
                 ]';
 
             dx9dx = [
                 zeros(6, 1);
 
-                 1/2*w2;
-                 1/2*w1;
+                1/2*w2;
+                1/2*w1;
                 -1/2*w0;
-                 0;
+                0;
 
                 -1/2*e2;
-                 1/2*e1;
-                 1/2*e0;
-            ]';
+                1/2*e1;
+                1/2*e0;
+
+                zeros(3,1);
+                ]';
 
             dx10dx = [
                 zeros(10, 1);
                 0;
                 w2 * (J22 - J33) / J11;
                 w1 * (J22 - J33) / J11;
-            ]';
+
+                zeros(3,1);
+                ]';
 
             dx11dx = [
                 zeros(10, 1);
-                w2 * (J33 - J11) / J22
+                w2 * (J33 - J11) / J22;
                 0;
-                w0 * (J33 - J11) / J22
-            ]';
+                w0 * (J33 - J11) / J22;
+
+                zeros(3,1);
+                ]';
 
             dx12dx = [
                 zeros(10, 1);
                 w1 * (J11 - J22) / J33;
                 w0 * (J11 - J22) / J33;
                 0;
-            ]';
+
+                zeros(3,1);
+                ]';
+
+            dx13dx = [
+                zeros(13,1);
+                -1/obj.tau_d;
+                0;
+                0
+                ]';
+
+            dx14dx = [
+                zeros(13,1);
+                0;
+                -1/obj.tau_d;
+                0
+                ]';
+
+            dx15dx = [zeros(13,1);
+                0;
+                0;
+                -1/obj.tau_d
+                ]';
 
             dfdx = [
               dx0dx;
@@ -271,23 +329,26 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
               dx10dx;
               dx11dx;
               dx12dx;
+              dx13dx;
+              dx14dx;
+              dx15dx;
             ];
         end
 
         function dhdx = h_jacobian_states(~)
             dhdx = [
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
 
-                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0;
 
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
                 ];
         end
 

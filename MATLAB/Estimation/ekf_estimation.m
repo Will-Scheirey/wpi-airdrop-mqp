@@ -6,12 +6,6 @@ tspan = linspace(0, num_sec, num_sec * meas_freq + 1);
 [t, y, model] = propagate_model('tspan', tspan, 'riser', true);
 x_actual = y(1:end-1, :);
 
-model_inds = struct(...
-    'p', 1:3,...
-    'v', 4:6,...
-    'e', 7:10 ...
-    );
-
 %% Extract Model Properties
 
 [p_actual, v_actual, a_actual, e_actual, w_actual, alpha_actual] = get_model_property(t, y, model, 'P_p', 'V_p', 'a_p_curr', 'e_p', 'w_p', 'alpha_p_curr');
@@ -37,7 +31,13 @@ measurements = [p_meas, e_meas, w_meas]';
 %% Set up the Kalman Filter
 num_steps = numel(t);
 
-x0 = y(1, 1:13)';
+x0 = [
+    y(1, 1:13)';
+    zeros(3, 1)
+    ];
+
+tau_d   = 0.7e1;
+sigma_d = 5e1;
 
 R = blkdiag( ...
     (p_std_dev^2) * eye(3), ...
@@ -45,35 +45,26 @@ R = blkdiag( ...
     (w_std_dev^2) * eye(3)  ...
     );
 
-Q_P = [
-    1e-1, 0,    0;
-    0,    1e-1, 0;
-    0,    0,    1e-1
-];
-
-Q_V = [
-    1e-3, 0,    0;
-    0,    1e-3, 0;
-    0,    0,    1e-3
-];
-
 Q = blkdiag(...
-    Q_P,... % P
-    Q_V,... % V
+    1e0 * eye(3),... % P
+    6e-2 * eye(3),... % V
     1e-3 * eye(4), ... % e
-    1e-1 * eye(3)... % w
+    1e-1 * eye(3),... % w
+    sigma_d^2 * eye(3) ...
     );
 
 P0 = blkdiag( ...
     1e-3 * eye(3), ...
     1e-3 * eye(3), ...
     1e-3 * eye(4), ...
-    1e-3 * eye(3)  ...
+    1e-3 * eye(3), ...
+    sigma_d^2 * eye(3) ...
     );
 
 %% Run the Kalman Filter
 % The Kalman Filter
-kf = EKF_Basic_Kinematics(R, Q, x0, 0, P0, t(2) - t(1), model.payload.I());
+dt = t(2) - t(1);
+kf = EKF_Basic_Kinematics(R, Q, x0, 0, P0, dt, model.payload.I(), tau_d);
 % kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
 
 kf.run_filter(measurements, a_meas', num_steps);
@@ -120,6 +111,17 @@ xlabel("Time (s)")
 ylabel("Error (m/s)")
 title("Body Velocity Error vs. Time")
 
+V_e_est = zeros(num_steps-1, 3);
+V_e_truth = zeros(num_steps-1, 3);
+
+for i = 1:num_steps-1
+    e_e = e_est(i, :);
+    V_e_est(i, :) = ecef2body_rotm(e_e)' * v_est(i, :)';
+
+    e_r = e_truth(i, :);
+    V_e_truth(i, :) = ecef2body_rotm(e_r)' * v_truth(i, :)';
+end
+
 figure(3)
 clf
 plot(t_plot, e_err, 'LineWidth', 2)
@@ -136,7 +138,7 @@ xlabel("Time (s)")
 ylabel("Error (rad/s)")
 title("Body Angular Velocity Error vs. Time")
 
-state_idx = 3;
+state_idx = 6;
 
 figure(5)
 clf
@@ -205,6 +207,7 @@ title("Vb_2")
 
 legend
 
+return
 figure(3)
 
 clf
@@ -231,17 +234,6 @@ plot(t, e_actual(:, 4), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':
 title("e_3")
 
 legend
-
-V_e_e = zeros(num_steps, 3);
-V_e_r = zeros(num_steps, 3);
-
-for i = 1:num_steps
-    e_e = e_est(:, i);
-    V_e_e(i, :) = ecef2body_rotm(e_e)' * v_est(:, i);
-
-    e_r = e_truth(i, :);
-    V_e_r(i, :) = ecef2body_rotm(e_r)' * v_truth(i, :)';
-end
 
 figure(4)
 clf
