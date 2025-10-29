@@ -97,13 +97,13 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'tspan')
         tspan = NameValueArgs.tspan;
     else
-        tspan = linspace(0, 1000, 50000);
+        tspan = linspace(0, 100, 200);
     end
 
     if isfield(NameValueArgs, 'model')
         model = NameValueArgs.model;
     else
-        model = @Parachute_Model_Simple;
+        model = @Parachute_Model_Wind;
     end
 
     model_obj = model(payload, parachute, x0);
