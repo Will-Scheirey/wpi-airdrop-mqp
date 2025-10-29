@@ -1,6 +1,7 @@
 clear; clc; close all;
 
-[t, y, model] = propagate_model();
+[t, y, model] = propagate_model('tspan');
+
 
 
 % %% Send to FlightGear

@@ -35,7 +35,7 @@ classdef Box < Rigid_Body
             end
         end
 
-        function S_out = S(obj, aoa); S_out = obj.l * obj.w * abs(cos(aoa)); end
+        function S_out = S(obj, aoa); S_out = obj.l * obj.w; end
         function Cd_out = Cd(obj, ~); Cd_out = obj.Cd_0; end
     end
 end

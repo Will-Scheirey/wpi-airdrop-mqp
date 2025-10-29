@@ -7,6 +7,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         NameValueArgs.x0
         NameValueArgs.tspan
         NameValueArgs.model
+        NameValueArgs.riser
     end
 
     if isfield(NameValueArgs, 'use_drag')
@@ -43,8 +44,19 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         canopy_mass = 2;         % [kg]
         
         riser_length = 10;       % [m] (resting riser length)
-        riser_k = 10000;         % [N/m]       Riser stiffness
-        riser_c = 1000;          % [kg s^-1]   Riser damping coefficient
+
+        if isfield(NameValueArgs, 'riser')
+            if NameValueArgs.riser
+                riser_k = 10000;         % [N/m]       Riser stiffness
+                riser_c = 1000;          % [kg s^-1]   Riser damping coefficient
+            else
+                riser_k = 0;
+                riser_c = 0;
+            end
+        else
+            riser_k = 10000;         % [N/m]       Riser stiffness
+            riser_c = 1000;          % [kg s^-1]   Riser damping coefficient
+        end
         
         canopy_efficiency = 1;   % []
         canopy_porosity =   0.2; % []
@@ -69,13 +81,13 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     else
         % --- Payload ---
         P0   = [0; 0; 3000];              % ENU position      [m]
-        V_p0 = [300; 0; 0];                % ENU velocity      [m   s^-1]
+        V_p0 = [300; 0; 0] * 0;                % ENU velocity      [m   s^-1]
         e_p0 = eul2quat([0, 0, 0])'; % Orientation
         w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
         
         % --- Parachute ---
         P0_c = P0 + [0; 2; 10];           % ENU Position      [m]
-        V_c0 = [280; 0; 0];                % ENU velocity      [m   s^-1]
+        V_c0 = [280; 0; 0] * 0;                % ENU velocity      [m   s^-1]
         e_c0 = eul2quat([0, 0, 0])';  % Orientation
         w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
         

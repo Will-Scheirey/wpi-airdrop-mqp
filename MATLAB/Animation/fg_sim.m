@@ -28,31 +28,9 @@ setenv('FG_ROOT', '/Applications/FlightGear.app/Contents/Resources/data');
 h.OutputFileName = 'runfg.sh';
 
 get(h)
-
-GenerateRunScript(h)
-
-% --- Patch the launcher to use the correct executable and FG_ROOT ---
-fid = fopen('runfg.sh','r');
-txt = fread(fid,'*char')';
-fclose(fid);
-
-% Replace the broken fgfs line with the correct one
-txt = regexprep(txt, '\./\.\./MacOS/fgfs', ...
-    '/Applications/FlightGear.app/Contents/MacOS/FlightGear');
-
-% Add FG_ROOT if it isn't already there
-if ~contains(txt, 'export FG_ROOT')
-    txt = sprintf('#!/bin/zsh\nexport FG_ROOT="/Applications/FlightGear.app/Contents/Resources/data"\n%s', txt);
-end
-
-fid = fopen('runfg.sh','w');
-fwrite(fid, txt);
-fclose(fid);
-
-% --------------------------------------------------------------
-
-% system('bash runfg.sh &');
-pause(5);
-play(h);
+% 
+% GenerateRunScript(h)
+% 
+% system('runfg.bat &');
 
 end
