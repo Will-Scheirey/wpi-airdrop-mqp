@@ -17,6 +17,7 @@ classdef Kalman_Filter < handle
 
         P_hist
         x_hist
+        S_hist
 
         inno_hist
 
@@ -40,11 +41,14 @@ classdef Kalman_Filter < handle
             P_pred = obj.F * obj.P_curr * obj.F' + obj.Q; % Covariance prediction
         end
 
-        function [innovation, K] = update(obj, x_pred, y, P_pred)
+        function [innovation, K, S] = update(obj, x_pred, y, P_pred)
             % Update Step
             y_pred = obj.H * x_pred; % Measurement prediction
             innovation = y - y_pred; % Innovation
-            K = P_pred * obj.H' / (obj.H * P_pred * obj.H' + obj.R); % Kalman Gain
+
+            S = obj.R + obj.H*P_pred*obj.H';
+
+            K = P_pred * obj.H' / S; % Kalman Gain
         end
 
         function update_states(obj, x_pred, K, innovation, P_pred)
