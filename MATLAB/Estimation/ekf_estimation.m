@@ -1,7 +1,7 @@
 clear; clc; close all
 
 num_sec = 100;
-meas_freq = 100; % Number of measurements per second
+meas_freq = 20; % Number of measurements per second
 tspan = linspace(0, num_sec, num_sec * meas_freq + 1);
 [t, y, model] = propagate_model('tspan', tspan, 'riser', true);
 x_actual = y(1:end-1, :);
