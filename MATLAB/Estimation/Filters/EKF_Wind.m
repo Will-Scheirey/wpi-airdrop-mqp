@@ -25,12 +25,12 @@ classdef EKF_Wind < EKF_Basic_Kinematics
             C_BE = ecef2body_rotm(e);
 
             dP_dt = C_BE' * V_b;
-            dV_dt = a_b + d_a + C_BE * obj.g_vec_e - cross(w_b, V_b);
+            dV_dt = a_b + C_BE * obj.g_vec_e - cross(w_b, V_b);
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
             dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
 
-            dd_dt = -(1/obj.tau_d) * d_a;
+            dd_dt = -(1./obj.tau_d) .* d_a;
 
             dxdt = [dP_dt; dV_dt; de_dt; dw_dt; dd_dt; 0; 0];
         end
@@ -119,7 +119,7 @@ classdef EKF_Wind < EKF_Basic_Kinematics
                 v2;
                 -v1;
 
-                1;
+                0;
                 0;
                 0;
                 0;
@@ -142,7 +142,7 @@ classdef EKF_Wind < EKF_Basic_Kinematics
                 v0;
 
                 0;
-                1;
+                0;
                 0;
                 0;
                 0
@@ -166,7 +166,7 @@ classdef EKF_Wind < EKF_Basic_Kinematics
 
                 0;
                 0;
-                1;
+                0;
                 0;
                 0
                 ]';
@@ -274,7 +274,7 @@ classdef EKF_Wind < EKF_Basic_Kinematics
 
             dx13dx = [
                 zeros(13,1);
-                -1/obj.tau_d;
+                -1/obj.tau_d(1);
                 0;
                 0;
                 0;
@@ -284,7 +284,7 @@ classdef EKF_Wind < EKF_Basic_Kinematics
             dx14dx = [
                 zeros(13,1);
                 0;
-                -1/obj.tau_d;
+                -1/obj.tau_d(2);
                 0;
                 0;
                 0
@@ -293,7 +293,7 @@ classdef EKF_Wind < EKF_Basic_Kinematics
             dx15dx = [zeros(13,1);
                 0;
                 0;
-                -1/obj.tau_d;
+                -1/obj.tau_d(3);
                 0;
                 0
                 ]';
@@ -348,8 +348,7 @@ classdef EKF_Wind < EKF_Basic_Kinematics
 
                 (2*(2*e0*v2 + 2*e1*v1 - 2*e2*v0)*(v0*e0^2 + 2*v2*e0*e2 - 2*v1*e0*e3 + v0*e1^2 + 2*v1*e1*e2 + 2*v2*e1*e3 - v0*e2^2 - v0*e3^2) + 2*(2*e1*v0 + 2*e2*v1 + 2*e3*v2)*(v1*e0^2 - 2*v2*e0*e1 + 2*v0*e0*e3 - v1*e1^2 + 2*v0*e1*e2 + v1*e2^2 + 2*v2*e2*e3 - v1*e3^2))/(2*((v0*e0^2 + 2*v2*e0*e2 - 2*v1*e0*e3 + v0*e1^2 + 2*v1*e1*e2 + 2*v2*e1*e3 - v0*e2^2 - v0*e3^2)^2 + (v1*e0^2 - 2*v2*e0*e1 + 2*v0*e0*e3 - v1*e1^2 + 2*v0*e1*e2 + v1*e2^2 + 2*v2*e2*e3 - v1*e3^2)^2)^(1/2));
 
-                -(2*(2*e0*v1 - 2*e1*v2 + 2*e3*v0)*(v0*e0^2 + 2*v2*e0*e2 - 2*v1*e0*e3 + v0*e1^2 + 2*v1*e1*e2 + 2*v2*e1*e3 - v0*e2^2 - v0*e3^2) - 2*(2*e0*v0 + 2*e2*v2 - 2*e3*v1)*(v1*e0^2 - 2*v2*e0*e1 + 2*v0*e0*e3 - v1*e1^2 + 2*v0*e1*e2 + v1*e2^2 + 2*v2*e2*e3 - v1*e3^2))/(2*((v0*e0^2 + 2*v2*e0*e2 - 2*v1*e0*e3 + v0*e1^2 + 2*v1*e1*e2 + 2*v2*e1*e3 - v0*e2^2 - v0*e3^2)^2 + (v1*e0^2 - 2*v2*e0*e1 + 2*v0*e0*e3 - v1*e1^2 + 2*v0*e1*e2 + v1*e2^2 + 2*v2*e2*e3 - v1*e3^2)^2)^(1/2))
-                ];
+                -(2*(2*e0*v1 - 2*e1*v2 + 2*e3*v0)*(v0*e0^2 + 2*v2*e0*e2 - 2*v1*e0*e3 + v0*e1^2 + 2*v1*e1*e2 + 2*v2*e1*e3 - v0*e2^2 - v0*e3^2) - 2*(2*e0*v0 + 2*e2*v2 - 2*e3*v1)*(v1*e0^2 - 2*v2*e0*e1 + 2*v0*e0*e3 - v1*e1^2 + 2*v0*e1*e2 + v1*e2^2 + 2*v2*e2*e3 - v1*e3^2))/(2*((v0*e0^2 + 2*v2*e0*e2 - 2*v1*e0*e3 + v0*e1^2 + 2*v1*e1*e2 + 2*v2*e1*e3 - v0*e2^2 - v0*e3^2)^2 + (v1*e0^2 - 2*v2*e0*e1 + 2*v0*e0*e3 - v1*e1^2 + 2*v0*e1*e2 + v1*e2^2 + 2*v2*e2*e3 - v1*e3^2)^2)^(1/2))                ];
 
             dvgdx = dvgdx';
         end
