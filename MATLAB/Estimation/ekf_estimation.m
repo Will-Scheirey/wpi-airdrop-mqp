@@ -8,7 +8,7 @@ x_actual = y(1:end-1, :);
 
 %% Extract Model Properties
 
-[p_actual, v_actual, a_actual, e_actual, w_actual, alpha_actual] = get_model_property(t, y, model, 'P_p', 'V_p', 'a_p_curr', 'e_p', 'w_p', 'alpha_p_curr');
+[p_actual, v_g_actual, a_actual, e_actual, w_actual, alpha_actual] = get_model_property(t, y, model, 'P_p', 'V_p', 'a_p_curr', 'e_p', 'w_p', 'alpha_p_curr');
 
 %% Create Sensor Measurements
 sensor = Sensor_FlySight(meas_freq);
@@ -16,8 +16,9 @@ p_std_dev = sensor.gps_std_dev;
 a_std_dev = sensor.accel_std_dev;
 w_std_dev = sensor.gyro_std_dev;
 e_std_dev = sensor.mag_std_dev;
+v_g_std_dev = sensor.grnd_vel_std_dev;
 
-a_corr = correct_meas_accel(a_actual, v_actual, w_actual, e_actual, alpha_actual);
+a_corr = correct_meas_accel(a_actual, v_g_actual, w_actual, e_actual, alpha_actual);
 a_meas = sensor_noise_white(a_corr, a_std_dev);
 
 w_meas = sensor_noise_white(w_actual, w_std_dev);
@@ -26,14 +27,19 @@ p_meas = sensor_noise_white(p_actual, p_std_dev);
 
 e_meas = sensor_noise_white(e_actual, e_std_dev);
 
-measurements = [p_meas, e_meas, w_meas]';
+v_g_mag_actual = vecnorm(v_g_actual(:, 1:2), 2, 2);
+v_g_mag_meas = sensor_noise_white(v_g_mag_actual, v_g_std_dev);
+
+measurements = [p_meas, e_meas, w_meas, v_g_mag_meas]';
 
 %% Set up the Kalman Filter
 num_steps = numel(t);
 
 x0 = [
     y(1, 1:13)';
-    zeros(3, 1)
+    zeros(3, 1);
+    0;
+    0
     ];
 
 tau_d   = 0.7e1;
@@ -42,7 +48,8 @@ sigma_d = 5e1;
 R = blkdiag( ...
     (p_std_dev^2) * eye(3), ...
     (e_std_dev^2) * eye(4), ...
-    (w_std_dev^2) * eye(3)  ...
+    (w_std_dev^2) * eye(3),  ...
+    (v_g_std_dev^2) ...
     );
 
 Q = blkdiag(...
@@ -50,7 +57,8 @@ Q = blkdiag(...
     6e-2 * eye(3),... % V
     1e-3 * eye(4), ... % e
     1e-1 * eye(3),... % w
-    sigma_d^2 * eye(3) ...
+    sigma_d^2 * eye(3), ...
+    10^2 * eye(2)...
     );
 
 P0 = blkdiag( ...
@@ -58,13 +66,14 @@ P0 = blkdiag( ...
     1e-3 * eye(3), ...
     1e-3 * eye(4), ...
     1e-3 * eye(3), ...
-    sigma_d^2 * eye(3) ...
+    sigma_d^2 * eye(3), ...
+    10^2 * eye(2)...
     );
 
 %% Run the Kalman Filter
 % The Kalman Filter
 dt = t(2) - t(1);
-kf = EKF_Basic_Kinematics(R, Q, x0, 0, P0, dt, model.payload.I(), tau_d);
+kf = EKF_Wind(R, Q, x0, 0, P0, dt, model.payload.I(), tau_d);
 % kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
 
 kf.run_filter(measurements, a_meas', num_steps);
@@ -75,22 +84,22 @@ covariances = kf.P_hist;
 %% Exract Values
 
 p_truth = p_actual(1:end-1, :);
-v_truth = v_actual(1:end-1, :);
+v_g_truth = v_g_actual(1:end-1, :);
 e_truth = e_actual(1:end-1, :);
 w_truth = w_actual(1:end-1, :);
-x_truth = [p_truth, v_truth, e_truth, w_truth];
+x_truth = [p_truth, v_g_truth, e_truth, w_truth];
 
 p_est = x_est(:, 1:3);
-v_est = x_est(:, 4:6);
+v_g_est = x_est(:, 4:6);
 e_est = x_est(:, 7:10);
 w_est = x_est(:, 11:13);
 
 p_err = p_est - p_truth;
-v_err = v_est - v_truth;
+v_g_err = v_g_est - v_g_truth;
 e_err = e_est - e_truth;
 w_err = w_est - w_truth;
 
-x_err = [p_err, v_err, e_err, w_err];
+x_err = [p_err, v_g_err, e_err, w_err];
 
 t_plot = t(1:end-1);
 
@@ -105,7 +114,7 @@ title("Position Error vs. Time")
 
 figure(2)
 clf
-plot(t_plot, v_err, 'LineWidth', 2)
+plot(t_plot, v_g_err, 'LineWidth', 2)
 legend("V_0^B", "V_1^B", "V_2^B")
 xlabel("Time (s)")
 ylabel("Error (m/s)")
@@ -116,10 +125,10 @@ V_e_truth = zeros(num_steps-1, 3);
 
 for i = 1:num_steps-1
     e_e = e_est(i, :);
-    V_e_est(i, :) = ecef2body_rotm(e_e)' * v_est(i, :)';
+    V_e_est(i, :) = ecef2body_rotm(e_e)' * v_g_est(i, :)';
 
     e_r = e_truth(i, :);
-    V_e_truth(i, :) = ecef2body_rotm(e_r)' * v_truth(i, :)';
+    V_e_truth(i, :) = ecef2body_rotm(e_r)' * v_g_truth(i, :)';
 end
 
 figure(3)
@@ -189,20 +198,20 @@ legend
 figure(2)
 clf
 subplot(3, 1, 1)
-plot(t, v_est(1, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
-plot(t, v_actual(:, 1), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
+plot(t, v_g_est(1, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
+plot(t, v_g_actual(:, 1), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Vb_0")
 legend
 
 subplot(3, 1, 2)
-plot(t, v_est(2, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
-plot(t, v_actual(:, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
+plot(t, v_g_est(2, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
+plot(t, v_g_actual(:, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Vb_1")
 legend
 
 subplot(3, 1, 3)
-plot(t, v_est(3, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
-plot(t, v_actual(:, 3), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
+plot(t, v_g_est(3, :), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
+plot(t, v_g_actual(:, 3), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Vb_2")
 
 legend
@@ -258,8 +267,8 @@ legend
 
 figure(5)
 clf
-plot(t, vecnorm(v_est(:, :), 2, 1), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
-plot(t, vecnorm(v_actual(:, :), 2, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
+plot(t, vecnorm(v_g_est(:, :), 2, 1), 'DisplayName', 'Estimated', 'LineWidth', 3); hold on
+plot(t, vecnorm(v_g_actual(:, :), 2, 2), 'DisplayName', 'Actual', 'LineWidth', 3, 'LineStyle', ':');
 title("Velocity Norm")
 
 figure(7)

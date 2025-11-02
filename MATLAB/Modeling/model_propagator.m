@@ -1,6 +1,6 @@
 clear; clc; close all;
 
-[t, y, model] = propagate_model('tspan');
+[t, y, model] = propagate_model();
 
 
 

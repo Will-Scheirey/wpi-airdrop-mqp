@@ -22,7 +22,7 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             % ======================
 
             % --- Payload ---
-            wind = [2; -5; 0];              % Wind,             ECEF [m   s]
+            wind = [0; 0; 0];              % Wind,             ECEF [m   s]
 
             obj.e_p = x(7:10) / norm(x(7:10));   % Orientation,      ECEF
 
