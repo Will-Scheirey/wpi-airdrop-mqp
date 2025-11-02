@@ -32,6 +32,8 @@ v_g_mag_meas = sensor_noise_white(v_g_mag_actual, v_g_std_dev);
 
 measurements = [p_meas, e_meas, w_meas, v_g_mag_meas]';
 
+state_idx = 4;
+
 %% Set up the Kalman Filter
 num_steps = numel(t);
 
@@ -42,7 +44,7 @@ x0 = [
     0
     ];
 
-tau_d   = 0.7e1;
+tau_d   = [7e0; 1e1; 1e1];
 sigma_d = 5e1;
 
 R = blkdiag( ...
@@ -52,9 +54,23 @@ R = blkdiag( ...
     (v_g_std_dev^2) ...
     );
 
+Q_P = [
+    1e-5, 0,  0;
+    0,    1e-5, 0;
+    0,    0,    1e-5;
+];
+
+cross_term = 1e-3;
+
+Q_V = [
+    1e-1,           cross_term,  cross_term;
+    cross_term,    1e-1,        cross_term
+    cross_term,    cross_term,  1e-1
+];
+
 Q = blkdiag(...
-    1e0 * eye(3),... % P
-    6e-2 * eye(3),... % V
+    Q_P,... % P
+    Q_V,... % V
     1e-3 * eye(4), ... % e
     1e-1 * eye(3),... % w
     sigma_d^2 * eye(3), ...
@@ -62,8 +78,8 @@ Q = blkdiag(...
     );
 
 P0 = blkdiag( ...
-    1e-3 * eye(3), ...
-    1e-3 * eye(3), ...
+    1e1 * eye(3), ...
+    1e2 * eye(3), ...
     1e-3 * eye(4), ...
     1e-3 * eye(3), ...
     sigma_d^2 * eye(3), ...
@@ -131,6 +147,8 @@ for i = 1:num_steps-1
     V_e_truth(i, :) = ecef2body_rotm(e_r)' * v_g_truth(i, :)';
 end
 
+V_e_err = V_e_est - V_e_truth;
+
 figure(3)
 clf
 plot(t_plot, e_err, 'LineWidth', 2)
@@ -147,8 +165,6 @@ xlabel("Time (s)")
 ylabel("Error (rad/s)")
 title("Body Angular Velocity Error vs. Time")
 
-state_idx = 6;
-
 figure(5)
 clf
 plot_cov(x_err(:, state_idx), squeeze(covariances(state_idx, state_idx, 1:end-1)), t_plot)
@@ -159,18 +175,12 @@ function plot_cov(err, cov, t)
     plot(t, -sqrt(cov), '--r', 'LineWidth', 1, 'HandleVisibility', 'off');
 end
 
-figure(6)
-clf
-plot(t_plot, p_est(:, 3), 'DisplayName', 'Estimate'); hold on
-plot(t_plot, p_truth(:, 3), 'DisplayName', 'Actual')
-legend
-
 return
+
 figure(6)
 clf
 plot3(p_est(:, 1), p_est(:, 2), p_est(:, 3), '.b', 'DisplayName', 'Estimated', 'LineWidth', 1.5); hold on
 plot3(p_actual(:, 1), p_actual(:, 2), p_actual(:, 3), '.r', 'DisplayName', 'Actual', 'LineWidth', 1.5);
-
 
 legend
 return;

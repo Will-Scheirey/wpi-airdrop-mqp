@@ -20,6 +20,25 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             obj.x_inds.d_a = 14:16;
 
             obj.tau_d = tau_d;
+
+            obj.dhdx_p = [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+            ];
+
+            obj.dhdx_q = [
+                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0;
+            ];
+
+            obj.dhdx_w = [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+            ];
         end
 
         function P_E_out = get_P_E(obj)
@@ -45,14 +64,9 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
         function normalize_quat(obj)
             obj.x_curr(obj.x_inds.e) = obj.get_e() / norm(obj.get_e());
         end
-        
-        function normalize_cov(obj)
-            % I don't think this is actually allowed
-            obj.P_curr(obj.x_inds('e'), obj.x_inds('e')) = obj.P_curr(obj.x_inds('e'), obj.x_inds('e')) / norm(obj.P_curr(obj.x_inds('e'), obj.x_inds('e')));
-        end
 
-        function innovation = step_filter(obj, y, u)
-            innovation = step_filter@Extended_Kalman_Filter(obj, y, u);
+        function [innovation, S] = step_filter(obj, y, u)
+            [innovation, S] = step_filter@Extended_Kalman_Filter(obj, y, u);
             
             obj.normalize_quat();
         end
@@ -74,12 +88,12 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             C_BE = ecef2body_rotm(e);
 
             dP_dt = C_BE' * V_b;
-            dV_dt = a_b + d_a + C_BE * obj.g_vec_e - cross(w_b, V_b);
+            dV_dt = a_b + C_BE * obj.g_vec_e - cross(w_b, V_b);
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
             dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
 
-            dd_dt = -(1/obj.tau_d) * d_a;
+            dd_dt = -(1./obj.tau_d) .* d_a;
 
             dxdt = [dP_dt; dV_dt; de_dt; dw_dt; dd_dt];
         end
@@ -162,7 +176,7 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 v2;
                 -v1;
 
-                1;
+                0;
                 0;
                 0
                 ]';
@@ -183,7 +197,7 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 v0;
 
                 0;
-                1;
+                0;
                 0;
                 ]';
 
@@ -205,7 +219,7 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
 
                 0;
                 0;
-                1;
+                0;
                 ]';
 
             dx6dx = [
@@ -297,7 +311,7 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
 
             dx13dx = [
                 zeros(13,1);
-                -1/obj.tau_d;
+                -1/obj.tau_d(1);
                 0;
                 0
                 ]';
@@ -305,14 +319,14 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             dx14dx = [
                 zeros(13,1);
                 0;
-                -1/obj.tau_d;
+                -1/obj.tau_d(2);
                 0
                 ]';
 
             dx15dx = [zeros(13,1);
                 0;
                 0;
-                -1/obj.tau_d
+                -1/obj.tau_d(3)
                 ]';
 
             dfdx = [
@@ -334,12 +348,10 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
               dx15dx;
             ];
         end
-
+%{
         function dhdx = h_jacobian_states(~)
             dhdx = [
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                
 
                 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
@@ -377,5 +389,6 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
                 w2
             ];
         end
+%}
     end
 end

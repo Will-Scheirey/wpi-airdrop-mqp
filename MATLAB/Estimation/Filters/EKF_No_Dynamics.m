@@ -3,7 +3,11 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
     %   Detailed explanation goes here
 
     properties
+        dhdx_p
+        dhdx_q
+        dhdx_w
 
+        dh_names
     end
 
     methods
@@ -17,6 +21,25 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
                 );
 
             obj = obj@Extended_Kalman_Filter(R, Q, H0, x0, P0, dt, x_inds_);
+
+            obj.dhdx_p = [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+            ];
+
+            obj.dhdx_q = [
+                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+            ];
+
+            obj.dhdx_w = [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;
+            ];
 
             obj.H = obj.h_jacobian_states();
         end
@@ -248,20 +271,11 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
             ];
         end
 
-        function dhdx = h_jacobian_states(~)
+        function dhdx = h_jacobian_states(obj)
             dhdx = [
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-
-                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
-
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;
+               obj.dhdx_p;
+               obj.dhdx_q;
+               obj.dhdx_w;
                 ];
         end
 
@@ -269,25 +283,22 @@ classdef EKF_No_Dynamics < Extended_Kalman_Filter
             P_E = obj.get_P_E();
             p0 = P_E(1); p1 = P_E(2); p2 = P_E(3);
 
+            p = [p0; p1; p2];
+
             e = obj.get_e();
             e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
+
+            e = [e0; e1; e2; e3];
 
             w_b = obj.get_w_b();
             w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
 
+            w = [w0; w1; w2];
+
             y = [
-                p0;
-                p1;
-                p2;
-
-                e0;
-                e1;
-                e2;
-                e3;
-
-                w0; 
-                w1; 
-                w2
+                p;
+                e;
+                w;
             ];
         end
     end

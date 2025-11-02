@@ -20,36 +20,35 @@ classdef Extended_Kalman_Filter < Kalman_Filter
 
         function predict(obj, u)
             A   = obj.f_jacobian_states(u);
-            Phi = eye(size(A)) + obj.dt * A';
+            Phi = eye(size(A)) + obj.dt * A;
             % Phi = expm(obj.dt * A);
-        
-            % If your Q is continuous-time spectral density, discretize it.
-            % Minimal quick fix if Q is already tuned as discrete:
+
             Qd = obj.Q;
         
-            % Nonlinear state propagation (yours):
             obj.x_curr = obj.x_curr + obj.dt * obj.f(u);
         
             % Discrete covariance propagation:
             obj.P_curr = Phi * obj.P_curr * Phi' + Qd;
         end
 
-        function [innovation, K] = update(obj, y)
+        function [innovation, K, S] = update(obj, y)
             y_pred = obj.h(); % Measurement prediction
             innovation = y - y_pred; % Innovation
 
             H = obj.h_jacobian_states();
 
-            K = obj.P_curr * H' / (obj.R + H*obj.P_curr*H');
+            S = obj.R + H*obj.P_curr*H';
+
+            K = obj.P_curr * H' / S;
 
             obj.x_curr = obj.x_curr + K * innovation;
 
             obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*obj.R*K'; % Update covariance            
         end
 
-        function innovation = step_filter(obj, y, u)
+        function [innovation, S] = step_filter(obj, y, u)
             obj.predict(u);
-            innovation = obj.update(y);
+            [innovation, ~, S] = obj.update(y);
         end
 
         function run_filter(obj, y_all, u_all, num_steps)
@@ -57,13 +56,15 @@ classdef Extended_Kalman_Filter < Kalman_Filter
             obj.x_hist = zeros(numel(obj.x_curr), num_steps);
             obj.P_hist = zeros(numel(obj.x_curr), numel(obj.x_curr), num_steps);
             obj.inno_hist = zeros(size(y_all));
+            obj.S_hist = zeros(height(y_all), height(y_all), num_steps);
             
             for i=1:num_steps
                 obj.x_hist(:, i) = obj.x_curr;
             
-                innovation = obj.step_filter(y_all(:, i), u_all(:, i));
+                [innovation, S] = obj.step_filter(y_all(:, i), u_all(:, i));
                 obj.inno_hist(:, i) = innovation;
                 obj.P_hist(:, :, i) = obj.P_curr;
+                obj.S_hist(:, :, i) = S;
             end
             
         end
