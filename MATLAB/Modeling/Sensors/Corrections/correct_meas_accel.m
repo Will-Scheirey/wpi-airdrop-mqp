@@ -14,7 +14,7 @@ function accel_out = correct_meas_accel(a_list, v_list, w_list, e_list, alpha_li
         w_b     = w_list(i,:)';
         alpha_b = alpha_list(i,:)';
         
-        a_b = a_dot_b + cross(w_b, v_b) - g_b ...
+        a_b = a_dot_b - g_b ...
               + cross(alpha_b, r_s_b) + cross(w_b, cross(w_b, r_s_b));
         accel_out(i,:) = a_b';
     end

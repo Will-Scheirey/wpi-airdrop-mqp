@@ -88,7 +88,7 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             C_BE = ecef2body_rotm(e);
 
             dP_dt = C_BE' * V_b;
-            dV_dt = a_b + C_BE * obj.g_vec_e - cross(w_b, V_b);
+            dV_dt = a_b + C_BE * obj.g_vec_e; % - cross(w_b, V_b);
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
             dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
