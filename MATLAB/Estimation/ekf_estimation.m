@@ -117,7 +117,7 @@ x_err = [p_err, v_err, e_err, w_err];
 
 t_plot = t(1:end-1);
 
-LSTM_export_sensor = [y(:, 11:13), a_meas(:, 1:3)];
+LSTM_export_sensor = [y(:, 11:13), alpha_actual];
 LSTM_export_sensor_file = "LSTM_sensor_data.csv";
 
 LSTM_export_wind = wind_meas;
