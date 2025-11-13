@@ -89,8 +89,9 @@ P0 = blkdiag( ...
 %% Run the Kalman Filter
 % The Kalman Filter
 dt = t(2) - t(1);
-kf = EKF_Wind(R, Q, x0, 0, P0, dt, model.payload.I(), tau_d);
+% kf = EKF_Winf(R, Q, x0, 0, P0, dt, model.payload.I(), tau_d);
 % kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
+kf = EKF_Basic_Kinematics(R, Q, x0, 0, P0, dt, model.payload.I(), tau_d);
 
 kf.run_filter(measurements, a_meas', num_steps);
 

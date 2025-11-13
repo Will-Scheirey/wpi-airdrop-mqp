@@ -81,7 +81,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     else
         % --- Payload ---
         P0   = [0; 0; 3000];              % ENU position      [m]
-        V_p0 = [300; 0; 0] * 0;                % ENU velocity      [m   s^-1]
+        V_p0 = [300; 0; 0];                % ENU velocity      [m   s^-1]
         e_p0 = eul2quat([0, 0, 0])'; % Orientation
         w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
         
@@ -109,7 +109,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'tspan')
         tspan = NameValueArgs.tspan;
     else
-        tspan = linspace(0, 100, 15000);
+        tspan = linspace(0, 100, 10000);
     end
 
     if isfield(NameValueArgs, 'model')

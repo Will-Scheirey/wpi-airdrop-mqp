@@ -20,10 +20,15 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             % ======================
             % --- Current States ---
             % ======================
+            worc_wind = [6, 270]; % Average wind data in Worcester, MA ([mph], [deg])
+            mag = worc_wind(1); dir = worc_wind(2);
+
+            e = mph2kms(mag*sind(dir));
+            n = mph2kms(mag*cosd(dir));
+
+            wind = [e; n; 0];              % Wind,             ECEF [m   s]
 
             % --- Payload ---
-            wind = [5; 5; 0];              % Wind,             ECEF [m   s]
-
             obj.e_p = x(7:10) / norm(x(7:10));   % Orientation,      ECEF
 
             obj.P_p   = x(1:3);            % Position,         ECEF [m]
