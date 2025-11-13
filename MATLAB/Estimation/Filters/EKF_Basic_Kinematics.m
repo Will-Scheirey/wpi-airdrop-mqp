@@ -65,7 +65,7 @@ classdef EKF_Basic_Kinematics < EKF_No_Dynamics
             obj.x_curr(obj.x_inds.e) = obj.get_e() / norm(obj.get_e());
         end
 
-        function [giation, S] = step_filter(obj, y, u)
+        function [innovation, S] = step_filter(obj, y, u)
             [innovation, S] = step_filter@Extended_Kalman_Filter(obj, y, u);
             
             obj.normalize_quat();
