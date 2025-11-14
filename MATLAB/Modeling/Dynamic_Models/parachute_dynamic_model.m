@@ -53,7 +53,21 @@ gamma = flight_path_angle(C_BE, alpha, beta); % Flight path angle
 % --- Parachute Dynamics ---
 % ==========================
 
-D_P    = parachute_drag(R_p, rho, V_p);
+% Flow angle wrt +x_B
+if V > eps
+    u_flow_B = -V_b./V;
+    c = max(-1,min(1, u_flow_B.'*[1;0;0]));
+    aoa = acos(c);
+else
+    aoa = 0;
+end
+% Angle-dependent Cd using your Parachute_Rigid_Hemi convention
+Cd0   = 1.40;       % or expose as parameters
+Cedge = 0.05;
+Cd    = Cd0*cos(aoa)^2 + Cedge*sin(aoa)^2;
+
+S_p = pi*R_p^2;
+D_P = 0.5 * rho * V_p^2 * S_p * Cd;   % replaces parachute_drag(...)
 
 m_a    = parachute_added_mass(rho, R_p, h_p);
 [k, c] = parachute_spring_coefficients();

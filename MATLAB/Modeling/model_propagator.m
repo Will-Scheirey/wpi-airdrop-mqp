@@ -48,9 +48,9 @@ x0   = [
 
 %% Plotting
 
-plot_data(t, y, true, false)
+plot_data(t, y, true, false, parachute)
 
-function plot_data(t, y, do_animation, save_video)
+function plot_data(t, y, do_animation, save_video, parachute)
 
 if do_animation
 figure(1)
@@ -122,6 +122,10 @@ plot(t, y(:, 3), 'DisplayName', 'Payload Height'); hold on;
 plot(t, y(:, 16), 'DisplayName', 'Parachute Height'); hold on;
 % xlim([0, 2])
 legend
+
+plot_Cd_vs_aoa(parachute);
+
+plot_parachute_drag_components(t, y, parachute, @extract_VcB_rho);
 
 end
 

@@ -72,7 +72,7 @@ F_g_p = C_BE   * g_vec_e * payload.mass; % Force of gravity
 F_g_c = C_BE_c * g_vec_e * parachute.mass; % Force of gravity
 
 F_d_p = -1/2 * rho * payload.CdS(0) * V * V_p;
-F_d_c = -1/2 * rho * parachute.CdS(0) * norm(V_c) * V_c;
+F_d_c = parachute_drag_dynamic(parachute, rho, V_c); % tanner modification
 
 V_p_e = C_BE'   * V_p;
 V_c_e = C_BE_c' * V_c;
