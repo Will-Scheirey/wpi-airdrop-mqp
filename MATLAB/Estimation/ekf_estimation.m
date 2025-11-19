@@ -29,9 +29,10 @@ w_std_dev = sensor.gyro_std_dev;
 e_std_dev = sensor.mag_std_dev;
 
 a_corr = correct_meas_accel(a_actual, v_actual, w_actual, e_actual, alpha_actual);
+
 a_meas = sensor_noise_white(a_corr, a_std_dev);
 
-w_bias = 10 * randn(3, 1);
+w_bias = 5 * randn(3, 1);
 
 w_meas = sensor_noise_white(w_actual, w_std_dev);
 
@@ -51,7 +52,11 @@ state_idx = 13;
 num_steps = numel(t);
 
 x0 = [
-    y(1, 1:13)';
+    y(1, 1:3)';
+
+    ecef2body_rotm(y(1, 7:10)')' * y(1, 4:6)'
+
+    y(7:13)';
     zeros(3,1);
     ];
 
@@ -67,12 +72,13 @@ Q_P = [
     0,    0,    1e-5;
 ];
 
-cross_term = 1e-3;
+cross_term = 1e-10;
+diag_term = 1e-1;
 
 Q_V = [
-    1e-1,           cross_term,  cross_term;
-    cross_term,    1e-1,        cross_term
-    cross_term,    cross_term,  1e-1
+    diag_term,           cross_term,  cross_term;
+    cross_term,    diag_term,        cross_term
+    cross_term,    cross_term,  diag_term
 ];
 
 Q = blkdiag(...
@@ -94,7 +100,7 @@ P0 = blkdiag( ...
 %% Run the Kalman Filter
 % The Kalman Filter
 dt = t(2) - t(1);
-kf = EKF_Sensor_Bias(R, Q, x0, 0, P0, dt, model.payload.I());
+kf = EKF_V_E(R, Q, x0, 0, P0, dt, model.payload.I());
 % kf = EKF_No_Dynamics(R, Q, x0, 0, P0, t(2) - t(1));
 
 kf.run_filter(measurements, a_meas', num_steps);
@@ -105,9 +111,19 @@ covariances = kf.P_hist;
 %% Exract Values
 
 p_truth = p_actual(1:end-1, :);
-v_truth = v_actual(1:end-1, :);
+
+v_truth_b = v_actual(1:end-1, :);
+
 e_truth = e_actual(1:end-1, :);
 w_truth = w_actual(1:end-1, :);
+
+
+for i = 1:height(v_truth_b)
+    v_truth(i, :) = ecef2body_rotm(e_truth(i, :))' * v_truth_b(i, :)';
+end
+
+% v_truth = v_actual(1:end-1, :);
+
 x_truth = [p_truth, v_truth, e_truth, w_truth];
 
 p_est = x_est(:, 1:3);
@@ -136,23 +152,12 @@ title("Position Error vs. Time")
 figure(2)
 clf
 plot(t_plot, v_err, 'LineWidth', 2)
-legend("V_0^B", "V_1^B", "V_2^B")
+legend("V_0^E", "V_1^E", "V_2^E")
 xlabel("Time (s)")
 ylabel("Error (m/s)")
-title("Body Velocity Error vs. Time")
+title("ECEF Velocity Error vs. Time")
 
-V_e_est = zeros(num_steps-1, 3);
-V_e_truth = zeros(num_steps-1, 3);
-
-for i = 1:num_steps-1
-    e_e = e_est(i, :);
-    V_e_est(i, :) = ecef2body_rotm(e_e)' * v_est(i, :)';
-
-    e_r = e_truth(i, :);
-    V_e_truth(i, :) = ecef2body_rotm(e_r)' * v_truth(i, :)';
-end
-
-V_e_err = V_e_est - V_e_truth;
+return
 
 figure(3)
 clf
@@ -200,6 +205,56 @@ ylabel("Bias Error (rad/s)")
 sgtitle("Gyro Axis 2")
 
 sgtitle("Gyro Bias Estimate Errors")
+
+figure(7)
+clf
+plot(t_plot, v_est);
+
+figure(8)
+clf
+plot(t_plot, v_truth)
+
+%% O
+% 1) Build "model-predicted" ECEF acceleration using your filter's formula
+n = size(a_corr,1);
+a_model_e = zeros(n,3);
+
+g_e = [0;0;-9.81];
+
+for i = 1:n
+    e   = e_actual(i,:)';
+    a_b = a_corr(i,:)';             % what you feed to the EKF
+
+    C_EB = ecef2body_rotm(e)';      % body -> ECEF
+    a_model_e(i,:) = (C_EB * a_b + g_e)';   % EKF's view of dV_E/dt
+end
+
+% 2) Compute numerical derivative of the true ECEF velocity
+vE_truth = zeros(n,3);
+for i = 1:n
+    vE_truth(i,:) = (ecef2body_rotm(e_actual(i,:)')' * v_actual(i,:)')';
+end
+
+dt = t(2) - t(1);
+dv_dt_num = diff(vE_truth) / dt;        % size (n-1,3)
+
+% 3) Compare them (truncate a_model_e to same length)
+a_model_e_trunc = a_model_e(1:end-1,:);
+
+figure;
+subplot(3,1,1)
+plot(t(1:end-1), dv_dt_num(:,1), 'k', t(1:end-1), a_model_e_trunc(:,1), '--r');
+legend('dVx/dt truth','model'); ylabel('ax_E')
+
+subplot(3,1,2)
+plot(t(1:end-1), dv_dt_num(:,2), 'k', t(1:end-1), a_model_e_trunc(:,2), '--r');
+legend('dVy/dt truth','model'); ylabel('ay_E')
+
+subplot(3,1,3)
+plot(t(1:end-1), dv_dt_num(:,3), 'k', t(1:end-1), a_model_e_trunc(:,3), '--r');
+legend('dVz/dt truth','model'); ylabel('az_E'); xlabel('t (s)')
+
+
 function plot_cov(err, cov, t)
     plot(t, err, '-b', 'LineWidth', 1.5, 'DisplayName', 'Error'); hold on
     plot(t, sqrt(cov), '--r', 'LineWidth', 1, 'DisplayName', 'Covariance');
