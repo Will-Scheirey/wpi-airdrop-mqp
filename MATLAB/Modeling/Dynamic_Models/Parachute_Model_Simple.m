@@ -158,25 +158,43 @@ classdef Parachute_Model_Simple < Dynamic_Model
         end
 
         function [f_p, f_c] = calc_drag(obj)
-            aoa_p = flight_angles(obj.V_p, obj.C_EB_p);
-            aoa_c = flight_angles(obj.V_c, obj.C_EB_c);
-
-            f_p = -0.5 * obj.rho * obj.payload.CdS(aoa_p)   * obj.V_p * norm(obj.V_p);
-            f_c = -0.5 * obj.rho * obj.parachute.CdS(aoa_c) * obj.V_c * norm(obj.V_c);
-
-            if any(isnan(f_p))
-                f_p = [0; 0; 0];
-            end
-            if any(isnan(f_c))
-                f_c = [0; 0; 0];
-            end
-
-            obj.aoa_p_curr = aoa_p;
-            obj.aoa_c_curr = aoa_c;
-
-            obj.drag_force_p = f_p;
-            obj.drag_force_c = f_c;
-        end
+    % Payload drag (disabled)
+    aoa_p = flight_angles(obj.V_p, obj.C_EB_p);
+    f_p = [0; 0; 0];  % Payload drag disabled
+    
+    % VERTICAL-ONLY PARACHUTE DRAG
+    % Convert parachute velocity to ENU frame
+    V_c_ENU = obj.C_EB_c' * obj.V_c;
+    
+    % Extract vertical component only
+    V_vertical = V_c_ENU(3);  % m/s (positive = up)
+    
+    % Calculate parachute CdS
+    aoa_c = flight_angles(obj.V_c, obj.C_EB_c);
+    CdS = obj.parachute.CdS(aoa_c);
+    
+    % Vertical drag force (opposes vertical motion)
+    F_drag_vertical = -0.5 * obj.rho * CdS * V_vertical * abs(V_vertical);
+    
+    % Apply only in vertical direction (ENU frame)
+    F_drag_ENU = [0; 0; F_drag_vertical];
+    
+    % Convert back to body frame
+    f_c = obj.C_EB_c * F_drag_ENU;
+    
+    % Handle NaN
+    if any(isnan(f_p))
+        f_p = [0; 0; 0];
+    end
+    if any(isnan(f_c))
+        f_c = [0; 0; 0];
+    end
+    
+    obj.aoa_p_curr = aoa_p;
+    obj.aoa_c_curr = aoa_c;
+    obj.drag_force_p = f_p;
+    obj.drag_force_c = f_c;
+end
 
         function [f_p, f_c] = calc_riser_force(obj)
             % --- Velocity of attachment point ---
