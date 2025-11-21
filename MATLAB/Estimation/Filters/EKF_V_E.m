@@ -3,7 +3,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
     %   Detailed explanation goes here
 
     properties
-
+        accel_calc_all
     end
 
     methods
@@ -32,6 +32,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0;
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1;
             ];
+
+            obj.accel_calc_all = [0, 0, 0];
         end
 
         function P_E_out = get_P_E(obj)
@@ -82,6 +84,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
 
             dP_dt = V_e;
             dV_dt = C_EB * a_b + obj.g_vec_e;
+
+            obj.accel_calc_all = [obj.accel_calc_all; dV_dt'];
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
             dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));

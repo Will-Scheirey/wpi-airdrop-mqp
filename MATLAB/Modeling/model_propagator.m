@@ -1,54 +1,12 @@
 clear; clc; close all;
 
-[t, y, model] = propagate_model('tspan');
-
-
-%% Send to FlightGear
-
-lat0  = 42.273836;  % [deg]
-long0 = -71.809809; % [deg]
-h0    = 168.48;       % [m]
-
-[lla_p] = enu2lla([y(:, 1:3)], [lat0, long0, h0], 'flat');
-[heading, pitch, roll] = quat2angle(y(:, 7:10));
-
-lla_p(:, 1:2) = deg2rad(lla_p(:, 1:2));
-
-t_new = t * 5;
-
-fg_sim(t_new, lla_p, [roll, pitch, heading]);
-
-return
-
-
-%% Intermediate Values
-
-for i = 1:length(t)
-    model.ode_fcn(t(i), y(i, :)');
-    f_drag_c(i, :) = model.drag_force_c;
-    f_drag_p(i, :) = model.drag_force_p;
-
-    aoa_c(i)       = model.aoa_c_curr;
-    aoa_p(i)       = model.aoa_p_curr;
-end
-
-figure(1)
-clf
-plot(t, vecnorm(f_drag_c, 2, 2), 'DisplayName', 'Canopy Drag'); hold on
-plot(t, vecnorm(f_drag_p, 2, 2), 'DisplayName', 'Payload Drag')
-legend
-
-figure(2)
-clf
-plot(t, aoa_c, 'DisplayName', 'Canopy AOA'); hold on
-plot(t, aoa_p, 'DisplayName', 'Payload AOA')
-legend
-
-
+[t, y, model] = propagate_model('variable_parachute_mass', false, 'use_drag', false, 'damping', false);
 
 %% Plotting
 
-plot_data(t, y, true, false)
+% plot_data(t, y, true, false)
+
+plot_energy(t, y, model.payload, model.parachute)
 
 function plot_data(t, y, do_animation, save_video)
 
@@ -228,14 +186,16 @@ function plot_energy(t, y, payload, parachute)
     total = payload_total + parachute_total + spring_potential_energy;
     % plot(t, payload_total, 'DisplayName', 'Payload Total Energy', 'LineWidth', 1.5); hold on
     % plot(t, parachute_total, 'DisplayName', 'Parachute Total Energy', 'LineWidth', 1.5)
-    plot(t, total(1) - total, 'DisplayName', 'Total Lost Energy', 'LineWidth', 1.5); hold on
+    plot(t, total(1) - total, 'LineWidth', 1.5); hold on
     % plot(t, spring_potential_energy, 'DisplayName', 'Spring Potential Energy', 'LineWidth', 1.5)
-    
+    xlabel("Time (s)")
+    ylabel("Lost Energy %")
+    title("% Total Lost Energy / Initial Energy")
     legend
     
     figure(9)
     clf
-    plot(t, spring_length, 'DisplayName', 'Riser Length', 'LineWidth', 1.5)
+    plot(t, total)
     
     %{
     figure(9)
