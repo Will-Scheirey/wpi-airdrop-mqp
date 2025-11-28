@@ -4,6 +4,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
 
     properties
         accel_calc_all
+
+        hist_idx
     end
 
     methods
@@ -33,7 +35,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1;
             ];
 
-            obj.accel_calc_all = [0, 0, 0];
+            obj.hist_idx = 1;
         end
 
         function P_E_out = get_P_E(obj)
@@ -78,14 +80,11 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             
             w_b = obj.get_w_b();
 
-            a_b = u(1:3);
-
-            C_EB = ecef2body_rotm(e)';
+            dV_dt = obj.calc_accel(u(1:3));
 
             dP_dt = V_e;
-            dV_dt = C_EB * a_b + obj.g_vec_e;
 
-            obj.accel_calc_all = [obj.accel_calc_all; dV_dt'];
+            obj.accel_calc_all(obj.hist_idx, :) = dV_dt';
 
             de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
             dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
@@ -102,7 +101,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             w_b = obj.get_w_b();
             w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
 
-            a = u(1:3);
+            a = obj.calc_accel(u(1:3));
             a0 = a(1); a1 = a(2); a2 = a(3);
 
             J11 = obj.J(1,1);
@@ -341,6 +340,12 @@ classdef EKF_V_E < EKF_Basic_Kinematics
               dx14dx;
               dx15dx;
             ];
+        end
+
+        function a_e = calc_accel(obj, a)
+            e = obj.get_e();
+            C_EB = ecef2body_rotm(e)';
+            a_e = C_EB * a + obj.g_vec_e;
         end
 
         function y = h(obj)

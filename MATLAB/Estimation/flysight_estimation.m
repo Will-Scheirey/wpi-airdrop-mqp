@@ -1,6 +1,7 @@
-clearvars -except data; clc; close all
+clearvars -except data; clc;
 
 %% Load Flysight Data
+%{
 % if ~exist("data", "var")
     data = load_flysight_file("Data/SENSOR.CSV");
 % end
@@ -27,10 +28,15 @@ gyro_meas  = table(deg2rad([data.IMU.wx, data.IMU.wy, data.IMU.wz]), data.IMU.ti
 
 measurements = {mag_meas, gyro_meas};
 inputs = accel_meas;
-
+%}
 %% Load HPRC Data
-clear; clc; close all
-[data_accel, data_gyro, data_mag, data_gps, data_baro] = get_HPRC_data();
+clear; clc;
+% [data_accel, data_gyro, data_mag, data_gps, data_baro] = get_HPRC_data();
+
+[data_accel, data_gyro, data_mag, data_gps, data_baro] = get_HPRC_data_2();
+% 
+% plot(data_baro.time, data_baro.data)
+% return
 
 data_accel.meas_idx = repmat(-1, length(data_accel.time), 1);
 data_gps.meas_idx   = repmat(1, length(data_gps.time), 1);
@@ -38,9 +44,25 @@ data_mag.meas_idx   = repmat(2, length(data_mag.time), 1);
 data_gyro.meas_idx  = repmat(3, length(data_gyro.time), 1);
 data_baro.meas_idx  = repmat(4, length(data_baro.time), 1);
 
+the_mode = "movmedian";
+window = 3;
+mag_to_remove = any([isoutlier(data_mag.data(:, 1), the_mode, window), isoutlier(data_mag.data(:, 2), the_mode, window), isoutlier(data_mag.data(:, 3), the_mode, window)], 2);
+data_mag = data_mag(~mag_to_remove, :);
+
+%{
+the_mode = "movmedian";
+window = 100;
+accel_to_remove = any([isoutlier(data_accel.data(:, 1), the_mode, window), isoutlier(data_accel.data(:, 2), the_mode, window), isoutlier(data_accel.data(:, 3), the_mode, window)], 2);
+data_accel = data_accel(~accel_to_remove, :);
+%}
+%{
+bp = 0.01;
+data_accel.data(:, 1) = lowpass(data_accel.data(:,1), bp);
+data_accel.data(:, 2) = lowpass(data_accel.data(:,2), bp);
+data_accel.data(:, 3) = lowpass(data_accel.data(:,3), bp);
+%}
 
 measurements = {data_gps, data_mag, data_gyro, data_baro};
-% measurements = {data_mag, data_gyro};
 inputs = data_accel;
 
 dt_min_accel = min(diff(data_accel.time));
@@ -49,13 +71,10 @@ dt_min_mag   = min(diff(data_mag.time));
 dt_min_gyro  = min(diff(data_gyro.time));
 dt_min_baro  = min(diff(data_baro.time));
 
-dt        = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) / 3;
-tspan     = data_accel.time(1) : dt : data_accel.time(end) / 10;
+dt        = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]);
+% tspan     = data_accel.time(1) : dt : data_accel.time(end);
+tspan = data_accel.time(1) : dt : 14;
 meas_freq = 1 / dt;
-
-plot(data_gps.time, data_gps.data(:, 1)); hold on
-plot(data_gps.time, data_gps.data(:, 2))
-plot(data_gps.time, data_gps.data(:, 3))
 
 %% Create Sensor Info
 sensor = Sensor_FlySight(1000);
@@ -91,16 +110,36 @@ x0 = [
     0;
 ];
 
+Rp = 10;
+R_pos = [
+    Rp, 0,   0;
+    0,   Rp, 0;
+    0,   0,   Rp
+    ].^2;
+
+Rq = 1;
+R_quat = [
+    Rq, 0,  0,  0;
+    0,  Rq, 0,  0;
+    0,  0,  Rq, 0;
+    0,  0,  0,  Rq
+    ].^2;
+
+Rw = 1;
+R_w = [
+    Rw,  0,  0;
+    0,   Rw, 0;
+    0,   0,  Rw
+].^2;
+
+Rb = 10;
+R_baro = Rb^2;
+
 R = blkdiag( ...
-    [25, 0, 0; ...
-    0,  25, 0; ...
-    0,  0, 100].^2, ...
-    [1, 0, 0, 0; ...
-    0,    1, 0, 0; ...
-    0,    0,   1, 0; ...
-    0,    0,   0,   1].^2, ...
-    (w_std_dev^2) * eye(3),  ...
-    100 ...
+    R_pos, ...
+    R_quat, ...
+    R_w,  ...
+    R_baro ...
     );
 
 Q_P = [
@@ -109,7 +148,7 @@ Q_P = [
     0,    0,    1;
 ] * 1e0;
 
-cross_term = 1e-1;
+cross_term = 1e-4;
 diag_term = 1e0;
 
 Q_V = [
@@ -118,24 +157,47 @@ Q_V = [
     cross_term,    cross_term,  diag_term
 ];
 
+Qe = 1e-1;
+Q_e = [
+    Qe,  0,  0,  0;
+    0,   Qe, 0,  0;
+    0,   0,  Qe, 0;
+    0,   0,  0,  Qe
+].^2;
+
+Qw = 1e-1;
+Q_w = [
+    Qw, 0,  0;
+    0,  Qw, 0;
+    0,  0,  Qw
+].^2;
+
+Qwb = 1e-10;
+Q_wb = [
+ Qwb, 0,   0;
+ 0,   Qwb, 0;
+ 0,   0,   Qwb
+];
+
 Q = blkdiag(...
     Q_P,... % P
     Q_V,... % V
-    1e0 * eye(4), ... % e
-    1e0 * eye(3), ... % w
-    1e-8 * eye(3) ...
+    Q_e, ... % e
+    Q_w, ... % w
+    Q_wb ... % wb
     );
 
 P0 = blkdiag( ...
     1e1 * eye(3), ...
-    1e2 * eye(3), ...
-    1e-3 * eye(4), ...
-    1e-3 * eye(3), ...
-    w_bias_std_dev^2 * eye(3) ...
+    1e1 * eye(3), ...
+    1e1 * eye(4), ...
+    1e1 * eye(3), ...
+    1e1 * eye(3) ...
     );
 
 %% Run the Kalman Filter
-flysight_box = Box(0.1524, 0.1524, 3.6576, 20);
+flysight_box = Box(0.1524, 0.1524, 3.6576, 25);
+% flysight_box = Box(0.1524, 0.1524, 0.4, 2);
 
 kf = EKF_Varying_Measurements(R, Q, x0, 0, P0, dt, flysight_box.I());
 
@@ -153,23 +215,13 @@ w_est = x_est(:, 11:13);
 
 t_plot = tspan(1:end-1);
 
-%% Plot IMU
-
-figure(1)
-clf
-plot(data_mag.time, data_mag.data(:, 1), 'LineWidth', 2, 'DisplayName', 'Mag X'); hold on
-plot(data_mag.time, data_mag.data(:, 2), 'LineWidth', 2, 'DisplayName', 'Mag X'); hold on
-plot(data_mag.time, data_mag.data(:, 3), 'LineWidth', 2, 'DisplayName', 'Mag X'); hold on
-
-legend
-
 %% Plot Values
 figure(1)
 clf
 plot(t_plot, p_est, 'LineWidth', 2)
 legend("P_0^E", "P_1^E", "P_2^E")
 xlabel("Time (s)")
-ylabel("Error (m)")
+ylabel("Position (m)")
 title("Position vs. Time")
 
 hold on;
@@ -181,7 +233,7 @@ clf
 plot(t_plot, v_est, 'LineWidth', 2)
 legend("V_0^E", "V_1^E", "V_2^E")
 xlabel("Time (s)")
-ylabel("Error (m/s)")
+ylabel("Velocity (m/s)")
 title("ECEF Velocity vs. Time")
 
 figure(3)
@@ -189,7 +241,7 @@ clf
 plot(t_plot, e_est, 'LineWidth', 2)
 legend("e0", "e1", "e2", "e3")
 xlabel("Time (s)")
-ylabel("Error")
+ylabel("Value")
 title("Quaternion vs. Time")
 
 figure(4)
@@ -197,7 +249,7 @@ clf
 plot(t_plot, w_est, 'LineWidth', 2)
 legend("w_0^B", "w_1^B", "w_2^B")
 xlabel("Time (s)")
-ylabel("Error (rad/s)")
+ylabel("Angular Velocity (rad/s)")
 title("Body Angular Velocity vs. Time")
 
 figure(6)
@@ -229,12 +281,183 @@ sgtitle("Gyro Bias Estimate Errors")
 
 figure(7)
 clf
-plot(t_plot, v_est);
+subplot(3,1,1)
+plot(t_plot, p_est(:,1), 'LineWidth', 2); hold on;
+plot(data_gps.time, data_gps.data(:, 1), '.', 'MarkerSize', 30);
+legend("Estimated", "Measurement")
+xlabel("Time (s)")
+ylabel("Position (m)")
+title("P_1^E vs. Time")
+xlim([t_plot(1), t_plot(end)])
 
-%% ANIMATION
+subplot(3,1,2)
+plot(t_plot, p_est(:,2), 'LineWidth', 2); hold on;
+plot(data_gps.time, data_gps.data(:, 2), '.', 'MarkerSize', 30);
+legend("Estimated", "Measurement")
+xlabel("Time (s)")
+ylabel("Position (m)")
+title("P_2^E vs. Time")
+xlim([t_plot(1), t_plot(end)])
+
+subplot(3,1,3)
+plot(t_plot, p_est(:,3), 'LineWidth', 2); hold on;
+plot(data_gps.time, data_gps.data(:, 3), '.', 'MarkerSize', 20);
+legend("Estimated", "Measurement")
+xlabel("Time (s)")
+ylabel("Position (m)")
+title("P_3^E vs. Time")
+xlim([t_plot(1), t_plot(end)])
 
 figure(8)
-for n = 1:10:num_steps
-    poseplot(quaternion(e_est(n, 4), e_est(n, 1), e_est(n, 2), e_est(n, 3)))
+clf
+plot(t_plot, kf.accel_calc_all(1:end-1, 1), 'LineWidth', 1.5, 'DisplayName', 'a_0^E'); hold on
+plot(t_plot, kf.accel_calc_all(1:end-1, 2), 'LineWidth', 1.5, 'DisplayName', 'a_1^E'); hold on
+plot(t_plot, kf.accel_calc_all(1:end-1, 3), 'LineWidth', 1.5, 'DisplayName', 'a_2^E'); hold on
+
+legend
+
+figure(9)
+clf
+idx = 1;
+plot_cov(kf.P_hist(idx,idx,:))
+
+
+figure(10)
+clf
+plot(data_mag.time, data_mag.data(:, 1), 'LineWidth', 2, 'DisplayName', 'Mag X'); hold on
+plot(data_mag.time, data_mag.data(:, 2), 'LineWidth', 2, 'DisplayName', 'Mag Y'); hold on
+plot(data_mag.time, data_mag.data(:, 3), 'LineWidth', 2, 'DisplayName', 'Mag Z'); hold on
+legend
+
+figure(11)
+clf
+plot(data_accel.time, data_accel.data(:, 1), 'LineWidth', 2, 'DisplayName', 'Accel X'); hold on
+plot(data_accel.time, data_accel.data(:, 2), 'LineWidth', 2, 'DisplayName', 'Accel Y'); hold on
+plot(data_accel.time, data_accel.data(:, 3), 'LineWidth', 2, 'DisplayName', 'Accel Z'); hold on
+plot(data_accel.time, vecnorm(data_accel.data, 2, 2), 'LineWidth', 2, 'DisplayName', 'Accel Norm'); hold on
+legend
+
+figure(12)
+clf
+plot(data_accel.time, vecnorm(data_accel.data, 2, 2), 'LineWidth', 2, 'DisplayName', 'Measured Accel Norm'); hold on
+plot(t_plot, vecnorm(kf.accel_calc_all(1:end-1, :), 2, 2), 'LineWidth', 2, 'DisplayName', 'Estimated Accel Norm'); hold on
+legend
+
+figure(13)
+clf
+plot(t_plot, kf.trust_accel_all(1:end-1))
+
+legend
+
+quats = quaternion(e_est(:, 1), e_est(:, 2), e_est(:, 3), e_est(:, 4));
+figure(14)
+eul_angles = rad2deg(quat2eul(quats));
+
+clf
+plot(t_plot, eul_angles(:, 1), 'LineWidth', 2, 'DisplayName', 'Eul 1'); hold on
+plot(t_plot, eul_angles(:, 2), 'LineWidth', 2, 'DisplayName', 'Eul 2'); hold on
+plot(t_plot, eul_angles(:, 3), 'LineWidth', 2, 'DisplayName', 'Eul 3'); hold on
+legend
+
+figure(15)
+clf
+plot3(p_est(:,1), p_est(:,2), p_est(:,3), 'MarkerSize', 10, 'DisplayName', 'Estimate'); hold on;
+plot3(data_gps.data(:,1), data_gps.data(:,2), data_gps.data(:,3), '.', 'MarkerSize', 10, 'DisplayName', 'Measurement'); hold on
+legend
+
+%% Plot Measurements
+
+figure(16)
+clf
+plot(data_gps.time, data_gps.data(:, 1), 'DisplayName', '0'); hold on
+plot(data_gps.time, data_gps.data(:, 2), 'DisplayName', '1')
+plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', '1')
+legend
+title("GPS")
+
+figure(17)
+clf
+plot(data_accel.time, data_accel.data(:, 1), 'DisplayName', '0'); hold on
+plot(data_accel.time, data_accel.data(:, 2), 'DisplayName', '1')
+plot(data_accel.time, data_accel.data(:, 3), 'DisplayName', '1')
+legend
+title("Accel")
+
+figure(18)
+clf
+plot(data_gyro.time, data_gyro.data(:, 1), 'DisplayName', '0'); hold on
+plot(data_gyro.time, data_gyro.data(:, 2), 'DisplayName', '1')
+plot(data_gyro.time, data_gyro.data(:, 3), 'DisplayName', '1')
+legend
+title("Gyro")
+
+figure(19)
+clf
+plot(data_mag.time, data_mag.data(:, 1), 'DisplayName', '0'); hold on
+plot(data_mag.time, data_mag.data(:, 2), 'DisplayName', '1')
+plot(data_mag.time, data_mag.data(:, 3), 'DisplayName', '1')
+legend
+title("Mag")
+
+figure(20)
+clf
+plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', '0'); hold on
+legend
+title("Baro")
+
+return
+%% ANIMATION
+figure(16)
+clf
+run_animation(t_plot, p_est, e_est, 10, 10);
+
+return
+figure(16)
+clf
+for n = 1:3:num_steps-1
+    poseplot(quaternion(e_est(n, 1), e_est(n, 2), e_est(n, 3), e_est(n, 4)))
+    title(sprintf("t=%0.2f sec", t_plot(n)));
     drawnow
+end
+
+function plot_cov(variance)
+    variance = squeeze(variance);
+    plot(sqrt(variance), '--r', 'DisplayName', 'Covariance'); hold on;
+    plot(-sqrt(variance), '--r', 'HandleVisibility', 'off');
+end
+
+
+function run_animation(t, position, orientation, step, substep)
+numsteps = height(position);
+
+quat = quaternion(orientation(1, :));
+patch = poseplot(quat); hold on
+
+patch.ScaleFactor = 50;
+xlabel("X")
+ylabel("Y")
+zlabel("Z")
+
+for i = 2:step:numsteps - step
+    for j=i:substep:i+step
+        quat = quaternion(orientation(j, :));
+        pos = position(j, :);
+    
+        set(patch, Orientation=quat, Position=pos); hold on
+
+        plot3(pos(1), pos(2), pos(3), '.b', 'MarkerSize', 1); hold on
+    end
+
+    set(gca,'ZDir','normal')  
+    legend("Payload", "Trajectory")
+    title(sprintf("t = %0.2f", t(i)))
+
+    lim = 1000;
+    xlim(position(j,1) + [-1, 1]*lim);
+    ylim(position(j,2) + [-1, 1]*lim);
+    zlim(position(j,3) + [-1, 1]*lim);
+
+    drawnow
+
+end
 end

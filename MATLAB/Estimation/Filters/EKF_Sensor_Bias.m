@@ -345,7 +345,7 @@ classdef EKF_Sensor_Bias < EKF_Basic_Kinematics
             y = h@EKF_Basic_Kinematics(obj);
 
             b_g = obj.get_b_g();
-
+            
             y(8:10) = y(8:10) + b_g;
         end
     end

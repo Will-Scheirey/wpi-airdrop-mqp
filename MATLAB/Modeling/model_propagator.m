@@ -1,6 +1,6 @@
 clear; clc; close all;
 
-[t, y, model] = propagate_model('variable_parachute_mass', false, 'use_drag', false, 'damping', false);
+[t, y, model] = propagate_model('variable_parachute_mass', false, 'use_drag', false, 'damping', false, 'riser', false);
 
 %% Plotting
 
@@ -142,11 +142,11 @@ function plot_energy(t, y, payload, parachute)
     parachute_kinetic_energy = 0.5 *parachute.m()*vecnorm(y(:,17:19), 2, 2).^2;
     
     omega = y(:, 11:13);
-    payload_rotational_energy = 0.5 * abs(sum((omega * payload.I()) .* omega, 2));
+    payload_rotational_energy = 0.5 * sum((omega * payload.I()) .* omega, 2);
     
     omega_p = y(:, 24:26);
-    parachute_rotational_energy = 0.5 * abs(sum((omega_p * parachute.I()) .* omega_p, 2));
-    
+    parachute_rotational_energy = 0.5 * sum((omega_p * parachute.I()) .* omega_p, 2);    
+
     payload_potential_energy =   9.81 * payload.m() *y(:,3);
     parachute_potential_energy = 9.81 *parachute.m()*y(:,16);
     
@@ -174,26 +174,26 @@ function plot_energy(t, y, payload, parachute)
     
     figure(8)
     clf
-    % plot(t, payload_kinetic_energy, 'DisplayName', 'Payload Kinetic Energy', 'LineWidth', 1.5); hold on
-    % plot(t, parachute_kinetic_energy, 'DisplayName', 'Parachute Kinetic Energy', 'LineWidth', 1.5)
+    plot(t, payload_kinetic_energy, 'DisplayName', 'Payload Kinetic Energy', 'LineWidth', 1.5); hold on
+    plot(t, parachute_kinetic_energy, 'DisplayName', 'Parachute Kinetic Energy', 'LineWidth', 1.5)
     hold on
     % plot(t, payload_rotational_energy, 'DisplayName', 'Payload Rotational Energy', 'LineWidth', 1.5)
     % plot(t, parachute_rotational_energy, 'DisplayName', 'Parachute Rotational Energy', 'LineWidth', 1.5)
     % plot(t, payload_rotational_energy + parachute_rotational_energy, 'DisplayName', 'Total Rotational Energy', 'LineWidth', 1.5)
     
-    % figure(9)
-    % clf
+    figure(9)
+    clf
     total = payload_total + parachute_total + spring_potential_energy;
     % plot(t, payload_total, 'DisplayName', 'Payload Total Energy', 'LineWidth', 1.5); hold on
     % plot(t, parachute_total, 'DisplayName', 'Parachute Total Energy', 'LineWidth', 1.5)
-    plot(t, total(1) - total, 'LineWidth', 1.5); hold on
+    plot(t, (total(1) - total) / total(1), 'LineWidth', 1.5); hold on
     % plot(t, spring_potential_energy, 'DisplayName', 'Spring Potential Energy', 'LineWidth', 1.5)
     xlabel("Time (s)")
     ylabel("Lost Energy %")
     title("% Total Lost Energy / Initial Energy")
-    legend
+    % legend
     
-    figure(9)
+    figure(10)
     clf
     plot(t, total)
     
