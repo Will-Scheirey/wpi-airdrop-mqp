@@ -1,5 +1,3 @@
-%results = validate_carp_vs_propagator('drop_altitude', 650, 'ballistic_wind', 10, 'indicated_airspeed', 140,'visualize', true);
-
 function [t, y, model_obj] = propagate_model(NameValueArgs)
     
     arguments
