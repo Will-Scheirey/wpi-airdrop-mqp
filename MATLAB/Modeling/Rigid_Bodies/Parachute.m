@@ -17,6 +17,8 @@ classdef Parachute < Rigid_Body
 
         Cd_0
         variable_ma
+        is_deployed    % NEW: deployment flag
+        t_deploy
     end
 
     methods
@@ -57,11 +59,26 @@ classdef Parachute < Rigid_Body
             else
                 obj.variable_ma = false;
             end
-
+% Default to deployed immediately
+            obj.is_deployed = false;
+            obj.t_deploy = 0;
         end
 
-        function Cd_out = Cd(obj, ~); Cd_out = obj.Cd_0 * obj.eta; end
-        function S_out = S(obj, ~); S_out = obj.A; end
+        function Cd_out = Cd(obj, ~)
+    if obj.is_deployed
+        Cd_out = obj.Cd_0 * obj.eta;
+    else
+        Cd_out = 0;  % No drag before deployment
+    end
+end
+
+function S_out = S(obj, ~)
+    if obj.is_deployed
+        S_out = obj.A;
+    else
+        S_out = 0;  % No area before deployment
+    end
+end
 
         function ma_out = added_mass(obj, rho)
             p = obj.porosity;

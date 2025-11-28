@@ -49,14 +49,20 @@ classdef Parachute_Model_Simple < Dynamic_Model
             obj.payload   = payload;
         end
 
-        function x_dot = ode_fcn(obj, ~, x)
+        function x_dot = ode_fcn(obj, t, x)
+            
+            % Check if parachute should deploy
+            if t >= obj.parachute.t_deploy && ~obj.parachute.is_deployed
+                obj.parachute.is_deployed = true;
+                fprintf('*** PARACHUTE DEPLOYED at t = %.2f seconds ***\n', t);
+            end
 
             obj.get_states(x);
 
             [F_p, F_c, M_p, M_c] = obj.equations_of_motion();
 
             x_dot = obj.dxdt(F_p, F_c, M_p, M_c);
-        end
+end
 
         function [F_p, F_c, M_p, M_c] = equations_of_motion(obj)
             % ===========================
