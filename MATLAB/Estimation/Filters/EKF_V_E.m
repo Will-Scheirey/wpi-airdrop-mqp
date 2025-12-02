@@ -15,24 +15,26 @@ classdef EKF_V_E < EKF_Basic_Kinematics
 
             obj.x_inds.b_g = (14:16)';
             obj.x_inds.V_E = (4:6)';
+            obj.x_inds.b_a = (17:19)';
+            obj.x_inds.b_p = (20:22)';
 
             obj.dhdx_p = [
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0;
+                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0;
+                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;
             ];
 
             obj.dhdx_q = [
-                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
             ];
 
             obj.dhdx_w = [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0;
             ];
 
             obj.hist_idx = 1;
@@ -56,6 +58,14 @@ classdef EKF_V_E < EKF_Basic_Kinematics
 
         function b_g_out = get_b_g(obj)
             b_g_out = obj.x_curr(obj.x_inds.b_g);
+        end
+
+        function b_a_out = get_b_a(obj)
+            b_a_out = obj.x_curr(obj.x_inds.b_a);
+        end
+
+        function b_p_out = get_b_p(obj)
+            b_p_out = obj.x_curr(obj.x_inds.b_p);
         end
 
         function normalize_quat(obj)
@@ -90,8 +100,10 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
 
             db_g_dt = zeros(3,1);
+            db_a_dt = zeros(3,1);
+            db_p_dt = zeros(3,1);
 
-            dxdt = [dP_dt; dV_dt; de_dt; dw_dt; db_g_dt];
+            dxdt = [dP_dt; dV_dt; de_dt; dw_dt; db_g_dt; db_a_dt; db_p_dt];
         end
 
         function dfdx = f_jacobian_states(obj, u)
@@ -120,7 +132,9 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
 
-                zeros(6,1)
+                zeros(6,1);
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx1dx = [
@@ -135,7 +149,9 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
 
-                zeros(6,1)
+                zeros(6,1);
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx2dx = [
@@ -150,7 +166,9 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
 
-                zeros(6,1)
+                zeros(6,1);
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx3dx = [
@@ -171,7 +189,11 @@ classdef EKF_V_E < EKF_Basic_Kinematics
 
                 0;
                 0;
-                0
+                0;
+                e0^2 + e1^2 - e2^2 - e3^2;
+                2*e1*e2 - 2*e0*e3;
+                2*e0*e2 + 2*e1*e3;
+                zeros(3,1);
                 ]';
 
             dx4dx = [
@@ -192,6 +214,11 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
                 0;
+
+                2*e0*e3 + 2*e1*e2;
+                e0^2 - e1^2 + e2^2 - e3^2;
+                2*e2*e3 - 2*e0*e1;
+                zeros(3,1);
                 ]';
 
 
@@ -213,6 +240,11 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
                 0;
+
+                2*e1*e3 - 2*e0*e2;
+                2*e0*e1 + 2*e2*e3;
+                e0^2 - e1^2 - e2^2 + e3^2;
+                zeros(3,1);
                 ]';
 
             dx6dx = [
@@ -227,6 +259,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 -1/2*e2;
                 -1/2*e3;
 
+                zeros(3,1);
+                zeros(3,1);
                 zeros(3,1);
                 ]';
 
@@ -243,6 +277,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 1/2*e2;
 
                 zeros(3,1);
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx8dx = [
@@ -257,6 +293,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 1/2*e0;
                 -1/2*e1;
 
+                zeros(3,1);
+                zeros(3,1);
                 zeros(3,1);
                 ]';
 
@@ -273,6 +311,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 1/2*e0;
 
                 zeros(3,1);
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx10dx = [
@@ -281,6 +321,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 w2 * (J22 - J33) / J11;
                 w1 * (J22 - J33) / J11;
 
+                zeros(3,1);
+                zeros(3,1);
                 zeros(3,1);
                 ]';
 
@@ -291,6 +333,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 w0 * (J33 - J11) / J22;
 
                 zeros(3,1);
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx12dx = [
@@ -300,27 +344,43 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
 
                 zeros(3,1);
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx13dx = [
                 zeros(13,1);
                 0;
                 0;
-                0
+                0;
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx14dx = [
                 zeros(13,1);
                 0;
                 0;
-                0
+                0;
+                zeros(3,1);
+                zeros(3,1);
                 ]';
 
             dx15dx = [zeros(13,1);
                 0;
                 0;
                 0;
+                zeros(3,1);
+                zeros(3,1);
                 ]';
+            
+            dx16dx = zeros(22, 1)';
+            dx17dx = zeros(22, 1)';
+            dx18dx = zeros(22, 1)';
+
+            dx19dx = zeros(22, 1)';
+            dx20dx = zeros(22, 1)';
+            dx21dx = zeros(22, 1)';
 
             dfdx = [
               dx0dx;
@@ -339,13 +399,22 @@ classdef EKF_V_E < EKF_Basic_Kinematics
               dx13dx;
               dx14dx;
               dx15dx;
+              dx16dx;
+              dx17dx;
+              dx18dx;
+              dx19dx;
+              dx20dx;
+              dx21dx
             ];
         end
 
         function a_e = calc_accel(obj, a)
             e = obj.get_e();
             C_EB = ecef2body_rotm(e)';
-            a_e = C_EB * a + obj.g_vec_e;
+            
+            b_a = obj.get_b_a();
+
+            a_e = C_EB * (a + b_a) + obj.g_vec_e;
         end
 
         function y = h(obj)
@@ -354,6 +423,9 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             b_g = obj.get_b_g();
 
             y(8:10) = y(8:10) + b_g;
+
+            b_p = obj.get_b_p();
+            y(1:3) = y(1:3) + b_p;
         end
     end
 end

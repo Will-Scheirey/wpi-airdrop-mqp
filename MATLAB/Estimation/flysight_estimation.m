@@ -49,18 +49,10 @@ window = 3;
 mag_to_remove = any([isoutlier(data_mag.data(:, 1), the_mode, window), isoutlier(data_mag.data(:, 2), the_mode, window), isoutlier(data_mag.data(:, 3), the_mode, window)], 2);
 data_mag = data_mag(~mag_to_remove, :);
 
-%{
 the_mode = "movmedian";
 window = 100;
 accel_to_remove = any([isoutlier(data_accel.data(:, 1), the_mode, window), isoutlier(data_accel.data(:, 2), the_mode, window), isoutlier(data_accel.data(:, 3), the_mode, window)], 2);
 data_accel = data_accel(~accel_to_remove, :);
-%}
-%{
-bp = 0.01;
-data_accel.data(:, 1) = lowpass(data_accel.data(:,1), bp);
-data_accel.data(:, 2) = lowpass(data_accel.data(:,2), bp);
-data_accel.data(:, 3) = lowpass(data_accel.data(:,3), bp);
-%}
 
 measurements = {data_gps, data_mag, data_gyro, data_baro};
 inputs = data_accel;
@@ -72,8 +64,8 @@ dt_min_gyro  = min(diff(data_gyro.time));
 dt_min_baro  = min(diff(data_baro.time));
 
 dt        = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]);
-% tspan     = data_accel.time(1) : dt : data_accel.time(end);
-tspan = data_accel.time(1) : dt : 14;
+tspan     = data_accel.time(1) : dt : data_accel.time(end);
+% tspan = data_accel.time(1) : dt : 14;
 meas_freq = 1 / dt;
 
 %% Create Sensor Info
@@ -108,16 +100,24 @@ x0 = [
     0;
     0;
     0;
+
+    0;
+    0;
+    0;
+
+    0;
+    0;
+    0;
 ];
 
-Rp = 10;
+Rp = 1;
 R_pos = [
     Rp, 0,   0;
     0,   Rp, 0;
     0,   0,   Rp
     ].^2;
 
-Rq = 1;
+Rq = 1e0;
 R_quat = [
     Rq, 0,  0,  0;
     0,  Rq, 0,  0;
@@ -125,14 +125,14 @@ R_quat = [
     0,  0,  0,  Rq
     ].^2;
 
-Rw = 1;
+Rw = 1e-1;
 R_w = [
     Rw,  0,  0;
     0,   Rw, 0;
     0,   0,  Rw
 ].^2;
 
-Rb = 10;
+Rb = 5;
 R_baro = Rb^2;
 
 R = blkdiag( ...
@@ -143,13 +143,13 @@ R = blkdiag( ...
     );
 
 Q_P = [
-    1, 0,  0;
-    0,    1, 0;
-    0,    0,    1;
-] * 1e0;
+    1, 0, 0;
+    0, 1, 0;
+    0, 0, 1;
+] * 1e-4;
 
 cross_term = 1e-4;
-diag_term = 1e0;
+diag_term = 1e-3;
 
 Q_V = [
     diag_term,           cross_term,  cross_term;
@@ -165,26 +165,42 @@ Q_e = [
     0,   0,  0,  Qe
 ].^2;
 
-Qw = 1e-1;
+Qw = 1e0;
 Q_w = [
     Qw, 0,  0;
     0,  Qw, 0;
     0,  0,  Qw
 ].^2;
 
-Qwb = 1e-10;
+Qwb = 1e-3;
 Q_wb = [
  Qwb, 0,   0;
  0,   Qwb, 0;
  0,   0,   Qwb
-];
+].^2;
+
+Qab = 1e-3;
+Q_ab = [
+ Qab, 0,   0;
+ 0,   Qab, 0;
+ 0,   0,   Qab
+].^2;
+
+Qpb = 1e-3;
+Q_pb = [
+ Qpb, 0,   0;
+ 0,   Qpb, 0;
+ 0,   0,   1e-10
+].^2;
 
 Q = blkdiag(...
     Q_P,... % P
     Q_V,... % V
     Q_e, ... % e
     Q_w, ... % w
-    Q_wb ... % wb
+    Q_wb, ... % wb
+    Q_ab, ... % ab
+    Q_pb ...
     );
 
 P0 = blkdiag( ...
@@ -192,7 +208,9 @@ P0 = blkdiag( ...
     1e1 * eye(3), ...
     1e1 * eye(4), ...
     1e1 * eye(3), ...
-    1e1 * eye(3) ...
+    1e4 * eye(3), ...
+    1e4 * eye(3), ...
+    1e2 * eye(3) ...
     );
 
 %% Run the Kalman Filter
@@ -274,16 +292,16 @@ subplot(3, 1, 3)
 plot(t_plot, x_est(:, 16), 'DisplayName', 'Bias Estimate', 'LineWidth', 1.5); hold on
 legend
 xlabel("Time (s)")
-ylabel("Bias Error (rad/s)")
+ylabel("Bias Estimate (rad/s)")
 sgtitle("Gyro Axis 2")
 
-sgtitle("Gyro Bias Estimate Errors")
+sgtitle("Gyro Bias Estimates")
 
 figure(7)
 clf
 subplot(3,1,1)
 plot(t_plot, p_est(:,1), 'LineWidth', 2); hold on;
-plot(data_gps.time, data_gps.data(:, 1), '.', 'MarkerSize', 30);
+plot(data_gps.time, data_gps.data(:, 1), '.', 'MarkerSize', 10);
 legend("Estimated", "Measurement")
 xlabel("Time (s)")
 ylabel("Position (m)")
@@ -292,7 +310,7 @@ xlim([t_plot(1), t_plot(end)])
 
 subplot(3,1,2)
 plot(t_plot, p_est(:,2), 'LineWidth', 2); hold on;
-plot(data_gps.time, data_gps.data(:, 2), '.', 'MarkerSize', 30);
+plot(data_gps.time, data_gps.data(:, 2), '.', 'MarkerSize', 10);
 legend("Estimated", "Measurement")
 xlabel("Time (s)")
 ylabel("Position (m)")
@@ -301,7 +319,7 @@ xlim([t_plot(1), t_plot(end)])
 
 subplot(3,1,3)
 plot(t_plot, p_est(:,3), 'LineWidth', 2); hold on;
-plot(data_gps.time, data_gps.data(:, 3), '.', 'MarkerSize', 20);
+plot(data_gps.time, data_gps.data(:, 3), '.', 'MarkerSize', 10);
 legend("Estimated", "Measurement")
 xlabel("Time (s)")
 ylabel("Position (m)")
@@ -364,10 +382,63 @@ clf
 plot3(p_est(:,1), p_est(:,2), p_est(:,3), 'MarkerSize', 10, 'DisplayName', 'Estimate'); hold on;
 plot3(data_gps.data(:,1), data_gps.data(:,2), data_gps.data(:,3), '.', 'MarkerSize', 10, 'DisplayName', 'Measurement'); hold on
 legend
+axis equal
+
+figure(16);
+clf
+subplot(3, 1, 1)
+plot(t_plot, x_est(:, 17), 'DisplayName', 'Bias Estimate', 'LineWidth', 1.5); hold on
+legend
+xlabel("Time (s)")
+ylabel("Bias (m/s^2)")
+sgtitle("Accel Axis 0")
+
+subplot(3, 1, 2)
+plot(t_plot, x_est(:, 18), 'DisplayName', 'Bias Estimate', 'LineWidth', 1.5); hold on
+
+legend
+xlabel("Time (s)")
+ylabel("Bias (m/s^2)")
+sgtitle("Accel Axis 1")
+
+subplot(3, 1, 3)
+plot(t_plot, x_est(:, 19), 'DisplayName', 'Bias Estimate', 'LineWidth', 1.5); hold on
+legend
+xlabel("Time (s)")
+ylabel("Bias Estimate (m/s^2)")
+sgtitle("Accel Axis 2")
+
+sgtitle("Accel Bias Estimates")
+
+figure(17);
+clf
+subplot(3, 1, 1)
+plot(t_plot, x_est(:, 20), 'DisplayName', 'Bias Estimate', 'LineWidth', 1.5); hold on
+legend
+xlabel("Time (s)")
+ylabel("Bias (m)")
+sgtitle("Position Axis 0")
+
+subplot(3, 1, 2)
+plot(t_plot, x_est(:, 21), 'DisplayName', 'Bias Estimate', 'LineWidth', 1.5); hold on
+
+legend
+xlabel("Time (s)")
+ylabel("Bias (m)")
+sgtitle("Position Axis 1")
+
+subplot(3, 1, 3)
+plot(t_plot, x_est(:, 22), 'DisplayName', 'Bias Estimate', 'LineWidth', 1.5); hold on
+legend
+xlabel("Time (s)")
+ylabel("Bias Estimate (m)")
+sgtitle("Position Axis 2")
+
+sgtitle("Position Bias Estimates")
 
 %% Plot Measurements
-
-figure(16)
+return
+figure(17)
 clf
 plot(data_gps.time, data_gps.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_gps.time, data_gps.data(:, 2), 'DisplayName', '1')
@@ -375,7 +446,7 @@ plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', '1')
 legend
 title("GPS")
 
-figure(17)
+figure(18)
 clf
 plot(data_accel.time, data_accel.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_accel.time, data_accel.data(:, 2), 'DisplayName', '1')
@@ -383,7 +454,7 @@ plot(data_accel.time, data_accel.data(:, 3), 'DisplayName', '1')
 legend
 title("Accel")
 
-figure(18)
+figure(19)
 clf
 plot(data_gyro.time, data_gyro.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_gyro.time, data_gyro.data(:, 2), 'DisplayName', '1')
@@ -391,7 +462,7 @@ plot(data_gyro.time, data_gyro.data(:, 3), 'DisplayName', '1')
 legend
 title("Gyro")
 
-figure(19)
+figure(20)
 clf
 plot(data_mag.time, data_mag.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_mag.time, data_mag.data(:, 2), 'DisplayName', '1')
@@ -399,7 +470,7 @@ plot(data_mag.time, data_mag.data(:, 3), 'DisplayName', '1')
 legend
 title("Mag")
 
-figure(20)
+figure(21)
 clf
 plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', '0'); hold on
 legend
@@ -411,7 +482,7 @@ figure(16)
 clf
 run_animation(t_plot, p_est, e_est, 10, 10);
 
-return
+
 figure(16)
 clf
 for n = 1:3:num_steps-1

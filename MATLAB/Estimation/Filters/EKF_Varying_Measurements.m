@@ -20,13 +20,13 @@ classdef EKF_Varying_Measurements < EKF_V_E
             obj.last_u = [0; 0; 0];
 
             obj.dhdx_alt = [
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 ];
 
             obj.dhdx_w_no_bias = [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
             ];
         end
 
@@ -44,8 +44,8 @@ classdef EKF_Varying_Measurements < EKF_V_E
                 obj.trust_accel_all(obj.hist_idx) = trust_accel;
             end
 
-            y_pred = obj.h(meas_idx); % Measurement prediction
-            innovation = y - y_pred; % Innovation
+            y_pred = obj.h(meas_idx);
+            innovation = y - y_pred;
 
             H = obj.h_jacobian_states(meas_idx);
 
@@ -55,12 +55,23 @@ classdef EKF_Varying_Measurements < EKF_V_E
 
             S = R_meas + H*obj.P_curr*H';
 
+            if meas_idx == 1
+                gamma = innovation' / S * innovation;
+                T_jump = 25;
+                if gamma > T_jump
+                    idx = obj.x_inds.b_p;
+                    scale_factor = 1e4;
+                    obj.P_curr(idx, idx) = obj.P_curr(idx, idx) + scale_factor * [1, 0, 0; 0, 1, 0; 0, 0, 0];
+                    S = R_meas + H*obj.P_curr*H';
+                end
+            end
+
             K = obj.P_curr * H' / S;
 
             obj.x_curr = obj.x_curr + K * innovation;
             obj.normalize_quat();
 
-            obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*R_meas*K'; % Update covariance
+            obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*R_meas*K';
         end
 
         function [innovation, S] = step_filter(obj, y, u)
@@ -149,24 +160,25 @@ classdef EKF_Varying_Measurements < EKF_V_E
                     [innovation, ~, S] = obj.update(meas.data', meas_idx);
                 end
 
-                % obj.inno_hist(:, i) = innovation;
                 obj.P_hist(:, :, i) = obj.P_curr;
-                % obj.S_hist(:, :, i) = S;
                 obj.hist_idx = obj.hist_idx + 1;
             end
         end
 
         function dhdx = h_jacobian_states(obj, meas_idx)
             
-            w_jacobian = obj.dhdx_w_no_bias;
-            if obj.x_curr(3) < 1
-                w_jacobian = obj.dhdx_w;
-            end
+            w_jacobian = obj.dhdx_w;
 
+            %{
+            if obj.x_curr(3) > 1
+                w_jacobian = obj.dhdx_w_no_bias;
+            end
+            %}
+            
             dhdx = [
                 obj.dhdx_p;
                 obj.dhdx_q;
-                w_jacobian
+                w_jacobian;
                 obj.dhdx_alt
                 ];
             if nargin == 2
@@ -176,9 +188,12 @@ classdef EKF_Varying_Measurements < EKF_V_E
 
         function y = h(obj, meas_idx)
             P_E = obj.get_P_E();
+            b_p = obj.get_b_p();
+
+            bp0 = b_p(1); bp1 = b_p(2); bp2 = b_p(3);
             p0 = P_E(1); p1 = P_E(2); p2 = P_E(3);
 
-            p = [p0; p1; p2];
+            p = [p0+bp0; p1+bp1; p2+bp2];
 
             e = obj.get_e();
             e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
@@ -186,9 +201,12 @@ classdef EKF_Varying_Measurements < EKF_V_E
             e = [e0; e1; e2; e3];
 
             w_b = obj.get_w_b();
+            b_g = obj.get_b_g();
+
+            bg0 = b_g(1); bg1 = b_g(2); bg2 = b_g(3);
             w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
 
-            w = [w0; w1; w2];
+            w = [w0 + bg0; w1 + bg1; w2 + bg2];
 
             alt = p2;
 
@@ -203,40 +221,33 @@ classdef EKF_Varying_Measurements < EKF_V_E
         end
 
         function [q_meas, trust_accel] = quat_from_acc_mag(obj, a_b, m_b)
-            % --- accel magnitude check ---
             a_norm = norm(a_b);
             trust_accel = abs(a_norm - obj.g_norm) < obj.accel_gate && obj.x_curr(3) < 50;
 
             if trust_accel
-                d_b = -a_b / norm(a_b);      % Down in body
+                d_b = -a_b / norm(a_b);
             else
                 e = obj.get_e();
                 g_b = ecef2body_rotm(e) * (obj.g_vec_e) / norm(obj.g_vec_e);
-                d_b = g_b / norm(g_b);    % predicted Down
+                d_b = g_b / norm(g_b);
             end
 
-            % Up in body (ENU uses +Z Up)
             u_b = -d_b;
 
-            % Normalize mag
             m_b = m_b / norm(m_b);
 
-            % East-ish horizontal (same definition)
             e_b = cross(m_b, d_b);
             e_b = e_b / norm(e_b);
 
-            % North from accel+mag
-            n_b = cross(u_b, e_b);    % note: differs from your NED version
+            n_b = cross(u_b, e_b);
             n_b = n_b / norm(n_b);
 
-            % Rotation matrix: ENU → Body
             C_BE = [ e_b, n_b, u_b ];
 
             q_meas = obj.rotm_to_quat(C_BE);
         end
 
         function q = rotm_to_quat(~, R)
-            % Convert 3x3 rotation matrix to [q0;q1;q2;q3] (scalar-first)
             tr = trace(R);
             if tr > 0
                 S  = sqrt(tr + 1.0) * 2.0;
