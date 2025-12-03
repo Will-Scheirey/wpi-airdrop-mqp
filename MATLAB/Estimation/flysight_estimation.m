@@ -65,16 +65,8 @@ dt_min_baro  = min(diff(data_baro.time));
 
 dt        = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]);
 tspan     = data_accel.time(1) : dt : data_accel.time(end);
-% tspan = data_accel.time(1) : dt : 14;
+% tspan = 0 : dt : 25;
 meas_freq = 1 / dt;
-
-%% Create Sensor Info
-sensor = Sensor_FlySight(1000);
-p_std_dev = sensor.gps_std_dev;
-a_std_dev = sensor.accel_std_dev;
-w_std_dev = sensor.gyro_std_dev;
-e_std_dev = sensor.mag_std_dev;
-w_bias_std_dev = 20;
 
 %% Set up the Kalman Filter
 num_steps = numel(tspan);
@@ -110,14 +102,16 @@ x0 = [
     0;
 ];
 
-Rp = 1;
+Rb = 5;
+
+Rp = 5;
 R_pos = [
     Rp, 0,   0;
     0,   Rp, 0;
-    0,   0,   Rp
+    0,   0,   Rb
     ].^2;
 
-Rq = 1e0;
+Rq = 1e-1;
 R_quat = [
     Rq, 0,  0,  0;
     0,  Rq, 0,  0;
@@ -132,7 +126,6 @@ R_w = [
     0,   0,  Rw
 ].^2;
 
-Rb = 5;
 R_baro = Rb^2;
 
 R = blkdiag( ...
@@ -146,10 +139,10 @@ Q_P = [
     1, 0, 0;
     0, 1, 0;
     0, 0, 1;
-] * 1e-4;
+] * 1e1;
 
 cross_term = 1e-4;
-diag_term = 1e-3;
+diag_term = 1e1;
 
 Q_V = [
     diag_term,           cross_term,  cross_term;
@@ -157,7 +150,7 @@ Q_V = [
     cross_term,    cross_term,  diag_term
 ];
 
-Qe = 1e-1;
+Qe = 1e-2;
 Q_e = [
     Qe,  0,  0,  0;
     0,   Qe, 0,  0;
@@ -165,7 +158,7 @@ Q_e = [
     0,   0,  0,  Qe
 ].^2;
 
-Qw = 1e0;
+Qw = 1e-3;
 Q_w = [
     Qw, 0,  0;
     0,  Qw, 0;
@@ -186,7 +179,7 @@ Q_ab = [
  0,   0,   Qab
 ].^2;
 
-Qpb = 1e-3;
+Qpb = 1e-8;
 Q_pb = [
  Qpb, 0,   0;
  0,   Qpb, 0;
@@ -331,14 +324,14 @@ clf
 plot(t_plot, kf.accel_calc_all(1:end-1, 1), 'LineWidth', 1.5, 'DisplayName', 'a_0^E'); hold on
 plot(t_plot, kf.accel_calc_all(1:end-1, 2), 'LineWidth', 1.5, 'DisplayName', 'a_1^E'); hold on
 plot(t_plot, kf.accel_calc_all(1:end-1, 3), 'LineWidth', 1.5, 'DisplayName', 'a_2^E'); hold on
-
+xlim([t_plot(1), t_plot(end)])
 legend
 
 figure(9)
 clf
 idx = 1;
 plot_cov(kf.P_hist(idx,idx,:))
-
+xlim([t_plot(1), t_plot(end)])
 
 figure(10)
 clf
@@ -346,6 +339,7 @@ plot(data_mag.time, data_mag.data(:, 1), 'LineWidth', 2, 'DisplayName', 'Mag X')
 plot(data_mag.time, data_mag.data(:, 2), 'LineWidth', 2, 'DisplayName', 'Mag Y'); hold on
 plot(data_mag.time, data_mag.data(:, 3), 'LineWidth', 2, 'DisplayName', 'Mag Z'); hold on
 legend
+xlim([t_plot(1), t_plot(end)])
 
 figure(11)
 clf
@@ -354,18 +348,15 @@ plot(data_accel.time, data_accel.data(:, 2), 'LineWidth', 2, 'DisplayName', 'Acc
 plot(data_accel.time, data_accel.data(:, 3), 'LineWidth', 2, 'DisplayName', 'Accel Z'); hold on
 plot(data_accel.time, vecnorm(data_accel.data, 2, 2), 'LineWidth', 2, 'DisplayName', 'Accel Norm'); hold on
 legend
+xlim([t_plot(1), t_plot(end)])
 
 figure(12)
 clf
 plot(data_accel.time, vecnorm(data_accel.data, 2, 2), 'LineWidth', 2, 'DisplayName', 'Measured Accel Norm'); hold on
 plot(t_plot, vecnorm(kf.accel_calc_all(1:end-1, :), 2, 2), 'LineWidth', 2, 'DisplayName', 'Estimated Accel Norm'); hold on
 legend
+xlim([t_plot(1), t_plot(end)])
 
-figure(13)
-clf
-plot(t_plot, kf.trust_accel_all(1:end-1))
-
-legend
 
 quats = quaternion(e_est(:, 1), e_est(:, 2), e_est(:, 3), e_est(:, 4));
 figure(14)
@@ -437,51 +428,82 @@ sgtitle("Position Axis 2")
 sgtitle("Position Bias Estimates")
 
 %% Plot Measurements
-return
-figure(17)
+figure(18)
 clf
 plot(data_gps.time, data_gps.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_gps.time, data_gps.data(:, 2), 'DisplayName', '1')
 plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', '1')
 legend
 title("GPS")
+xlim([tspan(1), tspan(end)])
 
-figure(18)
+figure(19)
 clf
 plot(data_accel.time, data_accel.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_accel.time, data_accel.data(:, 2), 'DisplayName', '1')
 plot(data_accel.time, data_accel.data(:, 3), 'DisplayName', '1')
 legend
 title("Accel")
+xlim([tspan(1), tspan(end)])
 
-figure(19)
+figure(20)
 clf
 plot(data_gyro.time, data_gyro.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_gyro.time, data_gyro.data(:, 2), 'DisplayName', '1')
 plot(data_gyro.time, data_gyro.data(:, 3), 'DisplayName', '1')
 legend
 title("Gyro")
+xlim([tspan(1), tspan(end)])
 
-figure(20)
+figure(21)
 clf
 plot(data_mag.time, data_mag.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_mag.time, data_mag.data(:, 2), 'DisplayName', '1')
 plot(data_mag.time, data_mag.data(:, 3), 'DisplayName', '1')
 legend
 title("Mag")
+xlim([tspan(1), tspan(end)])
 
-figure(21)
+figure(22)
 clf
 plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', '0'); hold on
 legend
 title("Baro")
+xlim([tspan(1), tspan(end)])
+
+%% Plot Innovation
+figure(23)
+clf
+plot(tspan, kf.inno_hist(1:3, :), '.-', 'MarkerSize', 10);
+legend("0", "1", "2")
+title("Position Innovation")
+xlabel("Time (s)")
+ylabel("Position Innovation (m)")
+xlim([dt*10, tspan(end)])
+
+figure(24)
+clf
+plot(tspan, kf.inno_hist(4:7, :), '.-', 'MarkerSize', 10);
+legend("0", "1", "2", "3")
+title("Quaternion Innovation")
+xlabel("Time (s)")
+ylabel("Quaternion Innovation")
+xlim([dt*10, tspan(end)])
+
+figure(25)
+clf
+plot(tspan, rad2deg(kf.inno_hist(8:10, :)), '.-', 'MarkerSize', 10);
+legend("0", "1", "2")
+title("Angular Velocity Innovation")
+xlabel("Time (s)")
+ylabel("Angular Velocity Innovation (rad/s)")
+xlim([dt*10, tspan(end)])
 
 return
 %% ANIMATION
 figure(16)
 clf
-run_animation(t_plot, p_est, e_est, 10, 10);
-
+run_animation(t_plot, p_est, e_est, 5, 10);
 
 figure(16)
 clf
@@ -504,7 +526,7 @@ numsteps = height(position);
 quat = quaternion(orientation(1, :));
 patch = poseplot(quat); hold on
 
-patch.ScaleFactor = 50;
+patch.ScaleFactor = 100;
 xlabel("X")
 ylabel("Y")
 zlabel("Z")

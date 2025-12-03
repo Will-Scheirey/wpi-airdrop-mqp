@@ -110,6 +110,8 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             e = obj.get_e();
             e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
 
+            b_p = obj.get_b_p();
+
             w_b = obj.get_w_b();
             w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
 
@@ -190,9 +192,11 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
                 0;
-                e0^2 + e1^2 - e2^2 - e3^2;
-                2*e1*e2 - 2*e0*e3;
-                2*e0*e2 + 2*e1*e3;
+
+                1;
+                0;
+                0;
+
                 zeros(3,1);
                 ]';
 
@@ -215,9 +219,11 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
 
-                2*e0*e3 + 2*e1*e2;
-                e0^2 - e1^2 + e2^2 - e3^2;
-                2*e2*e3 - 2*e0*e1;
+                
+                0;
+                1;
+                0;
+
                 zeros(3,1);
                 ]';
 
@@ -241,9 +247,10 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
 
-                2*e1*e3 - 2*e0*e2;
-                2*e0*e1 + 2*e2*e3;
-                e0^2 - e1^2 - e2^2 + e3^2;
+                0;
+                0;
+                1;
+
                 zeros(3,1);
                 ]';
 
@@ -414,7 +421,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             
             b_a = obj.get_b_a();
 
-            a_e = C_EB * (a + b_a) + obj.g_vec_e;
+            a_e = C_EB * a + obj.g_vec_e + b_a;
         end
 
         function y = h(obj)

@@ -55,14 +55,17 @@ classdef EKF_Varying_Measurements < EKF_V_E
 
             S = R_meas + H*obj.P_curr*H';
 
+            did_bias = false;
+
             if meas_idx == 1
                 gamma = innovation' / S * innovation;
-                T_jump = 25;
+                T_jump = 10;
                 if gamma > T_jump
                     idx = obj.x_inds.b_p;
-                    scale_factor = 1e4;
+                    scale_factor = 1e8;
                     obj.P_curr(idx, idx) = obj.P_curr(idx, idx) + scale_factor * [1, 0, 0; 0, 1, 0; 0, 0, 0];
                     S = R_meas + H*obj.P_curr*H';
+                    did_bias = true;
                 end
             end
 
@@ -72,6 +75,10 @@ classdef EKF_Varying_Measurements < EKF_V_E
             obj.normalize_quat();
 
             obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*R_meas*K';
+
+            if did_bias
+                [innovation, K, S] = update(obj, y, meas_idx);
+            end
         end
 
         function [innovation, S] = step_filter(obj, y, u)
@@ -96,7 +103,14 @@ classdef EKF_Varying_Measurements < EKF_V_E
 
             obj.x_hist = zeros(numel(obj.x_curr), num_steps);
             obj.P_hist = zeros(numel(obj.x_curr), numel(obj.x_curr), num_steps);
-            obj.inno_hist = zeros(size(y_all));
+
+            inno_height = 0;
+            for i = 1:numel(y_all)
+                inno_height = inno_height + width(y_all{i}.data);
+            end
+
+            obj.inno_hist = NaN(inno_height, num_steps);
+
             obj.S_hist = zeros(height(y_all), height(y_all), num_steps);
 
             obj.accel_calc_all = zeros(num_steps, 3);
@@ -158,6 +172,8 @@ classdef EKF_Varying_Measurements < EKF_V_E
                     meas_idx = meas.meas_idx;
 
                     [innovation, ~, S] = obj.update(meas.data', meas_idx);
+
+                    obj.inno_hist(obj.measurement_ranges{meas_idx}, obj.hist_idx) = innovation;
                 end
 
                 obj.P_hist(:, :, i) = obj.P_curr;
@@ -169,11 +185,11 @@ classdef EKF_Varying_Measurements < EKF_V_E
             
             w_jacobian = obj.dhdx_w;
 
-            %{
+            
             if obj.x_curr(3) > 1
                 w_jacobian = obj.dhdx_w_no_bias;
             end
-            %}
+            
             
             dhdx = [
                 obj.dhdx_p;
