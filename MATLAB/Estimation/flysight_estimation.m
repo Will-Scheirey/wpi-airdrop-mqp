@@ -119,7 +119,7 @@ R_quat = [
     0,  0,  0,  Rq
     ].^2;
 
-Rw = 1e-1;
+Rw = 1e-3;
 R_w = [
     Rw,  0,  0;
     0,   Rw, 0;
@@ -150,7 +150,7 @@ Q_V = [
     cross_term,    cross_term,  diag_term
 ];
 
-Qe = 1e-2;
+Qe = 1e-1;
 Q_e = [
     Qe,  0,  0,  0;
     0,   Qe, 0,  0;
@@ -158,7 +158,7 @@ Q_e = [
     0,   0,  0,  Qe
 ].^2;
 
-Qw = 1e-3;
+Qw = 1e-1;
 Q_w = [
     Qw, 0,  0;
     0,  Qw, 0;
@@ -208,7 +208,7 @@ P0 = blkdiag( ...
 
 %% Run the Kalman Filter
 flysight_box = Box(0.1524, 0.1524, 3.6576, 25);
-% flysight_box = Box(0.1524, 0.1524, 0.4, 2);
+flysight_box = Box(0.1524, 0.1524, 0.4, 2);
 
 kf = EKF_Varying_Measurements(R, Q, x0, 0, P0, dt, flysight_box.I());
 
@@ -492,7 +492,7 @@ xlim([dt*10, tspan(end)])
 
 figure(25)
 clf
-plot(tspan, rad2deg(kf.inno_hist(8:10, :)), '.-', 'MarkerSize', 10);
+plot(tspan, kf.inno_hist(8:10, :), '.-', 'MarkerSize', 10);
 legend("0", "1", "2")
 title("Angular Velocity Innovation")
 xlabel("Time (s)")
