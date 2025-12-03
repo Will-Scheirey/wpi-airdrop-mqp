@@ -8,7 +8,7 @@ h.TimeseriesSourceType = 'Timeseries';
 h.TimeseriesSource = ts;
 
 h.FlightGearBaseDirectory = '/Applications/FlightGear.app';
-h.GeometryModelName = 'Animation/Parachutist';
+h.GeometryModelName = 'Parachutist';
 h.DestinationIpAddress = '127.0.0.1';
 h.DestinationPort = '5502';
 
@@ -23,11 +23,14 @@ h.InstallScenery = true;
 h.DisableShaders = true;
 h.TimeScaling = 5;
 
+setenv('FG_ROOT', '/Applications/FlightGear.app/Contents/Resources/data');
+
+h.OutputFileName = 'runfg.sh';
+
 get(h)
 % 
 % GenerateRunScript(h)
 % 
 % system('runfg.bat &');
 
-play(h)
 end

@@ -75,7 +75,6 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
             M_p = cross(obj.payload.  P_attach_B, F_r_p); % Payload body moments   [N m]
             M_c = cross(obj.parachute.P_attach_B, F_r_c); % Parachute body moments [N m]
-
         end
 
         function x_dot = dxdt(obj, F_p, F_c, M_p, M_c)

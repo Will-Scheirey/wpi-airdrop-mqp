@@ -49,6 +49,13 @@ measurements = [p_meas, e_meas, w_meas]';
 
 state_idx = 14;
 
+% Wind noise addition
+mag = 6 * ones(2001, 1);
+direction = 270 * ones(2001, 1);
+wind = [mag direction];
+
+wind_meas = sensor_noise_white(wind, 1);
+
 %% Set up the Kalman Filter
 num_steps = numel(t);
 
@@ -141,6 +148,15 @@ w_bias_err = w_bias' - x_est(:, 14:16);
 x_err = [p_err, v_err, e_err, w_err, w_bias_err];
 
 t_plot = t(1:end-1);
+
+LSTM_export_sensor = [y(:, 11:13), alpha_actual];
+LSTM_export_sensor_file = "LSTM_sensor_data.csv";
+
+LSTM_export_wind = wind_meas;
+LSTM_export_wind_file = "LSTM_wind_data.csv";
+
+writematrix(LSTM_export_sensor, LSTM_export_sensor_file);
+writematrix(LSTM_export_wind, LSTM_export_wind_file);
 
 %% Plot Values
 figure(1)
