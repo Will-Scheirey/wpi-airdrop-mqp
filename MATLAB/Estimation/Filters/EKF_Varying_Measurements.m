@@ -4,15 +4,23 @@ classdef EKF_Varying_Measurements < EKF_V_E
         last_u
 
         g_norm = 9.80665;
-        accel_gate  = 2;
+        accel_gate  = 1;
+        alt_gate    = 1e8;
 
         dhdx_alt
         dhdx_w_no_bias
         trust_accel_all
+        dhdx_pos_no_bias
+        down_vec_all
+
+        last_down
+
+        quat_meas_all
     end
 
     methods
-        function obj = EKF_Varying_Measurements(R, Q, x0, H0, P0, dt, J)
+        function obj = EKF_Varying_Measurements(R, Q, H0, P0, dt, J)
+            x0 = zeros(height(P0), 1);
 
             obj = obj@EKF_V_E(R, Q, x0, H0, P0, dt, J);
 
@@ -23,18 +31,66 @@ classdef EKF_Varying_Measurements < EKF_V_E
                 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 ];
 
+            obj.dhdx_pos_no_bias = [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+            ];
+
             obj.dhdx_w_no_bias = [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
             ];
+
+            obj.g_vec_e = [0; 0; -9.81];
+
+            obj.last_down = [0; 0; 1];
+            obj.update_a_b = true;
         end
 
-        function [innovation, K, S] = update(obj, y, meas_idx)
+        function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas)
+            pos_inds = obj.x_inds.P_E;
 
-            mag_idx = find(meas_idx == 2, 1);
+            % Initialize position to the GPS measurement
+            obj.x_curr(pos_inds(1:2)) = gps_meas(1:2);
 
-            if ~isempty(mag_idx)
+            % Initialize altitude to the baro measurement
+            obj.x_curr(pos_inds(3))   = baro_meas;
+
+            % Initialize altitude bias to GPS altitude minus baro altitude
+            obj.x_curr(obj.x_inds.b_p(3)) = gps_meas(3) - baro_meas;
+
+            if ~stationary, return; end
+
+            % Rescale accel to have the expected norm
+            accel_meas_corr = obj.g_norm * accel_meas / norm(accel_meas);
+
+            % Change alt gate so we can calculate the down vector
+            old_alt_gate = obj.alt_gate;
+            obj.alt_gate = 1e10;
+
+            % Estimate the orientation from accel and mag measurments
+            q_meas = obj.quat_from_acc_mag(accel_meas_corr, mag_meas);
+
+            % Change alt gate back
+            obj.alt_gate = old_alt_gate;
+
+            % Initialize velocity and angular velocity to zero
+            obj.x_curr(obj.x_inds.V_E) = zeros(3,1);
+            obj.x_curr(obj.x_inds.w_b) = zeros(3,1);
+
+            % Initialize gyro bias to the current gyro readings
+            obj.x_curr(obj.x_inds.b_g) = gyro_meas;
+            % Initialize orientation 
+            obj.x_curr(obj.x_inds.e) = q_meas;
+            % Initialize accel bias to the measurement minus corrected
+            obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
+        end
+
+        function [innovation, K, S] = update(obj, y, meas_idx, R_gps)
+
+            if meas_idx == 2
                 [y, trust_accel] = obj.quat_from_acc_mag(obj.last_u, y);
 
                 if dot(y, obj.get_e()) < 0
@@ -42,6 +98,7 @@ classdef EKF_Varying_Measurements < EKF_V_E
                 end
 
                 obj.trust_accel_all(obj.hist_idx) = trust_accel;
+                obj.quat_meas_all(obj.hist_idx, :)   = y;
             end
 
             y_pred = obj.h(meas_idx);
@@ -52,22 +109,11 @@ classdef EKF_Varying_Measurements < EKF_V_E
             range = obj.measurement_ranges{meas_idx};
 
             R_meas = obj.R(range, range);
+            if nargin == 4
+                R_meas = R_gps;
+            end
 
             S = R_meas + H*obj.P_curr*H';
-
-            did_bias = false;
-
-            if meas_idx == 1
-                gamma = innovation' / S * innovation;
-                T_jump = 10;
-                if gamma > T_jump
-                    idx = obj.x_inds.b_p;
-                    scale_factor = 1e8;
-                    obj.P_curr(idx, idx) = obj.P_curr(idx, idx) + scale_factor * [1, 0, 0; 0, 1, 0; 0, 0, 0];
-                    S = R_meas + H*obj.P_curr*H';
-                    did_bias = true;
-                end
-            end
 
             K = obj.P_curr * H' / S;
 
@@ -75,10 +121,6 @@ classdef EKF_Varying_Measurements < EKF_V_E
             obj.normalize_quat();
 
             obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*R_meas*K';
-
-            if did_bias
-                [innovation, K, S] = update(obj, y, meas_idx);
-            end
         end
 
         function [innovation, S] = step_filter(obj, y, u)
@@ -97,7 +139,7 @@ classdef EKF_Varying_Measurements < EKF_V_E
             obj.normalize_quat();
         end
 
-        function run_filter(obj, y_all, u_all, timesteps)
+        function run_filter(obj, y_all, u_all, timesteps, acc_gps_all)
             num_steps = numel(timesteps);
             dt = timesteps(2) - timesteps(1);
 
@@ -114,7 +156,9 @@ classdef EKF_Varying_Measurements < EKF_V_E
             obj.S_hist = zeros(height(y_all), height(y_all), num_steps);
 
             obj.accel_calc_all = zeros(num_steps, 3);
-            obj.trust_accel_all = false(num_steps, 1);
+            obj.trust_accel_all = NaN(num_steps, 1);
+            obj.down_vec_all = NaN(num_steps, 3);
+            obj.quat_meas_all = NaN(num_steps, 4);
 
             last_idx = zeros(size(y_all));
             last_idx_u = 0;
@@ -149,9 +193,9 @@ classdef EKF_Varying_Measurements < EKF_V_E
                     timestamps = y_all_n.time((last_idx(n) + 1):end);
 
                     above_min = t > timestamps;
-                    above_max = t + dt > timestamps;
+                    below_max = t + dt > timestamps;
 
-                    check = [above_min, above_max];
+                    check = [above_min, below_max];
 
                     good_meas = all(check, 2);
 
@@ -171,7 +215,16 @@ classdef EKF_Varying_Measurements < EKF_V_E
 
                     meas_idx = meas.meas_idx;
 
-                    [innovation, ~, S] = obj.update(meas.data', meas_idx);
+                    if meas_idx == 1
+                        accH = acc_gps_all(last_idx(n), 1);
+                        accV = acc_gps_all(last_idx(n), 2);
+                        
+                        R_gps = (blkdiag(accH, accH, accV)).^2;
+
+                        [innovation, ~, S] = obj.update(meas.data', meas_idx, R_gps);
+                    else
+                        [innovation, ~, S] = obj.update(meas.data', meas_idx);
+                    end
 
                     obj.inno_hist(obj.measurement_ranges{meas_idx}, obj.hist_idx) = innovation;
                 end
@@ -185,14 +238,16 @@ classdef EKF_Varying_Measurements < EKF_V_E
             
             w_jacobian = obj.dhdx_w;
 
-            
-            if obj.x_curr(3) > 1
+            if obj.x_curr(3) > obj.alt_gate || norm(obj.x_curr(4:6)) > 1
                 w_jacobian = obj.dhdx_w_no_bias;
+                obj.update_a_b = false;
             end
             
-            
+            % p_jacobian = obj.dhdx_pos_no_bias;
+            p_jacobian = obj.dhdx_p;
+
             dhdx = [
-                obj.dhdx_p;
+                p_jacobian
                 obj.dhdx_q;
                 w_jacobian;
                 obj.dhdx_alt
@@ -238,15 +293,16 @@ classdef EKF_Varying_Measurements < EKF_V_E
 
         function [q_meas, trust_accel] = quat_from_acc_mag(obj, a_b, m_b)
             a_norm = norm(a_b);
-            trust_accel = abs(a_norm - obj.g_norm) < obj.accel_gate && obj.x_curr(3) < 50;
+            trust_accel = (abs(a_norm - obj.g_norm) < obj.accel_gate) && (obj.x_curr(3) < obj.alt_gate);
 
             if trust_accel
                 d_b = -a_b / norm(a_b);
+                obj.last_down = d_b;
             else
-                e = obj.get_e();
-                g_b = ecef2body_rotm(e) * (obj.g_vec_e) / norm(obj.g_vec_e);
-                d_b = g_b / norm(g_b);
+                d_b = obj.last_down;
             end
+
+            obj.down_vec_all(obj.hist_idx, :) = d_b;
 
             u_b = -d_b;
 

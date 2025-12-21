@@ -6,6 +6,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
         accel_calc_all
 
         hist_idx
+        update_a_b
     end
 
     methods
@@ -106,7 +107,11 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             dxdt = [dP_dt; dV_dt; de_dt; dw_dt; db_g_dt; db_a_dt; db_p_dt];
         end
 
-        function dfdx = f_jacobian_states(obj, u)
+        function dfdx = f_jacobian_states(obj, u, a_b_mult)
+            if nargin < 3
+                a_b_mult = obj.update_a_b;
+            end
+
             e = obj.get_e();
             e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
 
@@ -118,9 +123,16 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             a = obj.calc_accel(u(1:3));
             a0 = a(1); a1 = a(2); a2 = a(3);
 
+            a_b = 1;
+            if obj.x_curr(3) > 5
+                a_b = 0;
+            end
+
             J11 = obj.J(1,1);
             J22 = obj.J(2,2);
             J33 = obj.J(3,3);
+
+            C_EB = ecef2body_rotm(e)' * a_b_mult;
 
             dx0dx = [
                 zeros(3,1);
@@ -193,9 +205,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
 
-                1;
-                0;
-                0;
+                -C_EB(1,:).';
 
                 zeros(3,1);
                 ]';
@@ -220,9 +230,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
 
                 
-                0;
-                1;
-                0;
+                -C_EB(2,:).';
 
                 zeros(3,1);
                 ]';
@@ -247,9 +255,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
                 0;
                 0;
 
-                0;
-                0;
-                1;
+                -C_EB(3,:).';
 
                 zeros(3,1);
                 ]';
@@ -421,7 +427,7 @@ classdef EKF_V_E < EKF_Basic_Kinematics
             
             b_a = obj.get_b_a();
 
-            a_e = C_EB * a + obj.g_vec_e + b_a;
+            a_e = C_EB * (a - b_a) + obj.g_vec_e;
         end
 
         function y = h(obj)

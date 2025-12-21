@@ -1,10 +1,10 @@
 function data_out = load_flysight_file(filename)
 % LOAD_FLYSIGHT_FILE  Parse a FlySight-style log and return per-sensor tables.
 %   data_out = load_flysight_file(filename)
-%   Returns a struct where each field is a sensor type (e.g. 'IMU') and
-%   data_out.IMU is a table with columns [time, field2, field3, ...].
-%
-%   The function reads $COL and $UNIT metadata when present to name columns.
+%   Returns a struct where each field is a sensor type (e.g. 'IMU', 'GNSS') and
+%   data_out.IMU  is a table with columns [time, field2, field3, ...].
+%   For GNSS logs with ISO timestamps, the 'time' column is converted to
+%   seconds from the first GNSS sample.
 
 inputFile = filename;
 
@@ -22,6 +22,9 @@ colsMap  = containers.Map();  % TYPE -> column names
 unitsMap = containers.Map();  % TYPE -> units (parsed but not used here)
 dataMap  = struct();          % TYPE -> numeric matrix
 
+% Reference time for GNSS (first timestamp)
+gnssBaseTime = datetime.empty;
+
 while ~feof(fid)
     line = fgetl(fid);
     if ~ischar(line), continue; end
@@ -35,21 +38,60 @@ while ~feof(fid)
         case 'COL'
             if numel(parts) < 3, continue; end
             colsMap(parts{2}) = strtrim(parts(3:end));
+
         case 'UNIT'
             if numel(parts) < 3, continue; end
             unitsMap(parts{2}) = strtrim(parts(3:end));
+
         otherwise
             type = tag;
-            vals = nan(1, numel(parts)-1);
-            for k = 2:numel(parts)
-                v = str2double(parts{k});
-                if ~isnan(v)
-                    vals(k-1) = v;
-                else
-                    % non-numeric fields -> NaN (most FlySight numeric)
-                    vals(k-1) = NaN;
+
+            % -------- GNSS SPECIAL CASE: ISO-8601 TIME STRING ----------
+            if strcmpi(type, 'GNSS')
+                % parts{2} is something like '2025-08-07T13:20:02.000Z'
+                timeStr = strtrim(parts{2});
+
+                % Parse as UTC datetime
+                dt = datetime(timeStr, ...
+                    'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', ...
+                    'TimeZone', 'UTC');
+
+                % Set reference (first sample) if needed
+                if isempty(gnssBaseTime)
+                    gnssBaseTime = dt;
+                end
+
+                % Seconds since first GNSS sample
+                tsec = seconds(dt - gnssBaseTime);
+
+                % Allocate row: first column = time [s], rest numeric
+                vals = nan(1, numel(parts)-1);
+                vals(1) = tsec;
+
+                % Remaining columns are numeric (lat, lon, hMSL, velN, ...)
+                for k = 3:numel(parts)
+                    v = str2double(parts{k});
+                    if ~isnan(v)
+                        vals(k-1) = v;
+                    else
+                        vals(k-1) = NaN;
+                    end
+                end
+
+            else
+                % -------- DEFAULT: all fields numeric ----------
+                vals = nan(1, numel(parts)-1);
+                for k = 2:numel(parts)
+                    v = str2double(parts{k});
+                    if ~isnan(v)
+                        vals(k-1) = v;
+                    else
+                        vals(k-1) = NaN;
+                    end
                 end
             end
+
+            % Append to dataMap
             if isfield(dataMap, type)
                 dataMap.(type) = [dataMap.(type); vals];
             else
@@ -71,11 +113,11 @@ data_out = struct();
 for i = 1:numel(types)
     t = types{i};
     mat = dataMap.(t);
+
     if isempty(mat)
         % empty: create empty table with no rows but with columns if possible
         if isKey(colsMap, t)
             colnames = colsMap(t);
-            % ensure at least "time" column
             if isempty(colnames)
                 colnames = {'time'};
             end
@@ -83,7 +125,6 @@ for i = 1:numel(types)
             colnames = {'time'};
         end
         safeNames = matlab.lang.makeValidName(colnames);
-        % build an empty table with those variable names
         emptyMat = nan(0, numel(safeNames));
         data_out.(t) = array2table(emptyMat, 'VariableNames', safeNames);
         continue;
@@ -94,7 +135,6 @@ for i = 1:numel(types)
     % Get column names from $COL if available, else generate generic names
     if isKey(colsMap, t)
         rawNames = colsMap(t);
-        % ensure number of names matches columns
         if numel(rawNames) < ncols
             extra = arrayfun(@(k) sprintf('col%d', k), numel(rawNames)+1:ncols, 'UniformOutput', false);
             rawNames = [rawNames, extra];
@@ -105,32 +145,20 @@ for i = 1:numel(types)
         rawNames = arrayfun(@(k) sprintf('col%d', k), 1:ncols, 'UniformOutput', false);
     end
 
-    % Ensure first column is 'time' named consistently
-    % If the first name isn't obviously a time label, still keep the provided name
-    % but normalize variable names for MATLAB table.
     safeNames = matlab.lang.makeValidName(rawNames);
-
-    % Convert numeric matrix to table
     T = array2table(mat, 'VariableNames', safeNames);
 
-    % If the first column is not called 'time' (case-insensitive), still add a 'time' alias
-    % so users can always reference T.time. We'll preserve original name and add time var.
+    % Ensure 'time' is the first column and named 'time'
     if ~any(strcmpi(safeNames{1}, 'time'))
-        % move original first column to variable with its safe name, then add 'time' var
         timeVar = T.(safeNames{1});
-        % remove original first variable
         T.(safeNames{1}) = [];
-        % create new table with 'time' first
         T = addvars(T, timeVar, 'Before', 1, 'NewVariableNames', 'time');
     else
-        % ensure 'time' uses the canonical lowercase name
         if ~strcmp(safeNames{1}, 'time')
-            % rename the first var to 'time' preserving its data
             T.Properties.VariableNames{1} = 'time';
         end
     end
 
-    % Assign resulting table into output struct
     data_out.(t) = T;
 end
 

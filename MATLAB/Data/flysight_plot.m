@@ -1,6 +1,7 @@
-clear; clc; close all
+clearvars -except data; clc; close all
 
-data = load_flysight_file("SENSOR.csv");
+[~, ~, ~, ~, ~, ~, data, data_gps] = get_flysight_data("Data/Drop1/SENSOR.CSV", "Data/Drop1/TRACK.CSV", false);
+
 
 imu = data.IMU;
 
@@ -18,3 +19,10 @@ legend
 xlabel("Time (s)")
 ylabel("Acceleration (g)")
 title("Flysight Test Data")
+
+uif = uifigure;
+g = geoglobe(uif);
+geoplot3(g,data_gps.GNSS.lat,data_gps.GNSS.lon,data_gps.GNSS.hMSL,"r", "LineWidth", 3)
+
+% plot(imu., vecnorm([data_gps.GNSS.velN, data_gps.GNSS.velE], 2, 2))
+

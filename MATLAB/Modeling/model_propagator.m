@@ -1,7 +1,6 @@
 clear; clc; close all;
 
-[t, y, model] = propagate_model();
-
+[t, y, model] = propagate_model('tspan', 0:0.01:20);
 
 
 % %% Send to FlightGear
@@ -49,9 +48,9 @@ legend
 
 %% Plotting
 
-% plot_data(t, y, true, false)
+plot_data(t, y, true, true)
 
-plot_energy(t, y, model.payload, model.parachute)
+% plot_energy(t, y, model.payload, model.parachute)
 
 function plot_data(t, y, do_animation, save_video)
 
@@ -136,7 +135,9 @@ quat = quaternion(y(1, 7:10));
 patch = poseplot(quat); hold on
 patch1 = poseplot(quaternion(y(1, 20:23)));
 
-% patch.ScaleFactor = 50;
+patch.ScaleFactor = 2;
+patch1.ScaleFactor = 2;
+
 xlabel("X")
 ylabel("Y")
 zlabel("Z")
