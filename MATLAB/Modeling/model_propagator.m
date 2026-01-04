@@ -1,7 +1,13 @@
 clear; clc; close all;
 
-[t, y, model] = propagate_model('tspan', 0:0.01:20);
+[t, y, model] = propagate_model('tspan', 0:0.01:100, 'model', @Parachute_Model_Simple);
 
+%% Other Stuff
+
+during_drop = y(:, 3) >= 0;
+
+t = t(during_drop);
+y = y(during_drop, :);
 
 % %% Send to FlightGear
 % 
@@ -22,7 +28,7 @@ clear; clc; close all;
 
 
 %% Intermediate Values
-
+%{
 for i = 1:length(t)
     model.ode_fcn(t(i), y(i, :)');
     f_drag_c(i, :) = model.drag_force_c;
@@ -43,12 +49,12 @@ clf
 plot(t, aoa_c, 'DisplayName', 'Canopy AOA'); hold on
 plot(t, aoa_p, 'DisplayName', 'Payload AOA')
 legend
-
+%}
 
 
 %% Plotting
 
-plot_data(t, y, true, true)
+plot_data(t, y, false, false)
 
 % plot_energy(t, y, model.payload, model.parachute)
 
@@ -83,7 +89,7 @@ yyaxis right
 plot(t, y(:,3), 'DisplayName', 'Z', 'LineWidth', 1.5)
 ylabel("Z Position (m)")
 
-title("ECEF Position vs. Time")
+title("Position vs. Time")
 xlabel("Time (s)")
 legend
 
@@ -95,6 +101,8 @@ title("ECEF Trajectory")
 xlabel("X")
 ylabel("Y")
 zlabel("Z")
+axis square
+% axis equal
 
 figure(5)
 clf
@@ -135,8 +143,10 @@ quat = quaternion(y(1, 7:10));
 patch = poseplot(quat); hold on
 patch1 = poseplot(quaternion(y(1, 20:23)));
 
-patch.ScaleFactor = 2;
-patch1.ScaleFactor = 2;
+scaleFactor = 2;
+
+patch.ScaleFactor = scaleFactor;
+patch1.ScaleFactor = scaleFactor;
 
 xlabel("X")
 ylabel("Y")

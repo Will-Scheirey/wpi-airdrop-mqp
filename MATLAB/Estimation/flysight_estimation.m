@@ -2,7 +2,7 @@ clearvars -except data_accel_all data_gyro_all data_mag_all data_gps_all data_ba
 %% Load HPRC Data
 % [data_accel, data_gyro, data_mag, data_gps, data_baro] = get_HPRC_data_2();
 
-folder = "Drop1";
+folder = "Drop2";
 load_data = false;
 
 if ~exist("data_accel_all", "var")
@@ -47,8 +47,8 @@ data_gyro = data_gyro_all;
 data_gyro.meas_idx  = repmat(3, length(data_gyro.time), 1);
 data_baro.meas_idx  = repmat(4, length(data_baro.time), 1);
 
-t_start = 3800;
-t_dur   = 3000;
+t_start = 5000;
+t_dur   = 2000;
 t_end   = t_start + t_dur;
 
 acc_gps = [data_gpsTrack_all.GNSS.hAcc, data_gpsTrack_all.GNSS.vAcc];
@@ -101,7 +101,7 @@ R_pos = [
     0,   0,   Rp
     ].^2;
 
-Rq = 1e-3;
+Rq = 1e-4;
 R_quat = [
     Rq, 0,  0,  0;
     0,  Rq, 0,  0;
@@ -269,8 +269,8 @@ xlim(t_plot_drop)
 
 figure(3)
 clf
-plot(tspan, kf.inno_hist(1:3, :), '.-', 'MarkerSize', 10); hold on
-legend("0", "1", "2")
+plot(tspan, kf.inno_hist(1:2, :), '.-', 'MarkerSize', 10); hold on
+legend("X", "Y")
 title("Position Innovation")
 xlabel("Time (s)")
 ylabel("Position Innovation (m)")
@@ -489,13 +489,33 @@ title("GPS Bias Estimates")
 
 figure(17)
 clf
+
 idx = 1;
-plot_cov(kf.P_hist(idx,idx,:))
-% xticks(tspan)
+plot_cov(kf.P_hist(idx,idx,:)); hold on
+%{
+pos_inno = kf.inno_hist(1:3, :)';
+good_pos_inno = ~isnan(pos_inno(:, 1));
+
+plot(tspan(good_pos_inno), pos_inno(good_pos_inno, 1))
+%}
 xlabel("Timestep")
 ylabel("Variance (m)")
-title("State " + idx + " Variance vs. Time")
-xlim([t_plot(1)+1, t_plot(end)])
+title("X Position Variance")
+xlim([0, 26313])
+% 
+% subplot(3,1,2)
+% idx = 2;
+% plot_cov(kf.P_hist(idx,idx,:))
+% xlabel("Timestep")
+% ylabel("Variance (m)")
+% title("Y Position Variance")
+% 
+% subplot(3,1,3)
+% idx = 3;
+% plot_cov(kf.P_hist(idx,idx,:))
+% xlabel("Timestep")
+% ylabel("Variance (m)")
+% title("Z Position Variance")
 
 figure(18)
 clf
@@ -521,6 +541,27 @@ xlabel("X (m)")
 ylabel("Y (m)")
 zlabel("Z (m)")
 title("Trajectory")
+
+figure(1000)
+clf
+yyaxis left
+drop_time = 6365;
+drop_idx = t_plot > drop_time;
+x_pos = p_est(drop_idx, 1) - p_est(find(drop_idx, 1), 1);
+y_pos = p_est(drop_idx, 2) - p_est(find(drop_idx, 1), 2);
+z_pos = p_est(drop_idx, 3);
+
+plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), x_pos, 'LineWidth', 1.5, 'DisplayName', 'X'); hold on;
+plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), y_pos, 'LineWidth', 1.5, 'DisplayName', 'Y'); hold on;
+ylabel("X, Y Position (m)")
+yyaxis right
+plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), z_pos, 'LineWidth', 1.5, 'DisplayName', 'z'); hold on;
+xlabel("Time (s)")
+ylabel("Altitude (m)")
+
+legend
+
+title("Position vs. Time")
 
 %% Plot Innovation
 
@@ -559,7 +600,7 @@ figure(27)
 clf
 plot(data_gps.time, data_gps.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_gps.time, data_gps.data(:, 2), 'DisplayName', '1')
-plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', '1')
+plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', '2')
 legend
 title("GPS")
 xlim([tspan(1), tspan(end)])
@@ -574,7 +615,7 @@ figure(29)
 clf
 plot(data_accel.time, data_accel.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_accel.time, data_accel.data(:, 2), 'DisplayName', '1')
-plot(data_accel.time, data_accel.data(:, 3), 'DisplayName', '1')
+plot(data_accel.time, data_accel.data(:, 3), 'DisplayName', '2')
 legend
 title("Accel")
 xlim([tspan(1), tspan(end)])
@@ -583,7 +624,7 @@ figure(30)
 clf
 plot(data_gyro.time, data_gyro.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_gyro.time, data_gyro.data(:, 2), 'DisplayName', '1')
-plot(data_gyro.time, data_gyro.data(:, 3), 'DisplayName', '1')
+plot(data_gyro.time, data_gyro.data(:, 3), 'DisplayName', '2')
 legend
 title("Gyro")
 xlim([tspan(1), tspan(end)])
@@ -592,7 +633,7 @@ figure(31)
 clf
 plot(data_mag.time, data_mag.data(:, 1), 'DisplayName', '0'); hold on
 plot(data_mag.time, data_mag.data(:, 2), 'DisplayName', '1')
-plot(data_mag.time, data_mag.data(:, 3), 'DisplayName', '1')
+plot(data_mag.time, data_mag.data(:, 3), 'DisplayName', '2')
 legend
 title("Mag")
 xlim([tspan(1), tspan(end)])
@@ -613,10 +654,13 @@ legend
 
 figure(34)
 clf
-plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', 'Baro'); hold on
-plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', 'GPS'); hold on
+plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', 'Baro', 'LineWidth', 1); hold on
+plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', 'GPS', 'LineWidth', 1); hold on
 legend
 xlim([tspan(1), tspan(end)])
+xlabel("Time (s)")
+ylabel("Altitude Measurement (m)")
+title("Measured GPS and Barometric Altitude")
 
 step = 100;
 %{
@@ -695,7 +739,7 @@ figure(16)
 clf
 animation_start_time = 4650;
 start_idx = find(t_plot > animation_start_time, 1);
-run_animation(t_plot, p_est, e_est, 8, 3, start_idx);
+run_animation(t_plot, p_est, e_est, 50, 50, start_idx, true);
 
 function plot_cov(variance)
     variance = squeeze(variance);
@@ -704,7 +748,12 @@ function plot_cov(variance)
 end
 
 
-function run_animation(t, position, orientation, step, substep, start_idx)
+function run_animation(t, position, orientation, step, substep, start_idx, save_video)
+
+if nargin < 7
+    save_video = false;
+end
+
 numsteps = height(position);
 
 quat = quaternion(orientation(1, :));
@@ -717,9 +766,14 @@ xlabel("X")
 ylabel("Y")
 zlabel("Z")
 
+if save_video
+outputVideo = VideoWriter('myVideo.mp4', 'MPEG-4'); % Specify filename and format
+open(outputVideo);
+end
+
 for i = start_idx:step:numsteps - step
     for j=i:substep:i+step
-        quat = quaternion(orientation(j, 1), orientation(j, 2), orientation(j, 3), orientation(j, 4));
+        quat = quaternion(orientation(j, 4), orientation(j, 1), orientation(j, 2), orientation(j, 3));
         pos = position(j, :);
     
         set(patch, Orientation=quat, Position=pos); hold on
@@ -737,5 +791,14 @@ for i = start_idx:step:numsteps - step
 
     drawnow
 
+    if save_video
+        frame = getframe(gcf); % captures the current figure (gcf)
+    
+        writeVideo(outputVideo, frame);
+    end
+
+end
+if save_video
+close(outputVideo)
 end
 end

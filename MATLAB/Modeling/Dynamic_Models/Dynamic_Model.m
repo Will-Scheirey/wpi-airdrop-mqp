@@ -35,7 +35,7 @@ classdef Dynamic_Model < matlab.System
 
             options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol); % Set solver tolerance
 
-            [t, y] = ode78(@obj.ode_fcn, tspan, x0, options);
+            [t, y] = ode15s(@obj.ode_fcn, tspan, x0, options);
 
             obj.time_history  = t;
             obj.state_history = y;

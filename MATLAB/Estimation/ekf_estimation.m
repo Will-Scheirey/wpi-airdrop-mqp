@@ -1,7 +1,7 @@
 clearvars -except t y model x_actual; clc; close all
 
-num_sec = 100;
-meas_freq = 20; % Number of measurements per second
+num_sec = 20;
+meas_freq = 10; % Number of measurements per second
 num_steps = num_sec * meas_freq + 1;
 
 % Only re-run the simulation if we need to
@@ -15,7 +15,7 @@ end
 if run_sim
     disp("Running sim")
     tspan = linspace(0, num_sec, num_steps);
-    [t, y, model] = propagate_model('tspan', tspan, 'riser', true);
+    [t, y, model] = propagate_model('tspan', tspan, 'riser', true, 'model', @Parachute_Model_Simple);
     x_actual = y(1:end-1, :);
 end
 

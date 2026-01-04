@@ -48,7 +48,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         parachute = NameValueArgs.parachute;
     else
          % --- Parachute ---
-        canopy_radius = in2m(100);       % [m]
+        canopy_radius = in2m(50);       % [m]
         canopy_mass = 2;         % [kg]
         
         riser_length = 10;       % [m] (resting riser length)
@@ -94,7 +94,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         x0 = NameValueArgs.x0;
     else
         % --- Payload ---
-        P0   = [0; 0; 3000];              % ENU position      [m]
+        P0   = [0; 0; 5500];              % ENU position      [m]
         V_p0 = [300; 0; 0];                % ENU velocity      [m   s^-1]
         e_p0 = eul2quat([0, 0, 0])'; % Orientation
         w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]

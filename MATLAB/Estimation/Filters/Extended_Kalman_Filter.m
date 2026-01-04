@@ -9,7 +9,7 @@ classdef Extended_Kalman_Filter < Kalman_Filter
 
     methods
         function obj = Extended_Kalman_Filter(R, Q, H, x0, P0, dt, x_inds)
-            
+
             F0 = zeros(numel(x0), numel(x0));
             obj = obj@Kalman_Filter(R, Q, H, F0, x0, P0);
 
