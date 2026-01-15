@@ -1,6 +1,17 @@
 clear; clc
+
+result = questdlg('Select a .zip file to extract', 'Proceed?', 'Yes', 'Cancel', 'Yes');
+
+if strcmp(result, "Cancel")
+    return
+end
+
+file = uigetfile("*.zip");
+
+[pathstr, name, ext] = fileparts(file);
+
 main_out_dir_name = "haars_data";
-zip_out_dir_name = main_out_dir_name + "_extract";
+zip_out_dir_name = main_out_dir_name + "_temp";
 
 zip_name = "HAARS Data.zip";
 
@@ -26,13 +37,23 @@ for n = 1:num_files
 
     if ~isfolder(out_dir), mkdir(out_dir); end
 
-    if isfile(fullfile(out_dir, "SENSOR.CSV"))
+    if isfile(fullfile(out_dir, "SENSOR.mat"))
         disp("Skipping " + fullfile(zip_out_dir_name, filename))
         continue
     end
 
+    to_unzip = fullfile(zip_out_dir_name, filename);
+
+    if files(n).bytes > 100e6
+        result = questdlg(sprintf('The following file is %0.2f bytes: \n\n%s', files(n).bytes/1e6, to_unzip), 'Process?', 'Yes', 'Cancel', 'Yes');
+
+        if strcmp(result, 'Cancel')
+            continue
+        end
+    end
+
     disp("Unzipping " + fullfile(zip_out_dir_name, filename))
-    unzip(fullfile(zip_out_dir_name, filename), out_dir);
+    unzip(to_unzip, out_dir);
 
     subfiles = dir(out_dir);
 
@@ -79,14 +100,7 @@ for n = 1:num_files
     catch me
         rmdir(out_dir, 's')
         throw(me)
-        %{
-        disp("Deleting folder for " + out_dir)
-        disp("Error: " + me.message)
-        error("!")
-        %}
     end
-    %}
-
 end
 
 rmdir(zip_out_dir_name, 's')

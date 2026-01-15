@@ -1,4 +1,4 @@
-function data_out = load_flysight_file_fast(filename)
+function data_out = load_flysight_file(filename)
 % LOAD_FLYSIGHT_FILE_FAST  Faster FlySight parser for large logs.
 %
 % Speed tricks:
@@ -50,7 +50,7 @@ while ~feof(fid)
     if nowT - lastPrint > 0.25
         pos = ftell(fid);
         pct = 100 * double(pos) / double(totalBytes);
-        fprintf('\rReading %s: %.1f%%', inputFile, pct);
+        % fprintf('\rReading %s: %.1f%%', inputFile, pct);
         lastPrint = nowT;
     end
 
@@ -178,7 +178,7 @@ while ~feof(fid)
 end
 
 fclose(fid);
-fprintf('\rReading %s: 100.0%%\n', inputFile);
+% fprintf('\rReading %s: 100.0%%\n', inputFile);
 
 % ----- build tables -----
 types = keys(bufMap);
