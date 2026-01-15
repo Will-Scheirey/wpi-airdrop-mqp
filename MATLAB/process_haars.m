@@ -1,5 +1,4 @@
-clear; clc
-
+function process_haars()
 result = questdlg('Select a .zip file to extract', 'Proceed?', 'Yes', 'Cancel', 'Yes');
 
 if strcmp(result, "Cancel")
@@ -7,8 +6,6 @@ if strcmp(result, "Cancel")
 end
 
 file = uigetfile("*.zip");
-
-[pathstr, name, ext] = fileparts(file);
 
 main_out_dir_name = "haars_data";
 zip_out_dir_name = main_out_dir_name + "_temp";
@@ -29,7 +26,7 @@ num_files = length(files);
 
 for n = 1:num_files
     filename = files(n).name;
-    [pathstr, name, ext] = fileparts(filename);
+    [~, name, ext] = fileparts(filename);
 
     if ~strcmp(ext, ".zip"), continue; end
 
@@ -77,7 +74,7 @@ for n = 1:num_files
             break;
         end
     end
-    
+
     if isempty(subsubdir), continue; end
 
     disp("Copying " + fullfile(zip_out_dir_name, filename))
@@ -86,7 +83,7 @@ for n = 1:num_files
     sensor_out_name = fullfile(out_dir, "SENSOR.CSV");
     sensor_cpy_name = fullfile(data_dir, "SENSOR.CSV");
     copyfile(sensor_cpy_name, sensor_out_name);
-    
+
     track_out_name = fullfile(out_dir, "TRACK.CSV");
     track_cpy_name = fullfile(data_dir, "TRACK.CSV");
     copyfile(track_cpy_name, track_out_name);
@@ -94,7 +91,7 @@ for n = 1:num_files
     rmdir(fullfile(subdir.folder, subdir.name), 's')
 
     disp("Creating .mat file for " + fullfile(zip_out_dir_name, filename))
-    
+
     try
         get_flysight_data(sensor_out_name, track_out_name);
     catch me
@@ -104,3 +101,4 @@ for n = 1:num_files
 end
 
 rmdir(zip_out_dir_name, 's')
+end
