@@ -7,6 +7,9 @@ end
 
 drop_dirs = dir(data_dir);
 
+use_date = false;
+data_str = "08052025";
+
 figure(100)
 for n=1:length(drop_dirs)
     the_dir = drop_dirs(n);
@@ -16,9 +19,10 @@ for n=1:length(drop_dirs)
         continue
     end
 
-    
-    if contains(dir_name, "08052025")
-        continue
+    if use_date
+        if ~contains(dir_name, data_str)
+            continue
+        end
     end
     
 

@@ -9,6 +9,11 @@ function [data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, da
     data_flysight_sensor,...
     data_flysight_gps] = get_and_trim_flysight(sensor_filename, gps_filename);
 
+
+if isempty(data_gps)
+    return;
+end
+
 [data_gps,...
     data_gps_vel,...
     data_flysight_gps] = align_times(data_gps, data_baro, data_gps_vel, data_flysight_gps);
