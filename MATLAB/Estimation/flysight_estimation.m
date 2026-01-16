@@ -24,7 +24,26 @@ if load_data
         data_gps_vel_all,...
         data_sensors_all,...
         data_gpsTrack_all,...
-        ] = get_flysight_data("Data/" + folder + "/SENSOR.CSV", "Data/" + folder + "/TRACK.CSV", true);
+        ] = get_flysight_data("MATLAB/Data/" + folder + "/SENSOR.CSV", "MATLAB/Data/" + folder + "/TRACK.CSV", true);
+
+[data_accel_all,...
+        data_gyro_all,... 
+        data_mag_all,...
+        data_gps_all,...
+        data_baro_all,...
+        data_gps_vel_all,...
+        data_sensors_all,...
+        data_gpsTrack_all,...
+        ] = trim_flysight(data_accel_all,...
+        data_gyro_all,... 
+        data_mag_all,...
+        data_gps_all,...
+        data_baro_all,...
+        data_gps_vel_all,...
+        data_sensors_all,...
+        data_gpsTrack_all ...
+        );
+
     old_folder = folder;
 end
 
@@ -47,8 +66,10 @@ data_gyro = data_gyro_all;
 data_gyro.meas_idx  = repmat(3, length(data_gyro.time), 1);
 data_baro.meas_idx  = repmat(4, length(data_baro.time), 1);
 
-t_start = 5000;
-t_dur   = 2000;
+% t_start = 5000;
+% t_dur   = 2000;
+t_start = data_accel.time(1);
+t_dur   = data_accel.time(end) - data_accel.time(1);
 t_end   = t_start + t_dur;
 
 acc_gps = [data_gpsTrack_all.GNSS.hAcc, data_gpsTrack_all.GNSS.vAcc];
@@ -80,7 +101,7 @@ dt_min_mag   = min(diff(data_mag.time));
 dt_min_gyro  = min(diff(data_gyro.time));
 dt_min_baro  = min(diff(data_baro.time));
 
-dt        = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]);
+dt        = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
 % tspan = 0 : dt : data_accel.time(end);
 tspan = t_start : dt : t_start + t_dur;
 % tspan = 9000 : dt: 9500;
@@ -94,14 +115,14 @@ num_steps = numel(tspan);
 Rb = 0.1743;
 
 Rp = 0.25;
-Rp = 40;
+Rp = 10;
 R_pos = [
     Rp, 0,   0;
     0,   Rp, 0;
     0,   0,   Rp
     ].^2;
 
-Rq = 1e-4;
+Rq = 1e-2;
 R_quat = [
     Rq, 0,  0,  0;
     0,  Rq, 0,  0;
@@ -109,7 +130,7 @@ R_quat = [
     0,  0,  0,  Rq
     ].^2;
 
-Rw = 1e-8;
+Rw = 1e-4;
 R_w = [
     Rw,  0,  0;
     0,   Rw, 0;
@@ -133,7 +154,7 @@ Q_P = [
 ] .^2;
 
 cross_term = 1e-7;
-diag_term = 1e-2;
+diag_term = 1e-1;
 
 Q_V = [
     diag_term,     cross_term,  cross_term;
@@ -141,7 +162,7 @@ Q_V = [
     cross_term,    cross_term,  diag_term
 ];
 
-Qe = 1e-4;
+Qe = 1e-1;
 Q_e = [
     Qe,  0,  0,  0;
     0,   Qe, 0,  0;
@@ -149,7 +170,7 @@ Q_e = [
     0,   0,  0,  Qe
 ].^2;
 
-Qw = 1e-2;
+Qw = 1e-1;
 Q_w = [
     Qw, 0,  0;
     0,  Qw, 0;
@@ -451,11 +472,13 @@ title("Estimated Acceleration Components")
 
 figure(13)
 clf
-plot(data_accel.time, vecnorm(data_accel.data, 2, 2) - 9.81, 'LineWidth', 2, 'DisplayName', 'Measured Accel Norm'); hold on
+plot(data_accel.time, abs(vecnorm(data_accel.data, 2, 2) - 9.81), 'LineWidth', 2, 'DisplayName', 'Measured Accel Norm'); hold on
 plot(t_plot, vecnorm(kf.accel_calc_all(1:end-1, :), 2, 2), 'LineWidth', 2, 'DisplayName', 'Estimated Accel Norm'); hold on
 legend
 xlim([t_plot(1)+1, t_plot(end)])
 title("Measured and Estimated Acceleration Norm")
+xlim([6350, 6650])
+ylim([-1, 12])
 
 figure(14)
 clf
@@ -490,8 +513,52 @@ title("GPS Bias Estimates")
 figure(17)
 clf
 
+pos_inno = kf.inno_hist(1:3, :)';
+good_pos_inno = ~isnan(pos_inno(:, 1));
+pos_inno_tstep = 1:length(pos_inno);
+
+x_pos_inno = pos_inno(good_pos_inno, 1);
+
 idx = 1;
 plot_cov(kf.P_hist(idx,idx,:)); hold on
+plot(pos_inno_tstep(good_pos_inno), x_pos_inno)
+xlabel("Timestep")
+ylabel("Variance (rm/s)")
+title("X Position Variance and Innovation")
+% xlim([0, 26313])
+ylim([-7, 7])
+legend("Variance", "Innovation")
+
+figure(171)
+clf
+
+y_pos_inno = pos_inno(good_pos_inno, 2);
+
+idx = 2;
+plot_cov(kf.P_hist(idx,idx,:)); hold on
+plot(pos_inno_tstep(good_pos_inno), y_pos_inno)
+xlabel("Timestep")
+ylabel("Variance (rm/s)")
+title("\X_0 Position Variance")
+% xlim([0, 26313])
+
+var(y_pos_inno)
+mean(y_pos_inno)
+
+
+figure(1001)
+clf
+
+idx = 7;
+plot_cov(kf.P_hist(idx,idx,:)); hold on
+
+e_inno = kf.inno_hist(4:7, :)';
+good_e_inno = ~isnan(e_inno(:, 1));
+e_inno_tstep = 1:length(e_inno);
+
+e_0_inno = e_inno(good_e_inno, 1);
+
+plot(e_inno_tstep(good_e_inno), e_0_inno)
 %{
 pos_inno = kf.inno_hist(1:3, :)';
 good_pos_inno = ~isnan(pos_inno(:, 1));
@@ -499,9 +566,39 @@ good_pos_inno = ~isnan(pos_inno(:, 1));
 plot(tspan(good_pos_inno), pos_inno(good_pos_inno, 1))
 %}
 xlabel("Timestep")
-ylabel("Variance (m)")
-title("X Position Variance")
-xlim([0, 26313])
+ylabel("Variance ")
+title("e_0 Quaternion Part Variance")
+% xlim([0, 26313])
+ylim([-1,1]*0.15)
+legend("Variance", "Innovation")
+
+
+figure(1002)
+clf
+
+idx = 8;
+plot_cov(kf.P_hist(idx,idx,:)); hold on
+
+e_inno = kf.inno_hist(4:7, :)';
+good_e_inno = ~isnan(e_inno(:, 1));
+e_inno_tstep = 1:length(e_inno);
+
+e_1_inno = e_inno(good_e_inno, 2);
+
+plot(e_inno_tstep(good_e_inno), e_1_inno)
+%{
+pos_inno = kf.inno_hist(1:3, :)';
+good_pos_inno = ~isnan(pos_inno(:, 1));
+
+plot(tspan(good_pos_inno), pos_inno(good_pos_inno, 1))
+%}
+xlabel("Timestep")
+ylabel("Variance ")
+title("e_1 Quaternion Part Variance")
+% xlim([0, 26313])
+ylim([-1,1]*0.15)
+legend("Variance", "Innovation")
+
 % 
 % subplot(3,1,2)
 % idx = 2;
@@ -586,91 +683,6 @@ legend("Estimated GPS Accuracy")
 xlim(t_plot_drop)
 return
 
-%% Plot Measurements
-
-plot_meas(data_gps, data_accel, data_gyro, data_mag, data_baro, tspan)
-
-
-function plot_meas(data_gps, data_accel, data_gyro, data_mag, data_baro, tspan)
-%% Plot Measurements
-
-gps_time_range = all([data_gps.time > tspan(1), data_gps.time < tspan(end)], 2);
-
-figure(27)
-clf
-plot(data_gps.time, data_gps.data(:, 1), 'DisplayName', '0'); hold on
-plot(data_gps.time, data_gps.data(:, 2), 'DisplayName', '1')
-plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', '2')
-legend
-title("GPS")
-xlim([tspan(1), tspan(end)])
-
-figure(28)
-clf
-plot3(data_gps.data(gps_time_range, 1), data_gps.data(gps_time_range, 2), data_gps.data(gps_time_range, 3), 'DisplayName', 'Traj'); hold on
-legend
-title("GPS")
-
-figure(29)
-clf
-plot(data_accel.time, data_accel.data(:, 1), 'DisplayName', '0'); hold on
-plot(data_accel.time, data_accel.data(:, 2), 'DisplayName', '1')
-plot(data_accel.time, data_accel.data(:, 3), 'DisplayName', '2')
-legend
-title("Accel")
-xlim([tspan(1), tspan(end)])
-
-figure(30)
-clf
-plot(data_gyro.time, data_gyro.data(:, 1), 'DisplayName', '0'); hold on
-plot(data_gyro.time, data_gyro.data(:, 2), 'DisplayName', '1')
-plot(data_gyro.time, data_gyro.data(:, 3), 'DisplayName', '2')
-legend
-title("Gyro")
-xlim([tspan(1), tspan(end)])
-
-figure(31)
-clf
-plot(data_mag.time, data_mag.data(:, 1), 'DisplayName', '0'); hold on
-plot(data_mag.time, data_mag.data(:, 2), 'DisplayName', '1')
-plot(data_mag.time, data_mag.data(:, 3), 'DisplayName', '2')
-legend
-title("Mag")
-xlim([tspan(1), tspan(end)])
-
-figure(32)
-clf
-plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', '0'); hold on
-legend
-title("Baro")
-xlim([tspan(1), tspan(end)])
-
-figure(33)
-clf
-plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', 'Baro'); hold on
-plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', 'GPS'); hold on
-legend
-% xlim([tspan(1), tspan(end)])
-
-figure(34)
-clf
-plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', 'Baro', 'LineWidth', 1); hold on
-plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', 'GPS', 'LineWidth', 1); hold on
-legend
-xlim([tspan(1), tspan(end)])
-xlabel("Time (s)")
-ylabel("Altitude Measurement (m)")
-title("Measured GPS and Barometric Altitude")
-
-step = 100;
-%{
-figure(35)
-clf
-quiver3(p_est(1:step:end, 1), p_est(1:step:end, 2), p_est(1:step:end, 3), v_est(1:step:end, 1), v_est(1:step:end, 2), v_est(1:step:end, 3), 10, 'Clipping', 'off'); hold on
-plot3(p_est(:, 1), p_est(:, 2), p_est(:, 3), '.r', 'Clipping', 'off')
-%}
-end
-
 %% Down Vector
 figure(16)
 num_vec = height(down_vec_all);
@@ -739,12 +751,12 @@ figure(16)
 clf
 animation_start_time = 4650;
 start_idx = find(t_plot > animation_start_time, 1);
-run_animation(t_plot, p_est, e_est, 50, 50, start_idx, true);
+run_animation(t_plot, p_est, e_est, 200, 50, start_idx, false);
 
 function plot_cov(variance)
     variance = squeeze(variance);
-    plot(sqrt(variance), '--r', 'DisplayName', 'Covariance', 'LineWidth', 1.5); hold on;
-    plot(-sqrt(variance), '--r', 'HandleVisibility', 'off', 'LineWidth', 1.5);
+    plot(sqrt(variance), '.r', 'DisplayName', 'Covariance', 'LineWidth', 1.5); hold on;
+    plot(-sqrt(variance), '.r', 'HandleVisibility', 'off', 'LineWidth', 1.5);
 end
 
 

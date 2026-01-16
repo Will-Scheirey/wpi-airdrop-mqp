@@ -10,7 +10,7 @@ file = uigetfile("*.zip");
 main_out_dir_name = "haars_data";
 zip_out_dir_name = main_out_dir_name + "_temp";
 
-zip_name = "HAARS Data.zip";
+zip_name = file;
 
 if ~isfolder(zip_out_dir_name)
     disp("Unzipping Main Zip")
