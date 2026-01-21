@@ -35,13 +35,13 @@ classdef EKF_Varying_Measurements < EKF_V_E
                 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-            ];
+                ];
 
             obj.dhdx_w_no_bias = [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-            ];
+                ];
 
             obj.g_vec_e = [0; 0; -9.81];
 
@@ -82,7 +82,7 @@ classdef EKF_Varying_Measurements < EKF_V_E
 
             % Initialize gyro bias to the current gyro readings
             obj.x_curr(obj.x_inds.b_g) = gyro_meas;
-            % Initialize orientation 
+            % Initialize orientation
             obj.x_curr(obj.x_inds.e) = q_meas;
             % Initialize accel bias to the measurement minus corrected
             obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
@@ -139,110 +139,189 @@ classdef EKF_Varying_Measurements < EKF_V_E
             obj.normalize_quat();
         end
 
-        function run_filter(obj, y_all, u_all, timesteps, acc_gps_all)
+        function run_filter(obj, y_all, u_all, timesteps, acc_gps_all, verbose)
+            %RUN_FILTER Run EKF with multiple measurement streams at different rates.
+            %
+            % y_all: cell array of tables/timetables, each with fields:
+            %   - time (Nx1)
+            %   - data (NxM)
+            %   - meas_idx (Nx1)  (or scalar per row)
+            %
+            % u_all: table/timetable with fields:
+            %   - time (Kx1)
+            %   - data (KxU)
+            %
+            % acc_gps_all: array indexed consistently with the GPS stream rows (see below)
+            %
+            % Semantics:
+            %   At each step i with time window [t, t+dt), we:
+            %     1) apply ALL u samples with time in [t, t+dt)
+            %     2) apply ALL measurement samples in each y_all{n} with time in [t, t+dt)
+
+            if nargin < 6, verbose = false; end
+
             num_steps = numel(timesteps);
+            if num_steps < 2
+                error("timesteps must have at least 2 elements.");
+            end
             dt = timesteps(2) - timesteps(1);
 
-            obj.x_hist = zeros(numel(obj.x_curr), num_steps);
-            obj.P_hist = zeros(numel(obj.x_curr), numel(obj.x_curr), num_steps);
+            nx = numel(obj.x_curr);
 
+            % --- Pre-allocate histories ---
+            obj.x_hist = zeros(nx, num_steps);
+            obj.P_hist = zeros(nx, nx, num_steps);
+
+            % Innovation history height = sum of widths of each stream's data
             inno_height = 0;
-            for i = 1:numel(y_all)
-                inno_height = inno_height + width(y_all{i}.data);
+            for k = 1:numel(y_all)
+                inno_height = inno_height + width(y_all{k}.data);
             end
-
             obj.inno_hist = NaN(inno_height, num_steps);
 
-            obj.S_hist = zeros(height(y_all), height(y_all), num_steps);
+            % If you truly want S history, it's usually per-update; storing one S per
+            % timestep isn't well-defined when multiple streams update per step.
+            % Keep a cell to store {i,n,hit} if you want.
+            obj.S_hist = cell(num_steps, numel(y_all));
 
-            obj.accel_calc_all = zeros(num_steps, 3);
+            obj.accel_calc_all  = zeros(num_steps, 3);
             obj.trust_accel_all = NaN(num_steps, 1);
-            obj.down_vec_all = NaN(num_steps, 3);
-            obj.quat_meas_all = NaN(num_steps, 4);
+            obj.down_vec_all    = NaN(num_steps, 3);
+            obj.quat_meas_all   = NaN(num_steps, 4);
 
-            last_idx = zeros(size(y_all));
-            last_idx_u = 0;
+            % Pointers for each stream (next unread row)
+            y_ptr = ones(numel(y_all), 1);
+            u_ptr = 1;
 
-            for i=1:num_steps
-                fprintf("%d / %d\n", i, num_steps)
-                t = timesteps(i);
+            % If your class uses hist_idx, make it consistent
+            obj.hist_idx = 1;
+
+            % --- Main loop ---
+            for i = 1:num_steps
+                t0 = timesteps(i);
+                t1 = t0 + dt;
+
+                if verbose
+                    fprintf("%d / %d\n", i, num_steps);
+                end
+
+                % Log current state BEFORE propagation (matches your original)
                 obj.x_hist(:, i) = obj.x_curr;
 
-                timestamps = u_all.time((last_idx_u + 1):end);
+                % -------------------------
+                % 1) Apply all control inputs in [t0, t1)
+                % -------------------------
+                if ~isempty(u_all)
+                    [u_ptr, u_rows] = obj.take_rows_in_window(u_all.time, u_ptr, t0, t1);
+                    % Apply each input in chronological order
+                    for k = 1:numel(u_rows)
+                        u = u_all(u_rows(k), :);
+                        obj.predict(u.data');
+                    end
 
-                above_min = t > timestamps;
-                above_max = t + dt > timestamps;
-
-                check = [above_min, above_max];
-
-                good_meas = all(check, 2);
-
-                if sum(good_meas) ~= 0
-                    good_meas_idx = find(good_meas, 1);
-
-                    u = u_all(good_meas_idx + last_idx_u, :);
-                    last_idx_u = last_idx_u + good_meas_idx;
-                    obj.predict(u.data');
+                    % If no inputs, still do one predict (like your original)
+                    if isempty(u_rows)
+                        obj.predict([]);
+                    end
                 else
                     obj.predict([]);
                 end
 
+                % -------------------------
+                % 2) Apply all measurements (each stream) in [t0, t1)
+                % -------------------------
                 for n = 1:numel(y_all)
-                    y_all_n = y_all{n};
-
-                    timestamps = y_all_n.time((last_idx(n) + 1):end);
-
-                    above_min = t > timestamps;
-                    below_max = t + dt > timestamps;
-
-                    check = [above_min, below_max];
-
-                    good_meas = all(check, 2);
-
-                    if sum(good_meas) == 0
-                        continue
+                    yn = y_all{n};
+                    if isempty(yn)
+                        continue;
                     end
 
-                    good_meas_idx = find(good_meas, 1);
+                    [y_ptr(n), meas_rows] = obj.take_rows_in_window(yn.time, y_ptr(n), t0, t1);
 
-                    meas = y_all_n(good_meas_idx + last_idx(n), :);
-
-                    last_idx(n) = last_idx(n) + good_meas_idx;
-
-                    if isempty(meas)
-                        continue
+                    if isempty(meas_rows)
+                        continue;
                     end
 
-                    meas_idx = meas.meas_idx;
+                    % Apply *all* measurements that arrived in this bin
+                    S_list = cell(numel(meas_rows), 1);
 
-                    if meas_idx == 1
-                        accH = acc_gps_all(last_idx(n), 1);
-                        accV = acc_gps_all(last_idx(n), 2);
-                        
-                        R_gps = (blkdiag(accH, accH, accV)).^2;
+                    for k = 1:numel(meas_rows)
+                        r = meas_rows(k);
+                        meas = yn(r, :);
 
-                        [innovation, ~, S] = obj.update(meas.data', meas_idx, R_gps);
-                    else
-                        [innovation, ~, S] = obj.update(meas.data', meas_idx);
+                        if isempty(meas)
+                            continue;
+                        end
+
+                        meas_idx = meas.meas_idx;
+
+                        if meas_idx == 1
+                            % NOTE:
+                            % Your old code used acc_gps_all(last_idx(n), :) after incrementing
+                            % last_idx(n). That implies acc_gps_all is aligned with this stream's row index.
+                            % Here we use the stream row index r directly.
+                            accH = acc_gps_all(r, 1);
+                            accV = acc_gps_all(r, 2);
+                            R_gps = (blkdiag(accH, accH, accV)).^2;
+
+                            [innovation, ~, S] = obj.update(meas.data', meas_idx, R_gps);
+                        else
+                            [innovation, ~, S] = obj.update(meas.data', meas_idx);
+                        end
+
+                        % Store innovation in the "meas_idx block" for this timestep
+                        obj.inno_hist(obj.measurement_ranges{meas_idx}, obj.hist_idx) = innovation;
+
+                        S_list{k} = S;
                     end
 
-                    obj.inno_hist(obj.measurement_ranges{meas_idx}, obj.hist_idx) = innovation;
+                    obj.S_hist{i, n} = S_list;
                 end
 
+                % Log covariance after all updates at this timestep
                 obj.P_hist(:, :, i) = obj.P_curr;
+
                 obj.hist_idx = obj.hist_idx + 1;
             end
         end
 
+        % -------------------------------------------------------------------------
+        % Helper: advance pointer and return all indices in [t0, t1)
+        % Assumes time_vec is monotonic increasing.
+        % -------------------------------------------------------------------------
+        function [ptr_out, rows] = take_rows_in_window(~, time_vec, ptr_in, t0, t1)
+            N = numel(time_vec);
+            p = ptr_in;
+
+            % Skip anything strictly before the window
+            while p <= N && time_vec(p) < t0
+                p = p + 1;
+            end
+
+            % Collect everything inside the window
+            start_p = p;
+            while p <= N && time_vec(p) < t1
+                p = p + 1;
+            end
+
+            if start_p <= N && start_p < p
+                rows = start_p:(p-1);
+            else
+                rows = [];
+            end
+
+            ptr_out = p;
+        end
+
         function dhdx = h_jacobian_states(obj, meas_idx)
-            
+
             w_jacobian = obj.dhdx_w;
 
             if obj.x_curr(3) > obj.alt_gate || norm(obj.x_curr(4:6)) > 1
                 w_jacobian = obj.dhdx_w_no_bias;
                 obj.update_a_b = false;
             end
-            
+
             % p_jacobian = obj.dhdx_pos_no_bias;
             p_jacobian = obj.dhdx_p;
 

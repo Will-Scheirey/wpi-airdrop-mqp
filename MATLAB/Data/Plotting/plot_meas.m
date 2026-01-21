@@ -24,6 +24,7 @@ clf
 plot3(data_gps.data(gps_time_range, 1), data_gps.data(gps_time_range, 2), data_gps.data(gps_time_range, 3), 'DisplayName', 'Traj'); hold on
 legend
 title("GPS")
+axis equal
 
 figure(fig_idx); fig_idx = fig_idx + 1;
 clf

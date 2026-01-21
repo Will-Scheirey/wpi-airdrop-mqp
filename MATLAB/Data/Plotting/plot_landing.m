@@ -58,11 +58,20 @@ for n=1:length(drop_dirs)
         continue;
     end
 
-    all_landings(n, :) = data_gps.data(end, 1:2);
+    drop_info = get_drop_info(data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, data_flysight_sensor, data_flysight_gps);
+    
+    if isempty(drop_info)
+        continue;
+    end
+
+    all_landings(n, :) = drop_info.gps_land;
+    all_drops(n, :) = drop_info.gps_drop;
+    all_vel(n, :) = drop_info.vel_drop * 5; 
 end
 
-all_landings_scaled = rescale_data(all_landings);
-all_landings_scaled = rescale_data(all_landings_scaled);
+[all_drops_scaled, all_landings_scaled, all_vel_scaled] = rescale_data(all_landings, all_drops, all_vel, false);
+[all_drops_scaled, all_landings_scaled, all_vel_scaled] = rescale_data(all_landings_scaled, all_drops_scaled, all_vel_scaled, false);
+[all_drops_scaled, all_landings_scaled, all_vel_scaled] = rescale_data(all_landings_scaled, all_drops_scaled, all_vel_scaled, true);
 
 
 %% PLOT
@@ -70,16 +79,60 @@ all_landings_scaled = rescale_data(all_landings_scaled);
 stddev = std(all_landings_scaled);
 fprintf("Standard Dev\n\tX: %0.2fm\n\tY: %0.2fm\n", stddev(1), stddev(2));
 
-plot(all_landings_scaled(:,1), all_landings_scaled(:,2), 'rx', 'MarkerSize', 15, 'LineWidth', 1.5); hold on
-legend
+z = zeros(height(all_landings_scaled), 1);
 
-function all_landings = rescale_data(all_landings)
+figure(1)
+clf
+plot3(all_drops_scaled(:,1), all_drops_scaled(:,2), all_drops_scaled(:,3), 'ob', 'MarkerSize', 15, 'LineWidth', 1.5); hold on
+plot3(all_landings_scaled(:,1), all_landings_scaled(:,2), all_landings_scaled(:,3), 'rx', 'MarkerSize', 15, 'LineWidth', 1.5); hold on
+
+for n = 1:height(all_landings_scaled)
+    quiver3(all_drops_scaled(n,1), all_drops_scaled(n,2), all_drops_scaled(n,3), all_vel_scaled(n,1), all_vel_scaled(n,2), all_vel_scaled(n,3), 'g')
+    plot3([all_drops_scaled(n,1), all_landings_scaled(n,1)], [all_drops_scaled(n,2), all_landings_scaled(n,2)], [all_drops_scaled(n,3), 0], '-k', 'LineWidth', 0.5); hold on
+end
+axis equal
+xlabel("East")
+ylabel("North")
+
+figure(2)
+clf
+all_landings_corrected = (all_landings_scaled - all_drops_scaled) ./ all_vel_scaled;
+plot3(all_landings_corrected(:, 1), all_landings_corrected(:, 2), all_landings_corrected(:, 3), 'rx', 'MarkerSize', 15, 'LineWidth', 1.5); hold on
+% axis equal
+
+function [all_drops, all_landings, all_vel] = rescale_data(all_landings, all_drops, all_vel, drop)
+if ~drop
     outlier_x = isoutlier(all_landings(:, 1));
     all_landings = all_landings(~outlier_x, :);
-    
+    all_drops = all_drops(~outlier_x, :);
+    all_vel = all_vel(~outlier_x, :);
+
     outlier_y = isoutlier(all_landings(:, 2));
     all_landings = all_landings(~outlier_y, :);
-    
-    all_landings(:, 1) = all_landings(:, 1) - median(all_landings(:, 1)); 
-    all_landings(:, 2) = all_landings(:, 2) - median(all_landings(:, 2)); 
+    all_drops = all_drops(~outlier_y, :);
+    all_vel = all_vel(~outlier_y, :);
+end
+
+if drop
+    outlier_x = isoutlier(all_drops(:, 1), 'mean');
+    all_landings = all_landings(~outlier_x, :);
+    all_drops = all_drops(~outlier_x, :);
+    all_vel = all_vel(~outlier_x, :);
+
+    outlier_y = isoutlier(all_drops(:, 2), 'mean');
+    all_landings = all_landings(~outlier_y, :);
+    all_drops = all_drops(~outlier_y, :);
+    all_vel = all_vel(~outlier_y, :);
+end
+
+if ~drop
+    all_landings_median_x = median(all_landings(:, 1));
+    all_landings_median_y = median(all_landings(:, 2));
+
+    all_landings(:, 1) = all_landings(:, 1) - all_landings_median_x;
+    all_drops(:, 1) = all_drops(:, 1) - all_landings_median_x;
+
+    all_landings(:, 2) = all_landings(:, 2) - all_landings_median_y;
+    all_drops(:, 2) = all_drops(:, 2) - all_landings_median_y;
+end
 end
