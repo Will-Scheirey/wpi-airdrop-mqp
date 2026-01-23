@@ -1,2 +1,7 @@
 **/.DS_Store
 *.asv
+Python/Datasets/12683453/flights.csv
+Python/Datasets/**/*.csv
+*.zip
+/haars_data
+*.mp4

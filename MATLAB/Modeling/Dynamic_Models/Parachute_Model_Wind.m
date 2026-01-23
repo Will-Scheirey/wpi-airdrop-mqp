@@ -16,6 +16,51 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             obj.payload   = payload;
         end
 
+        function get_states(obj, x)
+            % ======================
+            % --- Current States ---
+            % ======================
+            worc_wind = [6, 270]; % Average wind data in Worcester, MA ([mph], [deg])
+            mag = worc_wind(1); dir = worc_wind(2);
+
+            e = mph2kms(mag*sind(dir));
+            n = mph2kms(mag*cosd(dir));
+
+            wind = [e; n; 0];              % Wind,             ECEF [m   s]
+
+            % --- Payload ---
+            obj.e_p = x(7:10) / norm(x(7:10));   % Orientation,      ECEF
+
+            obj.P_p   = x(1:3);            % Position,         ECEF [m]
+            wind = ecef2body_rotm(obj.e_p)*wind;
+            obj.V_p = wind + x(4:6);             % Velocity,         Body [m   s^-1]
+
+            obj.w_p = x(11:13);            % Angular Velocity, Body [rad s^-1]
+
+            % --- Parachute ---
+            obj.e_c = x(20:23) / norm(x(20:23)); % Orientation,      ECEF
+
+            obj.P_c = x(14:16);            % Position,         ECEF [m]
+            wind = ecef2body_rotm(obj.e_c)*wind;
+            obj.V_c = wind + x(17:19);           % Velocity,         Body [m   s^-1]
+
+            obj.w_c = x(24:26);            % Angular Velocity, Body [rad s^-1]
+
+            % --- Additional States ---
+
+            obj.rho = StandardAtmosphereModel.Density(obj.P_p(3)); % Density of air  [kg m^-3]
+
+            obj.m_payload   = obj.payload.  m(obj.rho);
+            obj.m_parachute = obj.parachute.m(obj.rho);
+
+            % =================
+            % --- Rotations ---
+            % =================
+
+            obj.C_EB_p   = ecef2body_rotm(obj.e_p);                 % ROTM from ECEF to Body
+            obj.C_EB_c   = ecef2body_rotm(obj.e_c);                 % ROTM from ECEF to Body
+        end
+
         function [F_p, F_c, M_p, M_c] = equations_of_motion(obj)
             % ===========================
             % --- Equations of Motion ---
@@ -25,12 +70,14 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             [F_g_p, F_g_c] = obj.calc_gravity();
             [F_d_p, F_d_c] = obj.calc_drag();
             [F_r_p, F_r_c] = obj.calc_riser_force();
-            [F_w_p, F_w_c] = obj.calc_wind_force();
+            % [F_w_p, F_w_c] = obj.calc_wind_force();
 
             % --- Body Moments ---
 
-            F_p = F_g_p + F_d_p + F_r_p + F_w_p; % Payload body forces [N]
-            F_c = F_g_c + F_d_c + F_r_c + F_w_c; % Parachute body forces [N]
+            F_p = F_g_p + F_d_p + F_r_p; % Payload body forces [N]
+            F_c = F_g_c + F_d_c + F_r_c; % Parachute body forces [N]
+            % F_p = F_g_p + F_d_p + F_r_p + F_w_p; % Payload body forces [N]
+            % F_c = F_g_c + F_d_c + F_r_c + F_w_c; % Parachute body forces [N]
 
             M_p = cross(obj.payload.  P_attach_B, F_r_p); % Payload body moments   [N m]
             M_c = cross(obj.parachute.P_attach_B, F_r_c); % Parachute body moments [N m]
@@ -55,10 +102,6 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
 
             obj.drag_force_p = f_p;
             obj.drag_force_c = f_c;
-        end
-
-        function [f_p, f_C] = calc_wind_force(obj)
-
         end
     end
 end

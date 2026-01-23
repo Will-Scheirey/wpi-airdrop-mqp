@@ -49,8 +49,8 @@ classdef Parachute_Model_Simple < Dynamic_Model
             obj.payload   = payload;
         end
 
-        function x_dot = ode_fcn(obj, ~, x)
-
+        function x_dot = ode_fcn(obj, t, x)
+            disp(t)
             obj.get_states(x);
 
             [F_p, F_c, M_p, M_c] = obj.equations_of_motion();
@@ -134,7 +134,9 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
             % --- Additional States ---
 
-            obj.rho = StandardAtmosphereModel.Density(obj.P_p(3)); % Density of air  [kg m^-3]
+            h = obj.P_p(3);
+            % h = 0;
+            obj.rho = StandardAtmosphereModel.Density(h); % Density of air  [kg m^-3]
 
             obj.m_payload   = obj.payload.  m(obj.rho);
             obj.m_parachute = obj.parachute.m(obj.rho);
@@ -143,8 +145,8 @@ classdef Parachute_Model_Simple < Dynamic_Model
             % --- Rotations ---
             % =================
 
-            obj.C_EB_p   = ecef2body_rotm(obj.e_p);                 % ROTM from ECEF to Body
-            obj.C_EB_c   = ecef2body_rotm(obj.e_c);                 % ROTM from ECEF to Body
+            obj.C_EB_p   = ecef2body_rotm(obj.e_p)';                 % ROTM from ECEF to Body
+            obj.C_EB_c   = ecef2body_rotm(obj.e_c)';                 % ROTM from ECEF to Body
         end
 
         function calc_mass(obj)

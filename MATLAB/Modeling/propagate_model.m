@@ -7,6 +7,9 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         NameValueArgs.x0
         NameValueArgs.tspan
         NameValueArgs.model
+        NameValueArgs.riser
+        NameValueArgs.variable_parachute_mass
+        NameValueArgs.damping
     end
 
     if isfield(NameValueArgs, 'use_drag')
@@ -35,16 +38,39 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
             use_drag);
     end
 
+    if isfield(NameValueArgs, 'variable_parachute_mass')
+        variable_parachute_mass = NameValueArgs.variable_parachute_mass;
+    else
+        variable_parachute_mass = true;
+    end
+
     if isfield(NameValueArgs, 'parachute')
         parachute = NameValueArgs.parachute;
     else
          % --- Parachute ---
-        canopy_radius = in2m(100);       % [m]
+        canopy_radius = in2m(50);       % [m]
         canopy_mass = 2;         % [kg]
         
         riser_length = 10;       % [m] (resting riser length)
-        riser_k = 10000;         % [N/m]       Riser stiffness
-        riser_c = 1000;          % [kg s^-1]   Riser damping coefficient
+
+        if isfield(NameValueArgs, 'riser')
+            if NameValueArgs.riser
+                riser_k = 10000;         % [N/m]       Riser stiffness
+                riser_c = 1000;          % [kg s^-1]   Riser damping coefficient
+            else
+                riser_k = 0;
+                riser_c = 0;
+            end
+        else
+            riser_k = 10000;         % [N/m]       Riser stiffness
+            riser_c = 1000;          % [kg s^-1]   Riser damping coefficient
+        end
+
+        if isfield(NameValueArgs, 'damping')
+            if ~NameValueArgs.damping
+                riser_c = 0;
+            end
+        end
         
         canopy_efficiency = 1;   % []
         canopy_porosity =   0.2; % []
@@ -57,7 +83,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
             canopy_efficiency, ...
             canopy_porosity, ...
             use_drag, ...
-            true);
+            variable_parachute_mass);
     end
 
     % ==========================
@@ -68,14 +94,14 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         x0 = NameValueArgs.x0;
     else
         % --- Payload ---
-        P0   = [0; 0; 3000];              % ENU position      [m]
+        P0   = [0; 0; 5500];              % ENU position      [m]
         V_p0 = [300; 0; 0];                % ENU velocity      [m   s^-1]
         e_p0 = eul2quat([0, 0, 0])'; % Orientation
         w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
         
         % --- Parachute ---
         P0_c = P0 + [0; 2; 10];           % ENU Position      [m]
-        V_c0 = [280; 0; 0];                % ENU velocity      [m   s^-1]
+        V_c0 = [280; 0; 0] * 0;                % ENU velocity      [m   s^-1]
         e_c0 = eul2quat([0, 0, 0])';  % Orientation
         w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
         
@@ -97,13 +123,13 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'tspan')
         tspan = NameValueArgs.tspan;
     else
-        tspan = linspace(0, 20, 1000);
+        tspan = linspace(0, 100, 10000);
     end
 
     if isfield(NameValueArgs, 'model')
         model = NameValueArgs.model;
     else
-        model = @Parachute_Model_Simple;
+        model = @Parachute_Model_Wind;
     end
 
     model_obj = model(payload, parachute, x0);

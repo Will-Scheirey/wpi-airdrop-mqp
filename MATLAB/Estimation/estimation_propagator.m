@@ -74,7 +74,7 @@ for i=1:num_steps
     x_estimates(:, i) = kf.x_curr;
     covariances(i) = kf.P_curr(state_idx,state_idx);
 
-    kf.stepFilter(measurements(:, i));
+    kf.step_filter(measurements(:, i));
 end
 
 
