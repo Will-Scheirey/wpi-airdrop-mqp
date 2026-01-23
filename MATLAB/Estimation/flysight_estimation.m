@@ -13,7 +13,7 @@ catch exception
 end
 
 parent_dir = "haars_data";
-drop_dir = "0005";
+drop_dir = "DN169_Lt3_n09_08072025_side_2";
 full_dir = fullfile(parent_dir, drop_dir);
 
 load_data = false;
@@ -158,50 +158,45 @@ num_steps = numel(tspan);
 Rb = 0.1743;
 
 % Rp = 0.25;
-% Rp = 10;
-Rp = sensor.gps_std_dev;
+Rp = 10;
+% Rp = sensor.gps_std_dev;
 R_pos = [
     Rp, 0,   0;
     0,   Rp, 0;
     0,   0,   Rp
     ].^2;
 
-% Rq = 5e-4;
-Rq = sensor.mag_std_dev * 1e2;
-R_quat = [
-    Rq, 0,  0,  0;
-    0,  Rq, 0,  0;
-    0,  0,  Rq, 0;
-    0,  0,  0,  Rq
-    ].^2;
+% Rm = sensor.mag_std_dev * 1e2;
+Rm = 1e-1;
+R_mag = (Rm^2) * eye(3);
 
-% Rw = 1e-4;
-Rw = sensor.gyro_std_dev;
+Rw = 1e-2;
+% Rw = sensor.gyro_std_dev;
 R_w = [
     Rw,  0,  0;
     0,   Rw, 0;
     0,   0,  Rw
 ].^2;
 
-Rb = 1e1;
+Rb = 1e2;
 R_baro = Rb^2;
 
 R = blkdiag( ...
     R_pos, ...
-    R_quat, ...
+    R_mag, ...
     R_w,  ...
     R_baro ...
     );
 
-Qp = 1e-4;
+Qp = 1e-3;
 Q_P = [
     Qp, 0, 0;
     0, Qp, 0;
     0, 0, Qp;
 ] .^2;
 
-cross_term = 1e-8;
-diag_term = 1e-4;
+cross_term = 1e-3;
+diag_term = 1e-2;
 
 Q_V = [
     diag_term,     cross_term,  cross_term;
@@ -217,7 +212,7 @@ Q_e = [
     0,   0,  0,  Qe
 ].^2;
 
-Qw = 1e0;
+Qw = 1e-3;
 Q_w = [
     Qw, 0,  0;
     0,  Qw, 0;
@@ -272,13 +267,77 @@ Q = Q + q_floor * eye(size(Q));      % jitter to make invertible
 %% Run the Kalman Filter
 payload = get_a22();
 
-kf = Airdrop_EKF(R, Q, 0, P0, dt, payload.I() / 1e3);
+kf = Airdrop_EKF(R, Q, 0, P0, dt, payload.I());
 
 if isempty(data_gps_all)
     data_gps.data = [0, 0, 0];
 end
 
 kf.initialize(true, data_accel.data(1, :)', data_gyro.data(1, :)', data_mag.data(1, :)', data_gps.data(1, :)', data_baro.data(1, :)');
+
+%% ===== Jacobian sanity check (finite difference) =====
+% Run right after kf.initialize(...)
+
+obj = kf; % convenience
+
+x0 = obj.x_curr;
+u0 = obj.last_u;   % or use data_accel.data(1,:)' if you want
+if isempty(u0), u0 = data_accel.data(1,:)'; end
+
+% analytic
+A_ana = obj.f_jacobian_states([u0; zeros(0,1)]);  % your code expects u(1:3)
+
+% numeric
+eps = 1e-6;
+nx  = numel(x0);
+f0  = obj.f([u0; zeros(0,1)]);
+
+A_num = zeros(nx, nx);
+
+for k = 1:nx
+    dx = zeros(nx,1);
+    dx(k) = eps;
+
+    % plus
+    obj.x_curr = x0 + dx;
+    obj.normalize_quat();
+    fp = obj.f([u0; zeros(0,1)]);
+
+    % minus
+    obj.x_curr = x0 - dx;
+    obj.normalize_quat();
+    fm = obj.f([u0; zeros(0,1)]);
+
+    A_num(:,k) = (fp - fm) / (2*eps);
+end
+
+% restore
+obj.x_curr = x0;
+
+% Compare only the velocity rows (most relevant for accel + bias issues)
+vel_rows = obj.x_inds.V_E;
+
+fprintf("\n=== dV/d(b_a) check ===\n");
+cols_ba = obj.x_inds.b_a;
+
+disp("Analytic dV/db_a:");
+disp(A_ana(vel_rows, cols_ba));
+
+disp("Numeric dV/db_a:");
+disp(A_num(vel_rows, cols_ba));
+
+disp("Difference (ana - num):");
+disp(A_ana(vel_rows, cols_ba) - A_num(vel_rows, cols_ba));
+
+fprintf("\n=== dV/d(q) check ===\n");
+cols_q = obj.x_inds.e;
+
+disp("Max abs error in dV/dq:");
+disp(max(abs(A_ana(vel_rows, cols_q) - A_num(vel_rows, cols_q)), [], "all"));
+
+% return
+
+
 kf.run_filter(measurements, inputs, tspan, acc_gps, drop_time, 1, true);
 %{
 %% Run the Smoother
@@ -420,7 +479,7 @@ xlim(t_plot_drop)
 
 figure(61)
 clf
-eul = quat2eul(e_est);
+eul = rad2deg(quat2eul(e_est));
 plot(eul);
 legend("X", "Y", "Z")
 
@@ -468,11 +527,11 @@ xlim(t_plot_drop)
 
 figure(8)
 clf
-plot(tspan, kf.inno_hist(4:7, :), '.-', 'MarkerSize', 10);
-legend("0", "1", "2", "3")
-title("Quaternion Innovation")
+plot(tspan, kf.inno_hist(4:6, :), '.-', 'MarkerSize', 10);
+legend("m_x", "m_y", "m_z")
+title("Magnetometer Innovation")
 xlabel("Time (s)")
-ylabel("Quaternion Innovation")
+ylabel("Mag Innovation")
 xlim(t_plot_drop)
 
 %{
@@ -531,11 +590,11 @@ xlim(t_plot_drop)
 
 figure(11)
 clf
-plot(tspan, kf.inno_hist(8:10, :), '.-', 'MarkerSize', 10);
-legend("0", "1", "2")
-title("Angular Velocity Innovation")
+plot(tspan, kf.inno_hist(7:9, :), '.-', 'MarkerSize', 10);
+legend("\omega_x", "\omega_y", "\omega_z")
+title("Gyro Innovation")
 xlabel("Time (s)")
-ylabel("Angular Velocity Innovation (rad/s)")
+ylabel("Gyro Innovation (rad/s)")
 xlim(t_plot_drop)
 
 figure(12)
@@ -618,8 +677,15 @@ ylabel("Variance (rm/s)")
 title("X_1 Position Variance")
 % xlim([0, 26313])
 
-var(y_pos_inno)
-mean(y_pos_inno)
+
+t0 = t_start;
+t1 = min(t_start + 2, data_accel.time(end));
+
+idx = data_accel.time >= t0 & data_accel.time <= t1;
+a_mean = mean(data_accel.data(idx,:), 1);
+a_norm = norm(a_mean);
+
+fprintf("Mean accel (first 2s): [%.3f %.3f %.3f], norm=%.3f\n", a_mean(1), a_mean(2), a_mean(3), a_norm);
 
 figure(1001)
 clf
@@ -627,7 +693,7 @@ clf
 idx = 7;
 plot_cov(kf.P_hist(idx,idx,:)); hold on
 
-e_inno = kf.inno_hist(4:7, :)';
+e_inno = kf.inno_hist(4:6, :)';
 good_e_inno = ~isnan(e_inno(:, 1));
 e_inno_tstep = 1:length(e_inno);
 
@@ -653,7 +719,7 @@ clf
 idx = 8;
 plot_cov(kf.P_hist(idx,idx,:)); hold on
 
-e_inno = kf.inno_hist(4:7, :)';
+e_inno = kf.inno_hist(4:6, :)';
 good_e_inno = ~isnan(e_inno(:, 1));
 e_inno_tstep = 1:length(e_inno);
 
@@ -740,11 +806,11 @@ plot(kf.trust_accel_all(good))
 
 %% Plot Innovation
 
-baro_values = ~ (kf.inno_hist(11, 2:end) == 0);
+baro_values = ~ (kf.inno_hist(10, 2:end) == 0);
 
 figure(20)
 clf
-plot(tspan(baro_values), kf.inno_hist(11, baro_values), '.-', 'MarkerSize', 10., 'LineWidth', 2);
+plot(tspan(baro_values), kf.inno_hist(10, baro_values), '.-', 'MarkerSize', 10., 'LineWidth', 2);
 title("Baro Innovation")
 xlabel("Time (s)")
 ylabel("Innovation (m)")
@@ -773,6 +839,7 @@ pos_cov = kf.P_hist(idx,idx,:);
 plot_cov(pos_cov)
 %}
 %% Plot Cross-Covariance
+
 %{
 figure(10000)
 clf
@@ -804,6 +871,7 @@ for n=1:100:num_steps
     drawnow
 end
 %}
+
 %{
 %% Plot Smoothed and Unsmoothed
 figure(23)
@@ -934,9 +1002,9 @@ figure(16)
 clf
 
 animation_start_time = drop_time;
-% animation_start_time = 10400;
+animation_start_time = 0;
 start_idx = find(t_plot > animation_start_time, 1);
-run_animation(t_plot, p_est, e_est, 20, 10, start_idx, false);
+run_animation(t_plot, p_est, e_est, 100, 50, start_idx, false);
 
 function plot_cov(variance)
     variance = squeeze(variance);

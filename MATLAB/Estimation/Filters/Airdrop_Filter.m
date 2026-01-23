@@ -6,7 +6,7 @@ classdef Airdrop_Filter < Abstract_Filter
         g_norm      = 9.80665;
         accel_gate  = 1e0;
         alt_gate    = 1e10;
-        speed_gate  = 1e100
+        speed_gate  = 3
         g_vec_e
         dt
         I
@@ -15,7 +15,7 @@ classdef Airdrop_Filter < Abstract_Filter
         measurement_ranges
 
         dhdx_p
-        dhdx_q
+        dhdx_mag
         dhdx_w
         dhdx_alt
         dhdx_w_no_bias
@@ -34,6 +34,8 @@ classdef Airdrop_Filter < Abstract_Filter
         update_a_b
         last_down
         last_u
+
+        m_ref_i  % 3x1 reference mag in inertial
 
         % --- Histories ---
         hist_idx
@@ -80,7 +82,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
             obj.g_vec_e = [0; 0; -obj.g_norm];
 
-            obj.measurement_ranges = {1:3, 4:7, 8:10, 11};
+            obj.measurement_ranges = {1:3, 4:6, 7:9, 10};
 
             obj.last_u = [0; 0; 0];
             obj.last_down = [0; 0; 1];
@@ -115,13 +117,6 @@ classdef Airdrop_Filter < Abstract_Filter
                 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;
                 ];
 
-            obj.dhdx_q = [
-                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                ];
-
             obj.dhdx_w = [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0;
@@ -143,6 +138,9 @@ classdef Airdrop_Filter < Abstract_Filter
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 ];
+
+            % placeholder (will be filled per-call because depends on q)
+            obj.dhdx_mag = zeros(3, 22);
         end
 
         function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas)
@@ -168,6 +166,19 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % Estimate the orientation from accel and mag measurments
             q_meas = obj.quat_from_acc_mag(accel_meas_corr, mag_meas);
+
+            % C_i_b = ecef2body_rotm(q_meas);   % IMPORTANT: check your function name returns which direction
+            % You used C_BE in your quat_from_acc_mag and called it C_BE.
+            % In your calc_accel you do: C_EB = ecef2body_rotm(e)' ; then a_e = C_EB*(a-b) + g
+            % That implies ecef2body_rotm(e) returns C_BE (body <- earth). Good.
+
+            C_bi = ecef2body_rotm(q_meas);     % body -> inertial (b2i)
+            m_b0 = mag_meas / norm(mag_meas);  % measured mag in body
+
+            % m_b = C_ib * m_i  =>  m_i = C_bi * m_b
+            obj.m_ref_i = C_bi * m_b0;         % inertial reference mag
+
+            % debug_mag_convention_once(accel_meas_corr, mag_meas, obj.m_ref_i);
 
             % Change alt gate back
             obj.alt_gate = old_alt_gate;
@@ -427,25 +438,10 @@ classdef Airdrop_Filter < Abstract_Filter
         % --- FILTER MATH ---
 
         function [innovation, K, S] = update(obj, y, meas_idx, R_gps)
-            if meas_idx == 2
-                [y, trust_accel] = obj.quat_from_acc_mag(obj.last_u, y);
-
-                
-                if dot(y, obj.get_e()) < 0
-                    y = -y;
-                end
-                
-                
-                obj.trust_accel_all(obj.hist_idx) = trust_accel;
-                obj.quat_meas_all(obj.hist_idx, :)   = y;
-            end
-
             y_pred = obj.h(meas_idx);
-
             H = obj.h_jacobian_states(meas_idx);
 
             range = obj.measurement_ranges{meas_idx};
-
             R_meas = obj.R(range, range);
             if nargin == 4
                 R_meas = R_gps;
@@ -454,7 +450,6 @@ classdef Airdrop_Filter < Abstract_Filter
             [innovation, K, S] = obj.update_impl(y, y_pred, H, R_meas);
             obj.normalize_quat();
         end
-
         function predict(obj, u)
             if isempty(u)
                 u = obj.last_u;
@@ -467,25 +462,31 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function dfdx = f_jacobian_states(obj, u, a_b_mult)
-            if nargin < 3
-                a_b_mult = obj.update_a_b;
+            a_b_mult = true;
+            if obj.altitude() > obj.alt_gate || obj.speed() > obj.speed_gate
+                a_b_mult = false;
             end
-
+            
             e = obj.get_e();
             e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
 
             w_b = obj.get_w_b();
             w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
 
-            a = obj.calc_accel(u(1:3));
-            a0 = a(1); a1 = a(2); a2 = a(3);
+            b_a = obj.get_b_a();
+
+            % body-frame specific force being rotated by q
+            a_b = (u(1:3) - b_a);
+            a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
+            
+            % rotation used for dV/db_a block (gate whether bias is "active" in the model)
+            C_bi = ecef2body_rotm(e);     % body -> inertial
+            C_EB = C_bi * a_b_mult;    % if a_b_mult==0 => dV/db_a becomes 0
 
             J11 = obj.J(1,1);
             J22 = obj.J(2,2);
             J33 = obj.J(3,3);
             
-            C_EB = ecef2body_rotm(e)' * a_b_mult;
-
             dx0dx = [
                 zeros(3,1);
 
@@ -796,25 +797,32 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function dhdx = h_jacobian_states(obj, meas_idx)
-            w_jacobian = obj.dhdx_w;
-            obj.update_a_b = true;
-
-            if obj.altitude() > obj.alt_gate || obj.speed() > obj.speed_gate
-                obj.update_a_b = false;
-                w_jacobian = obj.dhdx_w_no_bias;
-            end
-            
-
+            % Position Jacobian
             p_jacobian = obj.dhdx_p;
 
-            dhdx = [
-                p_jacobian
-                obj.dhdx_q;
-                w_jacobian;
-                obj.dhdx_alt
+            % Gyro Jacobian
+            w_jacobian = obj.dhdx_w;
+
+            % Baro Jacobian
+            alt_jacobian = obj.dhdx_alt;
+
+            % --- NEW: Mag Jacobian ---
+            q = obj.get_e();
+            Jq = obj.dmag_dq_numeric(q);   % numeric jacobian of ecef2body_rotm(q)*m_ref_i OR C' version? see below
+            mag_jacobian = zeros(3, 22);
+            mag_jacobian(:, obj.x_inds.e) = Jq;
+
+            dhdx_all = [
+                p_jacobian;        % 3
+                mag_jacobian;      % 3
+                w_jacobian;        % 3
+                alt_jacobian       % 1
                 ];
+
             if nargin == 2
-                dhdx = dhdx(obj.measurement_ranges{meas_idx}, :);
+                dhdx = dhdx_all(obj.measurement_ranges{meas_idx}, :);
+            else
+                dhdx = dhdx_all;
             end
         end
 
@@ -824,8 +832,6 @@ classdef Airdrop_Filter < Abstract_Filter
 
             p_pred = P_E + b_p;
 
-            e_pred = obj.get_e();
-
             w_b = obj.get_w_b();
             b_g = obj.get_b_g();
 
@@ -833,9 +839,16 @@ classdef Airdrop_Filter < Abstract_Filter
 
             alt_pred = obj.altitude();
 
+            q = obj.get_e();
+
+            % --- NEW: magnetometer prediction ---
+            C_bi  = ecef2body_rotm(q);   % (given: this is b2i)
+            C_ib  = C_bi.';              % i2b
+            m_pred = C_ib * obj.m_ref_i; % predicted mag in body
+
             y_all = [
                 p_pred;
-                e_pred;
+                m_pred;
                 w_pred;
                 alt_pred
                 ];
@@ -850,11 +863,11 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function a_e = calc_accel(obj, a)
             e = obj.get_e();
-            C_EB = ecef2body_rotm(e)';
+            C_bi = ecef2body_rotm(e);          % body -> inertial
 
             b_a = obj.get_b_a();
 
-            a_e = C_EB * (a - b_a) + obj.g_vec_e;
+            a_e  = C_bi * (a - b_a) + obj.g_vec_e;
         end
 
         function [q_meas, trust_accel] = quat_from_acc_mag(obj, a_b, m_b)
@@ -882,7 +895,8 @@ classdef Airdrop_Filter < Abstract_Filter
 
             C_BE = [ e_b, n_b, u_b ];
 
-            q_meas = obj.rotm_to_quat(C_BE);
+            C_bi  = C_BE.';                 % b2i
+            q_meas = obj.rotm_to_quat(C_bi);
         end
 
         function q = rotm_to_quat(~, R)
@@ -985,6 +999,72 @@ classdef Airdrop_Filter < Abstract_Filter
 
                 ptr_out = p; % next unread index when scanning backward
             end
+        end
+
+        function Jq = dmag_dq_numeric(obj, q)
+            % Numeric Jacobian wrt q = [w x y z]' for:
+            %   m_pred(q) = C_ib(q) * m_ref_i = ecef2body_rotm(q)' * m_ref_i
+            % where ecef2body_rotm(q) returns C_bi (body->inertial, b2i).
+
+            eps = 1e-6;
+
+            q = q(:);
+            q = q / norm(q);
+
+            % baseline
+            C_bi = ecef2body_rotm(q);      % b2i
+            m0   = C_bi.' * obj.m_ref_i;   % i2b * m_ref_i
+
+            Jq = zeros(3,4);
+
+            for k = 1:4
+                dq = zeros(4,1);
+                dq(k) = eps;
+
+                qp = q + dq;  qp = qp / norm(qp);
+                qm = q - dq;  qm = qm / norm(qm);
+
+                C_bi_p = ecef2body_rotm(qp);
+                C_bi_m = ecef2body_rotm(qm);
+
+                mp = C_bi_p.' * obj.m_ref_i;
+                mm = C_bi_m.' * obj.m_ref_i;
+
+                Jq(:,k) = (mp - mm) / (2*eps);
+            end
+        end
+
+        function Jq = dCtranspose_times_m_dq_wxyz_b2i(obj, q, m)
+            % Analytic Jacobian of y = C(q)' * m wrt q = [w x y z]'.
+            % Here C(q) is the standard i2b DCM formula (the one I wrote earlier),
+            % and you want C' * m because your ecef2body_rotm returns b2i.
+            %
+            % Returns Jq (3x4): [dy/dw, dy/dx, dy/dy, dy/dz]
+
+            q = q(:);  m = m(:);
+            q = q / norm(q);
+
+            w=q(1); x=q(2); y=q(3); z=q(4);
+
+            % Partials of C(q) (the standard wxyz i2b form)
+            dC_dw = [  0,  2*z, -2*y;
+                -2*z,  0,  2*x;
+                2*y, -2*x,  0 ];
+
+            dC_dx = [  0,   2*y,  2*z;
+                2*y, -4*x,  2*w;
+                2*z, -2*w, -4*x ];
+
+            dC_dy = [ -4*y,  2*x, -2*w;
+                2*x,   0,   2*z;
+                2*w,  2*z, -4*y ];
+
+            dC_dz = [ -4*z,  2*w,  2*x;
+                -2*w, -4*z,  2*y;
+                2*x,  2*y,   0 ];
+
+            % For y = C' * m, derivative is (dC/dq)' * m
+            Jq = [dC_dw.'*m, dC_dx.'*m, dC_dy.'*m, dC_dz.'*m];
         end
 
     end
