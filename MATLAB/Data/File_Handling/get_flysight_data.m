@@ -46,12 +46,6 @@ function [data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, da
     gyro_meas = deg2rad(gyro_meas);
     data_gyro = table(imu_time, gyro_meas, 'VariableNames', {'time', 'data'});
 
-    data_gps_lla = [data_flysight_gps.GNSS.lat, data_flysight_gps.GNSS.lon, data_flysight_gps.GNSS.hMSL];
-    data_gps_enu = lla2enu(data_gps_lla(:, 1:3), data_gps_lla(1, 1:3), 'flat');
-
-    data_gps = table(data_flysight_gps.GNSS.time, data_gps_enu, 'VariableNames', {'time', 'data'});
-    % data_gps = data_gps(1:100:end, :);
-
     mag_time = (data_flysight_sensor.MAG.time - data_flysight_sensor.MAG.time(1));
     data_mag = table(mag_time, [data_flysight_sensor.MAG.x, data_flysight_sensor.MAG.y, data_flysight_sensor.MAG.z], 'VariableNames', {'time', 'data'});
 
@@ -59,6 +53,17 @@ function [data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, da
     baro_alt = baro_alt - baro_alt(1);
     baro_time = (data_flysight_sensor.BARO.time - data_flysight_sensor.BARO.time(1));
     data_baro = table(baro_time, baro_alt, 'VariableNames', {'time', 'data'});
+
+    if ~isfield(data_flysight_gps, "GNSS")
+        data_gps = table();
+        data_gps_vel = table();
+        return
+    end
+
+    data_gps_lla = [data_flysight_gps.GNSS.lat, data_flysight_gps.GNSS.lon, data_flysight_gps.GNSS.hMSL];
+    data_gps_enu = lla2enu(data_gps_lla(:, 1:3), data_gps_lla(1, 1:3), 'flat');
+
+    data_gps = table(data_flysight_gps.GNSS.time, data_gps_enu, 'VariableNames', {'time', 'data'});
 
     data_gps_vel = table(data_flysight_gps.GNSS.time, [data_flysight_gps.GNSS.velE, data_flysight_gps.GNSS.velN, -data_flysight_gps.GNSS.velD], 'VariableNames', {'time', 'data'});
 end

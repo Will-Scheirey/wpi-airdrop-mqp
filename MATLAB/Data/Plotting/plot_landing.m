@@ -15,6 +15,8 @@ for n=1:length(drop_dirs)
     the_dir = drop_dirs(n);
     dir_name = fullfile(data_dir, the_dir.name);
 
+    all_names{n} = dir_name;
+
     if contains(dir_name, ".")
         continue
     end
@@ -66,7 +68,8 @@ for n=1:length(drop_dirs)
 
     all_landings(n, :) = drop_info.gps_land;
     all_drops(n, :) = drop_info.gps_drop;
-    all_vel(n, :) = drop_info.vel_drop * 5; 
+    all_vel(n, :) = drop_info.vel_drop; 
+    time_drop(n, :) = drop_info.time_drop;
 end
 
 [all_drops_scaled, all_landings_scaled, all_vel_scaled] = rescale_data(all_landings, all_drops, all_vel, false);
@@ -93,12 +96,28 @@ end
 axis equal
 xlabel("East")
 ylabel("North")
+zlabel("Up")
 
 figure(2)
 clf
-all_landings_corrected = (all_landings_scaled - all_drops_scaled) ./ all_vel_scaled;
-plot3(all_landings_corrected(:, 1), all_landings_corrected(:, 2), all_landings_corrected(:, 3), 'rx', 'MarkerSize', 15, 'LineWidth', 1.5); hold on
-% axis equal
+drift = all_landings_scaled(:, 1:2) - all_drops_scaled(:, 1:2);
+drift_slope = vecnorm(drift, 2, 2) ./ (all_drops_scaled(:, 3) - all_landings_scaled(:, 3));
+plot(all_drops_scaled(:, 3), drift_slope, '.r', 'MarkerSize', 15, 'LineWidth', 1.5); hold on
+
+
+high_alt_drop = all_drops(:,3) > 3000;
+time_drop_high_alt = time_drop(high_alt_drop);
+time_drop_low_alt = time_drop(~high_alt_drop);
+
+figure(3)
+time_drop_high_alt = sort(time_drop_high_alt);
+plot(time_drop_high_alt)
+
+figure(4)
+time_drop_low_alt = sort(time_drop_low_alt);
+plot(time_drop_low_alt)
+
+
 
 function [all_drops, all_landings, all_vel] = rescale_data(all_landings, all_drops, all_vel, drop)
 if ~drop

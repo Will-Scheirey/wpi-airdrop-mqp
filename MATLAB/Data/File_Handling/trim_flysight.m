@@ -7,6 +7,10 @@
     data_flysight_sensor, ...
     data_flysight_gps] = trim_flysight(data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, data_flysight_sensor, data_flysight_gps)
 
+if isempty(data_gps)
+    return
+end
+
 gps_shift = data_baro.time(end) - data_gps.time(end);
 data_gps.time = data_gps.time + gps_shift;
 data_gps_vel.time = data_gps_vel.time + gps_shift;
