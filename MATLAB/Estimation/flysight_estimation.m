@@ -13,7 +13,7 @@ catch exception
 end
 
 parent_dir = "haars_data";
-drop_dir = "0010";
+drop_dir = "0005";
 full_dir = fullfile(parent_dir, drop_dir);
 
 load_data = false;
@@ -68,8 +68,8 @@ if isempty(drop_info)
 else
     drop_time = drop_info.time_drop;
     land_time = drop_info.time_land;
-    t_start = data_accel.time(1);
-    t_dur   = data_accel.time(end) - data_accel.time(1);
+    t_start = data_accel_all.time(1);
+    t_dur   = data_accel_all.time(end) - data_accel_all.time(1);
 end
 
 zero_alt_mean_window = 10;
@@ -137,7 +137,7 @@ if ~isempty(data_gps_all)
     dt          = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
 
 else
-    measurements = {data_baro, data_gyro};
+    measurements = {data_mag, data_gyro};
     dt          = min([dt_min_accel, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
 end
 inputs = data_accel;
@@ -167,7 +167,7 @@ R_pos = [
     ].^2;
 
 % Rq = 5e-4;
-Rq = sensor.mag_std_dev;
+Rq = sensor.mag_std_dev * 1e2;
 R_quat = [
     Rq, 0,  0,  0;
     0,  Rq, 0,  0;
@@ -183,7 +183,7 @@ R_w = [
     0,   0,  Rw
 ].^2;
 
-Rb = sensor.baro_std_dev;
+Rb = 1e1;
 R_baro = Rb^2;
 
 R = blkdiag( ...
@@ -936,7 +936,7 @@ clf
 animation_start_time = drop_time;
 % animation_start_time = 10400;
 start_idx = find(t_plot > animation_start_time, 1);
-run_animation(t_plot, p_est, e_est, 5, 1, start_idx, false);
+run_animation(t_plot, p_est, e_est, 20, 10, start_idx, false);
 
 function plot_cov(variance)
     variance = squeeze(variance);

@@ -4,7 +4,7 @@ classdef Airdrop_Filter < Abstract_Filter
         % --- Constants ---
         J
         g_norm      = 9.80665;
-        accel_gate  = 1e-2;
+        accel_gate  = 1e0;
         alt_gate    = 1e10;
         speed_gate  = 1e100
         g_vec_e
@@ -483,7 +483,7 @@ classdef Airdrop_Filter < Abstract_Filter
             J11 = obj.J(1,1);
             J22 = obj.J(2,2);
             J33 = obj.J(3,3);
-
+            
             C_EB = ecef2body_rotm(e)' * a_b_mult;
 
             dx0dx = [
@@ -797,11 +797,13 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function dhdx = h_jacobian_states(obj, meas_idx)
             w_jacobian = obj.dhdx_w;
+            obj.update_a_b = true;
 
             if obj.altitude() > obj.alt_gate || obj.speed() > obj.speed_gate
-                w_jacobian = obj.dhdx_w_no_bias;
                 obj.update_a_b = false;
+                w_jacobian = obj.dhdx_w_no_bias;
             end
+            
 
             p_jacobian = obj.dhdx_p;
 
