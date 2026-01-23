@@ -23,7 +23,9 @@ classdef Airdrop_Filter < Abstract_Filter
 
         % --- Filter Properties
 
+        meas_defs
         is_initialized
+        num_states
 
         x_curr
         P_curr
@@ -82,14 +84,12 @@ classdef Airdrop_Filter < Abstract_Filter
 
             obj.g_vec_e = [0; 0; -obj.g_norm];
 
-            obj.measurement_ranges = {1:3, 4:6, 7:9, 10};
-
             obj.last_u = [0; 0; 0];
             obj.last_down = [0; 0; 1];
             obj.update_a_b = true;
 
             obj.init_x_inds();
-            obj.init_matrices();
+            obj.init_y_inds();
 
             obj.is_initialized = false;
 
@@ -99,48 +99,43 @@ classdef Airdrop_Filter < Abstract_Filter
         % --- SETUP ---
 
         function init_x_inds(obj)
-            obj.x_inds = struct(  ...
-                'P_E', (1:3)', ... % Position in Inertial Frame
-                'V_E', (4:6)', ... % Velocity in Inertial Frame
-                'e',   (7:10)', ... % Quaternion
-                'w_b', (11:13)', ... % Angular Velocity
-                'b_g', (14:16)', ... % Gyro Bias
-                'b_a', (17:19)', ... % Accelerometer Bias
-                'b_p',  (20:22)' ... % GPS Position Bias
-                );
+
+            state_blocks = {
+                "P_E", 3; ... % Position in Inertial Frame
+                "V_E", 3; ... % Velocity in Inertial Frame
+                "e",   4; ... % Quaternion
+                "w_b", 3; ... % Angular Velocity
+                "b_g", 3; ... % Gyro Bias
+                "b_a", 3; ... % Accelerometer Bias
+                "b_p", 3; ... % GPS Position Bias
+                "b_m", 3; ... % Magnetometer Bias
+                };
+
+            state_idx = 1;
+            for i=1:size(state_blocks,1)
+                state_name = state_blocks{i,1};
+                state_size  = state_blocks{i,2};
+                obj.x_inds.(state_name) = (state_idx:(state_idx+state_size-1))';
+                state_idx = state_idx + state_size;
+            end
+
+            obj.num_states = state_idx - 1;
         end
 
-        function init_matrices(obj)
-            obj.dhdx_p = [
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0;
-                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0;
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1;
-                ];
+        function init_y_inds(obj)
+            obj.meas_defs = struct( ...
+                "pos", struct("idx",1,"dim",3), ...
+                "mag", struct("idx",2,"dim",3), ...
+                "gyro",struct("idx",3,"dim",3), ...
+                "alt", struct("idx",4,"dim",1));
 
-            obj.dhdx_w = [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0;
-                ];
-
-            obj.dhdx_alt = [
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                ];
-
-            obj.dhdx_pos_no_bias = [
-                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                ];
-
-            obj.dhdx_w_no_bias = [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
-                ];
-
-            % placeholder (will be filled per-call because depends on q)
-            obj.dhdx_mag = zeros(3, 22);
+            r = 1;
+            for k = 1:numel(fieldnames(obj.meas_defs))
+                fn = fieldnames(obj.meas_defs);
+                s = obj.meas_defs.(fn{k});
+                obj.measurement_ranges{s.idx} = r:(r+s.dim-1);
+                r = r + s.dim;
+            end
         end
 
         function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas)
@@ -193,6 +188,7 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.x_curr(obj.x_inds.e) = q_meas;
             % Initialize accel bias to the measurement minus corrected
             obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
+            obj.x_curr(obj.x_inds.b_m) = zeros(3,1);
 
             obj.x_curr = obj.x_curr(:);
 
@@ -227,6 +223,10 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function b_p_out = get_b_p(obj)
             b_p_out = obj.x_curr(obj.x_inds.b_p);
+        end
+
+        function b_m_out = get_b_m(obj)
+            b_m_out = obj.x_curr(obj.x_inds.b_m);
         end
 
         function alt_out = altitude(obj)
@@ -326,12 +326,12 @@ classdef Airdrop_Filter < Abstract_Filter
                 t0 = timesteps(i);
                 t1 = t0 + dt_;  % forward: t1>t0, backward: t1<t0
 
-                %{
+                
                 if t0 > drop_time
-                    obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
-                    obj.R(11, 11)   = 300;
+                    % obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
+                    % obj.R(11, 11)   = 300;
+                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-10 * eye(3);
                 end
-                %}
 
                 % Define bin as [tmin, tmax)
                 tmin = min(t0, t1);
@@ -461,368 +461,197 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.normalize_quat();
         end
 
-        function dfdx = f_jacobian_states(obj, u, a_b_mult)
+        function A = f_jacobian_states(obj, u)
+            %F_JACOBIAN_STATES  Continuous-time state Jacobian (df/dx)
+            % Rewritten to be maintainable, but it uses the EXACT SAME equations
+            % as your existing dx0dx..dx21dx construction.
+            %
+            % Works for both your old 22-state layout and your newer layouts (e.g. if you
+            % added b_m). Any extra states beyond the original ones get zero dynamics here.
+
+            % --- size / indices ---
+            nx = numel(obj.x_curr);
+            A  = zeros(nx, nx);
+
+            % Required groups (must exist in your init_x_inds)
+            P  = obj.x_inds.P_E(:);   % 3
+            V  = obj.x_inds.V_E(:);   % 3
+            E  = obj.x_inds.e(:);     % 4  (e0 e1 e2 e3)
+            W  = obj.x_inds.w_b(:);   % 3  (w0 w1 w2)
+            BG = obj.x_inds.b_g(:);   % 3
+            BA = obj.x_inds.b_a(:);   % 3
+            BP = obj.x_inds.b_p(:);   % 3
+
+            % ---- your gating logic for accel-bias coupling (same as current code) ----
             a_b_mult = true;
             if obj.altitude() > obj.alt_gate || obj.speed() > obj.speed_gate
                 a_b_mult = false;
             end
-            
-            e = obj.get_e();
-            e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
 
-            w_b = obj.get_w_b();
-            w0 = w_b(1); w1 = w_b(2); w2 = w_b(3);
+            % --- pull current state (same variable names) ---
+            e  = obj.get_e();      e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
+            w  = obj.get_w_b();    w0 = w(1); w1 = w(2); w2 = w(3);
 
             b_a = obj.get_b_a();
 
-            % body-frame specific force being rotated by q
+            % body-frame specific force being rotated by q (same as yours)
             a_b = (u(1:3) - b_a);
             a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
-            
-            % rotation used for dV/db_a block (gate whether bias is "active" in the model)
+
+            % rotation used for dV/db_a block (same as yours)
             C_bi = ecef2body_rotm(e);     % body -> inertial
-            C_EB = C_bi * a_b_mult;    % if a_b_mult==0 => dV/db_a becomes 0
+            C_EB = C_bi * a_b_mult;       % if gate false => zero
 
             J11 = obj.J(1,1);
             J22 = obj.J(2,2);
             J33 = obj.J(3,3);
-            
-            dx0dx = [
-                zeros(3,1);
 
-                1;
-                0;
-                0;
+            % =========================================================================
+            % Pdot = V  => dPdot/dV = I
+            % (this replaces your dx0dx/dx1dx/dx2dx rows)
+            % =========================================================================
+            A(P, V) = eye(3);
 
-                0;
-                0;
-                0;
-                0;
+            % =========================================================================
+            % Vdot Jacobian rows (this replaces dx3dx/dx4dx/dx5dx)
+            % Your existing equations are exactly preserved.
+            % =========================================================================
 
-                zeros(6,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx1dx = [
-                zeros(3,1);
-
-                0;
-                1;
-                0;
-
-                0;
-                0;
-                0;
-                0;
-
-                zeros(6,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx2dx = [
-                zeros(3,1);
-
-                0;
-                0;
-                1;
-
-                0;
-                0;
-                0;
-                0;
-
-                zeros(6,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx3dx = [
-                zeros(3, 1);
-
-                0;
-                0;
-                0;
-
-                2*a0*e0 - 2*a1*e3 + 2*a2*e2;
-                2*a0*e1 + 2*a1*e2 + 2*a2*e3;
-                2*a1*e1 - 2*a0*e2 + 2*a2*e0;
-                2*a2*e1 - 2*a0*e3 - 2*a1*e0;
-
-                0;
-                0;
-                0
-
-                0;
-                0;
-                0;
-
-                -C_EB(1,:).';
-
-                zeros(3,1);
-                ]';
-
-            dx4dx = [
-                zeros(3, 1);
-                0;
-                0;
-                0;
-
-                2*a1*e0 + 2*a0*e3 - 2*a2*e1;
-                2*a0*e2 - 2*a1*e1 - 2*a2*e0;
-                2*a0*e1 + 2*a1*e2 + 2*a2*e3;
-                2*a0*e0 - 2*a1*e3 + 2*a2*e2;
-
-                0;
-                0;
-                0;
-
-                0;
-                0;
-                0;
-
-
-                -C_EB(2,:).';
-
-                zeros(3,1);
-                ]';
-
-
-            dx5dx = [
-                zeros(3, 1);
-                0;
-                0;
-                0;
-
-                2*a1*e1 - 2*a0*e2 + 2*a2*e0;
-                2*a1*e0 + 2*a0*e3 - 2*a2*e1;
-                2*a1*e3 - 2*a0*e0 - 2*a2*e2;
-                2*a0*e1 + 2*a1*e2 + 2*a2*e3;
-
-                0;
-                0;
-                0;
-
-                0;
-                0;
-                0;
-
-                -C_EB(3,:).';
-
-                zeros(3,1);
-                ]';
-
-            dx6dx = [
-                zeros(6, 1);
-
-                0;
-                -1/2*w0;
-                -1/2*w1;
-                -1/2*w2;
-
-                -1/2*e1;
-                -1/2*e2;
-                -1/2*e3;
-
-                zeros(3,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx7dx = [
-                zeros(6, 1);
-
-                1/2*w0;
-                0;
-                1/2*w2;
-                -1/2*w1;
-
-                1/2*e0;
-                -1/2*e3;
-                1/2*e2;
-
-                zeros(3,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx8dx = [
-                zeros(6, 1);
-
-                1/2*w1;
-                -1/2*w2;
-                0;
-                1/2*w0;
-
-                1/2*e3;
-                1/2*e0;
-                -1/2*e1;
-
-                zeros(3,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx9dx = [
-                zeros(6, 1);
-
-                1/2*w2;
-                1/2*w1;
-                -1/2*w0;
-                0;
-
-                -1/2*e2;
-                1/2*e1;
-                1/2*e0;
-
-                zeros(3,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx10dx = [
-                zeros(10, 1);
-                0;
-                w2 * (J22 - J33) / J11;
-                w1 * (J22 - J33) / J11;
-
-                zeros(3,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx11dx = [
-                zeros(10, 1);
-                w2 * (J33 - J11) / J22;
-                0;
-                w0 * (J33 - J11) / J22;
-
-                zeros(3,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx12dx = [
-                zeros(10, 1);
-                w1 * (J11 - J22) / J33;
-                w0 * (J11 - J22) / J33;
-                0;
-
-                zeros(3,1);
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx13dx = [
-                zeros(13,1);
-                0;
-                0;
-                0;
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx14dx = [
-                zeros(13,1);
-                0;
-                0;
-                0;
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx15dx = [zeros(13,1);
-                0;
-                0;
-                0;
-                zeros(3,1);
-                zeros(3,1);
-                ]';
-
-            dx16dx = zeros(22, 1)';
-            dx17dx = zeros(22, 1)';
-            dx18dx = zeros(22, 1)';
-
-            dx19dx = zeros(22, 1)';
-            dx20dx = zeros(22, 1)';
-            dx21dx = zeros(22, 1)';
-
-            dfdx = [
-                dx0dx;
-                dx1dx;
-                dx2dx;
-                dx3dx;
-                dx4dx;
-                dx5dx;
-                dx6dx;
-                dx7dx;
-                dx8dx;
-                dx9dx;
-                dx10dx;
-                dx11dx;
-                dx12dx;
-                dx13dx;
-                dx14dx;
-                dx15dx;
-                dx16dx;
-                dx17dx;
-                dx18dx;
-                dx19dx;
-                dx20dx;
-                dx21dx
+            % Row for d(V0)/dx  (your dx3dx)
+            A(V(1), E)  = [ ...
+                2*a0*e0 - 2*a1*e3 + 2*a2*e2, ...
+                2*a0*e1 + 2*a1*e2 + 2*a2*e3, ...
+                2*a1*e1 - 2*a0*e2 + 2*a2*e0, ...
+                2*a2*e1 - 2*a0*e3 - 2*a1*e0 ...
                 ];
+            A(V(1), BA) = -C_EB(1,:);   % (-C_EB(1,:).')'  same content
+
+            % Row for d(V1)/dx  (your dx4dx)
+            A(V(2), E)  = [ ...
+                2*a1*e0 + 2*a0*e3 - 2*a2*e1, ...
+                2*a0*e2 - 2*a1*e1 - 2*a2*e0, ...
+                2*a0*e1 + 2*a1*e2 + 2*a2*e3, ...
+                2*a0*e0 - 2*a1*e3 + 2*a2*e2 ...
+                ];
+            A(V(2), BA) = -C_EB(2,:);
+
+            % Row for d(V2)/dx  (your dx5dx)
+            A(V(3), E)  = [ ...
+                2*a1*e1 - 2*a0*e2 + 2*a2*e0, ...
+                2*a1*e0 + 2*a0*e3 - 2*a2*e1, ...
+                2*a1*e3 - 2*a0*e0 - 2*a2*e2, ...
+                2*a0*e1 + 2*a1*e2 + 2*a2*e3 ...
+                ];
+            A(V(3), BA) = -C_EB(3,:);
+
+            % =========================================================================
+            % Quaternion kinematics Jacobian rows (dx6dx..dx9dx)
+            % de/dt = -1/2 * Omega(w) * e
+            % Your existing partials are preserved exactly as written.
+            % =========================================================================
+
+            % Row for de0/dx  (your dx6dx)
+            A(E(1), E) = [0, -0.5*w0, -0.5*w1, -0.5*w2];
+            A(E(1), W) = [-0.5*e1, -0.5*e2, -0.5*e3];
+
+            % Row for de1/dx  (your dx7dx)
+            A(E(2), E) = [0.5*w0, 0, 0.5*w2, -0.5*w1];
+            A(E(2), W) = [0.5*e0, -0.5*e3, 0.5*e2];
+
+            % Row for de2/dx  (your dx8dx)
+            A(E(3), E) = [0.5*w1, -0.5*w2, 0, 0.5*w0];
+            A(E(3), W) = [0.5*e3, 0.5*e0, -0.5*e1];
+
+            % Row for de3/dx  (your dx9dx)
+            A(E(4), E) = [0.5*w2, 0.5*w1, -0.5*w0, 0];
+            A(E(4), W) = [-0.5*e2, 0.5*e1, 0.5*e0];
+
+            % =========================================================================
+            % Rigid body rotational dynamics Jacobian rows (dx10dx..dx12dx)
+            % dw/dt = J^{-1}(-w x (Jw)) with your simplified partials
+            % =========================================================================
+            % Row for dw0/dx (your dx10dx)
+            A(W(1), W) = [ ...
+                0, ...
+                w2 * (J22 - J33) / J11, ...
+                w1 * (J22 - J33) / J11 ...
+                ];
+
+            % Row for dw1/dx (your dx11dx)
+            A(W(2), W) = [ ...
+                w2 * (J33 - J11) / J22, ...
+                0, ...
+                w0 * (J33 - J11) / J22 ...
+                ];
+
+            % Row for dw2/dx (your dx12dx)
+            A(W(3), W) = [ ...
+                w1 * (J11 - J22) / J33, ...
+                w0 * (J11 - J22) / J33, ...
+                0 ...
+                ];
+
+            % =========================================================================
+            % Bias random walks: db/dt = 0  => rows already zero
+            % (BG, BA, BP, and any extra states like b_m remain zero)
+            % =========================================================================
         end
 
         function dxdt = f(obj, u)
-            V_e = obj.get_V_E();
-            e   = obj.get_e();
+            % State derivative using the SAME equations as your current code,
+            % but assembled by named blocks for maintainability.
 
-            w_b = obj.get_w_b();
+            % ---- Unpack state via getters (already index-safe) ----
+            V_e = obj.get_V_E();     % 3x1
+            e   = obj.get_e();       % 4x1
+            w_b = obj.get_w_b();     % 3x1
 
-            dV_dt = obj.calc_accel(u(1:3));
+            % ---- Input handling ----
+            % In your code, u(1:3) is the accelerometer measurement used to compute accel
+            a_meas_b = u(1:3);
 
+            % ---- Allocate output ----
+            nx   = numel(obj.x_curr);
+            dxdt = zeros(nx, 1);
+
+            % ---- Kinematics / dynamics (same math) ----
             dP_dt = V_e;
+            dV_dt = obj.calc_accel(a_meas_b);                         % C_bi*(a - b_a) + g_vec_e
+            de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;            % your sign/convention
+            dw_dt = obj.J \ (-cross(w_b, obj.J * w_b));               % rigid body (no torque)
 
-            obj.accel_calc_all(obj.hist_idx, :) = dV_dt';
-
-            de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;
-            dw_dt = obj.J \ (-cross(w_b, obj.J*w_b));
-
+            % ---- Bias models (same as your current: random walk / constant) ----
             db_g_dt = zeros(3,1);
             db_a_dt = zeros(3,1);
             db_p_dt = zeros(3,1);
 
-            dxdt = [dP_dt; dV_dt; de_dt; dw_dt; db_g_dt; db_a_dt; db_p_dt];
+            % If you later add mag bias b_m:
+            % db_m_dt = zeros(3,1);
+
+            % ---- Write into dxdt using indices (no hard-coded positions) ----
+            dxdt(obj.x_inds.P_E) = dP_dt;
+            dxdt(obj.x_inds.V_E) = dV_dt;
+            dxdt(obj.x_inds.e)   = de_dt;
+            dxdt(obj.x_inds.w_b) = dw_dt;
+
+            dxdt(obj.x_inds.b_g) = db_g_dt;
+            dxdt(obj.x_inds.b_a) = db_a_dt;
+            dxdt(obj.x_inds.b_p) = db_p_dt;
+
+            % If you add b_m to x_inds, you just uncomment:
+            % dxdt(obj.x_inds.b_m) = db_m_dt;
+
+            % ---- Logging (keep exactly what you had) ----
+            obj.accel_calc_all(obj.hist_idx, :) = dV_dt.';
         end
 
-        function dhdx = h_jacobian_states(obj, meas_idx)
-            % Position Jacobian
-            p_jacobian = obj.dhdx_p;
-
-            % Gyro Jacobian
-            w_jacobian = obj.dhdx_w;
-
-            % Baro Jacobian
-            alt_jacobian = obj.dhdx_alt;
-
-            % --- NEW: Mag Jacobian ---
-            q = obj.get_e();
-            Jq = obj.dmag_dq_numeric(q);   % numeric jacobian of ecef2body_rotm(q)*m_ref_i OR C' version? see below
-            mag_jacobian = zeros(3, 22);
-            mag_jacobian(:, obj.x_inds.e) = Jq;
-
-            dhdx_all = [
-                p_jacobian;        % 3
-                mag_jacobian;      % 3
-                w_jacobian;        % 3
-                alt_jacobian       % 1
-                ];
-
-            if nargin == 2
-                dhdx = dhdx_all(obj.measurement_ranges{meas_idx}, :);
-            else
-                dhdx = dhdx_all;
+        function H = h_jacobian_states(obj, meas_idx)
+            switch meas_idx
+                case 1, H = obj.H_pos();
+                case 2, H = obj.H_mag();
+                case 3, H = obj.H_gyro();
+                case 4, H = obj.H_alt();
+                otherwise, error("bad meas_idx");
             end
         end
 
@@ -834,6 +663,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
             w_b = obj.get_w_b();
             b_g = obj.get_b_g();
+            b_m = obj.get_b_m();
 
             w_pred = w_b + b_g;
 
@@ -844,7 +674,7 @@ classdef Airdrop_Filter < Abstract_Filter
             % --- NEW: magnetometer prediction ---
             C_bi  = ecef2body_rotm(q);   % (given: this is b2i)
             C_ib  = C_bi.';              % i2b
-            m_pred = C_ib * obj.m_ref_i; % predicted mag in body
+            m_pred = C_ib * obj.m_ref_i + b_m; % predicted mag in body
 
             y_all = [
                 p_pred;
@@ -854,6 +684,47 @@ classdef Airdrop_Filter < Abstract_Filter
                 ];
 
             y = y_all(obj.measurement_ranges{meas_idx});
+        end
+
+        % --- JACOBIANS ---
+        function H = H_pos(obj)
+            H = zeros(3, obj.num_states);
+            H(:, obj.x_inds.P_E) = eye(3);
+            H(:, obj.x_inds.b_p) = eye(3);
+        end
+
+        function H = H_gyro(obj)
+            H = zeros(3, obj.num_states);
+            H(:, obj.x_inds.w_b) = eye(3);
+            H(:, obj.x_inds.b_g) = eye(3);
+        end
+
+        %{
+        function H = H_mag(obj)
+            H = zeros(3, obj.num_states);
+
+            q  = obj.get_e();
+            m  = obj.m_ref_i;
+
+            % analytic:
+            Jq = obj.dC_times_m_dq_wxyz_i2b(q, m);   % 3x4
+
+            H(:, obj.x_inds.e)   = Jq;
+            H(:, obj.x_inds.b_m) = eye(3);
+        end
+        %}
+        
+        function H = H_mag(obj)
+            H = zeros(3, obj.num_states);
+            q  = obj.get_e();
+            Jq = obj.dmag_dq_numeric(q);          % 3x4
+            H(:, obj.x_inds.e)   = Jq;
+            H(:, obj.x_inds.b_m) = eye(3);
+        end
+
+        function H = H_alt(obj)
+            H = zeros(1, obj.num_states);
+            H(:, obj.x_inds.P_E(3)) = 1;
         end
 
         % --- UTILS ---
@@ -1034,19 +905,17 @@ classdef Airdrop_Filter < Abstract_Filter
             end
         end
 
-        function Jq = dCtranspose_times_m_dq_wxyz_b2i(obj, q, m)
-            % Analytic Jacobian of y = C(q)' * m wrt q = [w x y z]'.
-            % Here C(q) is the standard i2b DCM formula (the one I wrote earlier),
-            % and you want C' * m because your ecef2body_rotm returns b2i.
-            %
+        function Jq = dC_times_m_dq_wxyz_i2b(~, q, m)
+            % Analytic Jacobian of y = C_ib(q) * m wrt q = [w x y z]'.
+            % Assumes C_ib is the "standard" i2b DCM for quaternion [w x y z].
             % Returns Jq (3x4): [dy/dw, dy/dx, dy/dy, dy/dz]
 
-            q = q(:);  m = m(:);
+            q = q(:); m = m(:);
             q = q / norm(q);
 
-            w=q(1); x=q(2); y=q(3); z=q(4);
+            w = q(1); x = q(2); y = q(3); z = q(4);
 
-            % Partials of C(q) (the standard wxyz i2b form)
+            % These are partials of the STANDARD i2b DCM C_ib(q)
             dC_dw = [  0,  2*z, -2*y;
                 -2*z,  0,  2*x;
                 2*y, -2*x,  0 ];
@@ -1063,8 +932,8 @@ classdef Airdrop_Filter < Abstract_Filter
                 -2*w, -4*z,  2*y;
                 2*x,  2*y,   0 ];
 
-            % For y = C' * m, derivative is (dC/dq)' * m
-            Jq = [dC_dw.'*m, dC_dx.'*m, dC_dy.'*m, dC_dz.'*m];
+            % y = C*m  => dy/dq = (dC/dq)*m
+            Jq = [dC_dw*m, dC_dx*m, dC_dy*m, dC_dz*m];
         end
 
     end
