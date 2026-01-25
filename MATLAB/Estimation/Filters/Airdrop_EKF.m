@@ -33,8 +33,7 @@ classdef Airdrop_EKF < Airdrop_Filter
             k = obj.hist_idx;
             if isempty(obj.F_hist)
                 nx = size(Phi,1);
-                % You'll want N = numel(tspan) available; easiest is allocate in run_filter via hook,
-                % but quick hack: grow dynamically
+
                 obj.F_hist = NaN(nx,nx,100000); % replace with real N allocation
                 obj.Q_hist = NaN(nx,nx,100000);
             end

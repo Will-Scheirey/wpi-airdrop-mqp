@@ -84,7 +84,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
             obj.g_vec_e = [0; 0; -obj.g_norm];
 
-            obj.last_u = [0; 0; 0];
+            obj.last_u = struct('accel', [0, 0, 0], 'gyro', [0, 0, 0]);
             obj.last_down = [0; 0; 1];
             obj.update_a_b = true;
 
@@ -104,7 +104,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 "P_E", 3; ... % Position in Inertial Frame
                 "V_E", 3; ... % Velocity in Inertial Frame
                 "e",   4; ... % Quaternion
-                "w_b", 3; ... % Angular Velocity
+                 ... % "w_b", 3; ... % Angular Velocity
                 "b_g", 3; ... % Gyro Bias
                 "b_a", 3; ... % Accelerometer Bias
                 "b_p", 3; ... % GPS Position Bias
@@ -126,8 +126,8 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.meas_defs = struct( ...
                 "pos", struct("idx",1,"dim",3), ...
                 "mag", struct("idx",2,"dim",3), ...
-                "gyro",struct("idx",3,"dim",3), ...
-                "alt", struct("idx",4,"dim",1));
+                ... % "gyro",struct("idx",3,"dim",3), ...
+                "alt", struct("idx",3,"dim",1));
 
             r = 1;
             for k = 1:numel(fieldnames(obj.meas_defs))
@@ -180,7 +180,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % Initialize velocity and angular velocity to zero
             obj.x_curr(obj.x_inds.V_E) = zeros(3,1);
-            obj.x_curr(obj.x_inds.w_b) = zeros(3,1);
+            % obj.x_curr(obj.x_inds.w_b) = zeros(3,1);
 
             % Initialize gyro bias to the current gyro readings
             obj.x_curr(obj.x_inds.b_g) = gyro_meas;
@@ -330,14 +330,14 @@ classdef Airdrop_Filter < Abstract_Filter
                 if t0 > drop_time
                     % obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
                     % obj.R(11, 11)   = 300;
-                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-10 * eye(3);
+                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-5 * eye(3);
                 end
 
                 % Define bin as [tmin, tmax)
                 tmin = min(t0, t1);
                 tmax = max(t0, t1);
 
-                if verbose
+                if verbose && mod(ii, 1) == 0
                     fprintf("%d / %d (t=%.6f)\n", ii, num_steps, t0);
                 end
 
@@ -380,7 +380,7 @@ classdef Airdrop_Filter < Abstract_Filter
                     % Apply in correct temporal order for the pass
                     for kk = 1:numel(u_rows)
                         u = u_all(u_rows(kk), :);
-                        obj.predict(u.data');
+                        obj.predict(u);
                     end
 
                     if isempty(u_rows)
@@ -420,6 +420,8 @@ classdef Airdrop_Filter < Abstract_Filter
                             accH = acc_gps_all(r, 1);
                             accV = acc_gps_all(r, 2);
                             R_gps = (blkdiag(accH, accH, accV)).^2;
+                            % Rgps = 20;
+                            % R_gps = eye(3) * Rgps^2;
 
                             [innovation, ~, S] = obj.update(meas.data', meas_idx, R_gps);
                         else
@@ -477,7 +479,7 @@ classdef Airdrop_Filter < Abstract_Filter
             P  = obj.x_inds.P_E(:);   % 3
             V  = obj.x_inds.V_E(:);   % 3
             E  = obj.x_inds.e(:);     % 4  (e0 e1 e2 e3)
-            W  = obj.x_inds.w_b(:);   % 3  (w0 w1 w2)
+            % W  = obj.x_inds.w_b(:);   % 3  (w0 w1 w2)
             BG = obj.x_inds.b_g(:);   % 3
             BA = obj.x_inds.b_a(:);   % 3
             BP = obj.x_inds.b_p(:);   % 3
@@ -490,12 +492,16 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % --- pull current state (same variable names) ---
             e  = obj.get_e();      e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
-            w  = obj.get_w_b();    w0 = w(1); w1 = w(2); w2 = w(3);
+
+            w_meas_b = u.gyro';
+            b_g = obj.get_b_g();
+            w = w_meas_b - b_g;
+            w0=w(1); w1=w(2); w2=w(3);
 
             b_a = obj.get_b_a();
 
             % body-frame specific force being rotated by q (same as yours)
-            a_b = (u(1:3) - b_a);
+            a_b = (u.accel' - b_a);
             a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
 
             % rotation used for dV/db_a block (same as yours)
@@ -552,25 +558,26 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % Row for de0/dx  (your dx6dx)
             A(E(1), E) = [0, -0.5*w0, -0.5*w1, -0.5*w2];
-            A(E(1), W) = [-0.5*e1, -0.5*e2, -0.5*e3];
+            % A(E(1), W) = [-0.5*e1, -0.5*e2, -0.5*e3];
 
             % Row for de1/dx  (your dx7dx)
             A(E(2), E) = [0.5*w0, 0, 0.5*w2, -0.5*w1];
-            A(E(2), W) = [0.5*e0, -0.5*e3, 0.5*e2];
+            % A(E(2), W) = [0.5*e0, -0.5*e3, 0.5*e2];
 
             % Row for de2/dx  (your dx8dx)
             A(E(3), E) = [0.5*w1, -0.5*w2, 0, 0.5*w0];
-            A(E(3), W) = [0.5*e3, 0.5*e0, -0.5*e1];
+            % A(E(3), W) = [0.5*e3, 0.5*e0, -0.5*e1];
 
             % Row for de3/dx  (your dx9dx)
             A(E(4), E) = [0.5*w2, 0.5*w1, -0.5*w0, 0];
-            A(E(4), W) = [-0.5*e2, 0.5*e1, 0.5*e0];
+            % A(E(4), W) = [-0.5*e2, 0.5*e1, 0.5*e0];
 
             % =========================================================================
             % Rigid body rotational dynamics Jacobian rows (dx10dx..dx12dx)
             % dw/dt = J^{-1}(-w x (Jw)) with your simplified partials
             % =========================================================================
             % Row for dw0/dx (your dx10dx)
+            %{
             A(W(1), W) = [ ...
                 0, ...
                 w2 * (J22 - J33) / J11, ...
@@ -590,7 +597,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 w0 * (J11 - J22) / J33, ...
                 0 ...
                 ];
-
+            %}
             % =========================================================================
             % Bias random walks: db/dt = 0  => rows already zero
             % (BG, BA, BP, and any extra states like b_m remain zero)
@@ -604,11 +611,13 @@ classdef Airdrop_Filter < Abstract_Filter
             % ---- Unpack state via getters (already index-safe) ----
             V_e = obj.get_V_E();     % 3x1
             e   = obj.get_e();       % 4x1
-            w_b = obj.get_w_b();     % 3x1
+            % w_b = obj.get_w_b();     % 3x1
 
             % ---- Input handling ----
-            % In your code, u(1:3) is the accelerometer measurement used to compute accel
-            a_meas_b = u(1:3);
+            a_meas_b = u.accel';
+            w_meas_b = u.gyro';
+
+            b_g = obj.get_b_g();
 
             % ---- Allocate output ----
             nx   = numel(obj.x_curr);
@@ -617,8 +626,11 @@ classdef Airdrop_Filter < Abstract_Filter
             % ---- Kinematics / dynamics (same math) ----
             dP_dt = V_e;
             dV_dt = obj.calc_accel(a_meas_b);                         % C_bi*(a - b_a) + g_vec_e
-            de_dt = -1/2 * quat_kinematic_matrix(w_b) * e;            % your sign/convention
-            dw_dt = obj.J \ (-cross(w_b, obj.J * w_b));               % rigid body (no torque)
+
+            % Use gyro as input:
+            w_corr = (w_meas_b - b_g);
+            de_dt  = -0.5 * quat_kinematic_matrix(w_corr) * e;
+            % dw_dt = obj.J \ (-cross(w_b, obj.J * w_b));               % rigid body (no torque)
 
             % ---- Bias models (same as your current: random walk / constant) ----
             db_g_dt = zeros(3,1);
@@ -632,7 +644,7 @@ classdef Airdrop_Filter < Abstract_Filter
             dxdt(obj.x_inds.P_E) = dP_dt;
             dxdt(obj.x_inds.V_E) = dV_dt;
             dxdt(obj.x_inds.e)   = de_dt;
-            dxdt(obj.x_inds.w_b) = dw_dt;
+            % dxdt(obj.x_inds.w_b) = dw_dt;
 
             dxdt(obj.x_inds.b_g) = db_g_dt;
             dxdt(obj.x_inds.b_a) = db_a_dt;
@@ -649,8 +661,8 @@ classdef Airdrop_Filter < Abstract_Filter
             switch meas_idx
                 case 1, H = obj.H_pos();
                 case 2, H = obj.H_mag();
-                case 3, H = obj.H_gyro();
-                case 4, H = obj.H_alt();
+                % case 3, H = obj.H_gyro();
+                case 3, H = obj.H_alt();
                 otherwise, error("bad meas_idx");
             end
         end
@@ -661,11 +673,11 @@ classdef Airdrop_Filter < Abstract_Filter
 
             p_pred = P_E + b_p;
 
-            w_b = obj.get_w_b();
+            % w_b = obj.get_w_b();
             b_g = obj.get_b_g();
             b_m = obj.get_b_m();
 
-            w_pred = w_b + b_g;
+            % w_pred = w_b + b_g;
 
             alt_pred = obj.altitude();
 
@@ -679,7 +691,7 @@ classdef Airdrop_Filter < Abstract_Filter
             y_all = [
                 p_pred;
                 m_pred;
-                w_pred;
+                % w_pred;
                 alt_pred
                 ];
 

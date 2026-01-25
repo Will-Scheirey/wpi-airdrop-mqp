@@ -13,7 +13,7 @@ catch exception
 end
 
 parent_dir = "haars_data";
-drop_dir = "DN167_Lt3_n07_08072025_side_2";
+drop_dir = "DN172_Lt3_n12_08072025_side_2";
 full_dir = fullfile(parent_dir, drop_dir);
 
 load_data = false;
@@ -41,15 +41,16 @@ if load_data
         data_sensors_all,...
         data_gpsTrack_all,...
         ] = get_and_trim_flysight(sensor_filename, gps_filename);
-
-    mean_window = 10;
-    data_gyro_all.data = movmean(data_gyro_all.data, mean_window, 1);
-    data_baro_all.data = movmean(data_baro_all.data, mean_window);
-    data_baro_all.data = movmean(data_baro_all.data, mean_window, 1);
+    % 
+    mean_window = 1;
+    data_gyro_all.data  = movmean(data_gyro_all.data, mean_window, 1);
+    % % data_baro_all.data  = movmean(data_baro_all.data, mean_window, 1);
+    data_accel_all.data = movmean(data_accel_all.data, mean_window, 1);
+    %{
     if ~isempty(data_gps_all)
         data_gps_all.data = movmean(data_gps_all.data, mean_window, 1);
-    end
-
+    ende
+    %}
     old_dir = full_dir;
 end
 
@@ -92,8 +93,8 @@ data_mag = data_mag_all;
 data_mag.meas_idx   = repmat(2, length(data_mag.time), 1);
 
 data_gyro = data_gyro_all;
-data_gyro.meas_idx  = repmat(3, length(data_gyro.time), 1);
-data_baro.meas_idx  = repmat(4, length(data_baro.time), 1);
+data_gyro.meas_idx  = repmat(-1, length(data_gyro.time), 1);
+data_baro.meas_idx  = repmat(3, length(data_baro.time), 1);
 
 t_end   = t_start + t_dur;
 
@@ -129,7 +130,7 @@ dt_min_gyro  = min(diff(data_gyro.time));
 dt_min_baro  = min(diff(data_baro.time));
 
 if ~isempty(data_gps_all)
-    measurements = {data_gps, data_baro, data_mag, data_gyro};
+    measurements = {data_gps, data_mag};
     dt_min_gps   = min(diff(data_gps.time));
     dt          = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
 
@@ -137,7 +138,8 @@ else
     measurements = {data_mag, data_gyro};
     dt          = min([dt_min_accel, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
 end
-inputs = data_accel;
+inputs = table(data_accel.time, data_accel.data, data_gyro.data, ...
+'VariableNames', {'time', 'accel', 'gyro'});
 
 tspan = t_start : dt : t_start + t_dur;
 
@@ -148,100 +150,47 @@ sensor = Sensor_FlySight(meas_freq);
 %% Set up the Kalman Filter
 num_steps = numel(tspan);
 
-Rb = 0.1743;
-
-% Rp = 0.25;
 Rp = 10;
 % Rp = sensor.gps_std_dev;
-R_pos = [
-    Rp, 0,   0;
-    0,   Rp, 0;
-    0,   0,   Rp
-    ].^2;
+R_pos = eye(3) * Rp^2;
 
 % Rm = sensor.mag_std_dev * 1e2;
 Rm = 1e-1;
-R_mag = (Rm^2) * eye(3);
+R_mag = eye(3) * Rm^2;
 
-Rw = 1e-2;
-% Rw = sensor.gyro_std_dev;
-R_w = [
-    Rw,  0,  0;
-    0,   Rw, 0;
-    0,   0,  Rw
-].^2;
-
-Rb = 1e2;
+Rb = 1e6;
 R_baro = Rb^2;
 
 R = blkdiag( ...
     R_pos, ...
     R_mag, ...
-    R_w,  ...
     R_baro ...
     );
 
-Qp = 1e-3;
-Q_P = [
-    Qp, 0, 0;
-    0, Qp, 0;
-    0, 0, Qp;
-] .^2;
+sigma_a = 1e-1;
+Q_V = eye(3) * (dt*sigma_a)^2;
+Q_P = eye(3) * (0.5*dt^2*sigma_a)^2;
 
-cross_term = 1e-3;
-diag_term = 1e-2;
+Qe = 1e-1;
+Q_e = eye(4) * (dt*Qe)^2;
 
-Q_V = [
-    diag_term,     cross_term,  cross_term;
-    cross_term,    diag_term,   cross_term
-    cross_term,    cross_term,  diag_term
-];
+Qwb = 1e-6;
+Q_wb = eye(3) * Qwb^2;
 
-Qe = 1e-3;
-Q_e = [
-    Qe,  0,  0,  0;
-    0,   Qe, 0,  0;
-    0,   0,  Qe, 0;
-    0,   0,  0,  Qe
-].^2;
+Qab = 1e-6;
+Q_ab = eye(3) * Qab^2;
 
-Qw = 1e-3;
-Q_w = [
-    Qw, 0,  0;
-    0,  Qw, 0;
-    0,  0,  Qw
-].^2;
+Qpb = 1e-6;
+Q_pb = eye(3) * Qpb^2;
 
-Qwb = 1e-12;
-Q_wb = [
- Qwb, 0,   0;
- 0,   Qwb, 0;
- 0,   0,   Qwb
-].^2;
-
-Qab = 1e-12;
-Q_ab = [
- Qab, 0,   0;
- 0,   Qab, 0;
- 0,   0,   Qab
-].^2;
-
-Qpb = 1e-12;
-Q_pb = [
- Qpb, 0,   0;
- 0,   Qpb, 0;
- 0,   0,   Qpb
-].^2;
-
-Qmb = 1e-1;
-Q_mb = Qmb * eye(3,3);
+sigma_bm = 1e-1;
+Q_mb = eye(3) * (sigma_bm^2);
 
 Q = blkdiag(...
     Q_P,... % P
     Q_V,... % V
     Q_e, ... % e
-    Q_w, ... % w
-    Q_wb, ... % wb
+    Q_wb, ... % w
     Q_ab, ... % ab
     Q_pb, ...
     Q_mb ...
@@ -251,7 +200,6 @@ P0 = blkdiag( ...
     1e-2 * eye(3), ...
     1e-2 * eye(3), ...
     1e-2 * eye(4), ...
-    1e-2 * eye(3), ...
     1e-2 * eye(3), ...
     1e-2 * eye(3), ...
     1e-2* eye(3), ...
@@ -294,7 +242,7 @@ covariances = kf.P_hist;
 p_est = x_est(:, kf.x_inds.P_E);
 v_est = x_est(:, kf.x_inds.V_E);
 e_est = x_est(:, kf.x_inds.e);
-w_est = x_est(:, kf.x_inds.w_b);
+% w_est = x_est(:, kf.x_inds.w_b);
 
 w_b_est = x_est(:, kf.x_inds.b_g);
 a_b_est = x_est(:, kf.x_inds.b_a);
@@ -356,6 +304,25 @@ legend("X", "Y")
 title("Position Innovation")
 xlabel("Time (s)")
 ylabel("Position Innovation (m)")
+xlim(t_plot_drop)
+
+fig_idx = new_fig(fig_idx);
+clf
+plot(data_gps.time, acc_gps(:, 1), 'DisplayName', 'Horizontal', 'LineWidth', 2); hold on
+plot(data_gps.time, acc_gps(:, 2), 'DisplayName', 'Vertical', 'LineWidth', 2);
+legend
+title("GPS Accuracy")
+xlabel("Time (s)")
+ylabel("Accuracy (m)")
+
+fig_idx = new_fig(fig_idx);
+clf
+plot(t_plot, p_b_est(:, 1), 'DisplayName', 'X', 'LineWidth', 1.5); hold on
+plot(t_plot, p_b_est(:, 2), 'DisplayName', 'Y', 'LineWidth', 1.5);
+plot(t_plot, p_b_est(:, 3), 'DisplayName', 'Z', 'LineWidth', 1.5);
+xlabel("Time (s)")
+ylabel("Bias Estimate (m)")
+title("Position Bias Estimate vs Time")
 xlim(t_plot_drop)
 
 fig_idx = new_fig(fig_idx);
@@ -427,6 +394,7 @@ ylabel("Bias Estimate (gauss)")
 title("Magnetometer Bias Estimate vs Time")
 xlim(t_plot_drop)
 
+%{
 fig_idx = new_fig(fig_idx);
 clf
 plot(t_plot, w_est, 'LineWidth', 2)
@@ -467,6 +435,8 @@ ylabel("Angular Velocity (rad/s)")
 title("\omega_3^E vs. Time")
 xlim([t_plot(1), t_plot(end)])
 xlim(t_plot_drop)
+%}
+%{
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -475,7 +445,7 @@ inno = kf.inno_hist(kf.measurement_ranges{3}(1), :);
 good = ~isnan(inno);
 
 % subplot(3,1,1)
-plot(tspan(good), inno(good), 'DisplayName', 'Innovation'); hold on
+plot(inno(good), 'DisplayName', 'Innovation'); hold on
 plot_cov(kf.P_hist(kf.x_inds.w_b(1),kf.x_inds.w_b(1),:));
 lim = max(kf.P_hist(kf.x_inds.w_b(1),kf.x_inds.w_b(1),:));
 ylim([-lim, lim])
@@ -485,7 +455,7 @@ title("Gyro Innovation")
 xlabel("Time (s)")
 ylabel("Gyro Innovation (rad/s)")
 xlim(t_plot_drop)
-
+%}
 fig_idx = new_fig(fig_idx);
 clf
 plot(tspan, kf.accel_calc_all, 'LineWidth', 2); hold on
@@ -493,15 +463,6 @@ legend("a_1", "a_2", "a_3")
 xlim([t_plot(1)+1, t_plot(end)])
 % xlim(t_plot_drop)
 title("Estimated Acceleration Components")
-
-fig_idx = new_fig(fig_idx);
-clf
-plot(data_accel.time, abs(vecnorm(data_accel.data, 2, 2) - 9.81), 'LineWidth', 2, 'DisplayName', 'Measured Accel Norm'); hold on
-plot(t_plot, vecnorm(kf.accel_calc_all(1:end-1, :), 2, 2), 'LineWidth', 2, 'DisplayName', 'Estimated Accel Norm'); hold on
-legend
-xlim([t_plot(1)+1, t_plot(end)])
-title("Measured and Estimated Acceleration Norm")
-ylim([-1, 12])
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -646,9 +607,10 @@ xlabel("Time (s)")
 legend
 title("Position vs. Time")
 
+%{
 %% Plot Innovation
 
-baro_values = ~ (kf.inno_hist(10, 2:end) == 0);
+baro_values = ~ (kf.inno_hist(kf.x_in, 2:end) == 0);
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -657,6 +619,7 @@ title("Baro Innovation")
 xlabel("Time (s)")
 ylabel("Innovation (m)")
 xlim(t_plot_drop)
+%}
 
 %% Plot Cross-Covariance
 
