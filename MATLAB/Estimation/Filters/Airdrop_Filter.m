@@ -109,6 +109,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 "b_a", 3; ... % Accelerometer Bias
                 "b_p", 3; ... % GPS Position Bias
                 "b_m", 3; ... % Magnetometer Bias
+                "b_b", 1; ... % Baro Bias
                 };
 
             state_idx = 1;
@@ -189,6 +190,7 @@ classdef Airdrop_Filter < Abstract_Filter
             % Initialize accel bias to the measurement minus corrected
             obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
             obj.x_curr(obj.x_inds.b_m) = zeros(3,1);
+            obj.x_curr(obj.x_inds.b_b) = 0;
 
             obj.x_curr = obj.x_curr(:);
 
@@ -227,6 +229,10 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function b_m_out = get_b_m(obj)
             b_m_out = obj.x_curr(obj.x_inds.b_m);
+        end
+
+        function b_b_out = get_b_b(obj)
+            b_b_out = obj.x_curr(obj.x_inds.b_b);
         end
 
         function alt_out = altitude(obj)
@@ -330,7 +336,9 @@ classdef Airdrop_Filter < Abstract_Filter
                 if t0 > drop_time
                     % obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
                     % obj.R(11, 11)   = 300;
-                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-5 * eye(3);
+                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-8 * eye(3);
+                    obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-20 * eye(3);
+                    obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = 1e-20 * eye(3);
                 end
 
                 % Define bin as [tmin, tmax)
@@ -486,22 +494,24 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % ---- your gating logic for accel-bias coupling (same as current code) ----
             a_b_mult = true;
+            %{
             if obj.altitude() > obj.alt_gate || obj.speed() > obj.speed_gate
                 a_b_mult = false;
             end
+            %}
 
             % --- pull current state (same variable names) ---
             e  = obj.get_e();      e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
 
             w_meas_b = u.gyro';
             b_g = obj.get_b_g();
-            w = w_meas_b - b_g;
+            w = w_meas_b + b_g;
             w0=w(1); w1=w(2); w2=w(3);
 
             b_a = obj.get_b_a();
 
             % body-frame specific force being rotated by q (same as yours)
-            a_b = (u.accel' - b_a);
+            a_b = (u.accel' + b_a);
             a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
 
             % rotation used for dV/db_a block (same as yours)
@@ -636,7 +646,7 @@ classdef Airdrop_Filter < Abstract_Filter
             db_g_dt = zeros(3,1);
             db_a_dt = zeros(3,1);
             db_p_dt = zeros(3,1);
-
+            db_b_dt = 0;
             % If you later add mag bias b_m:
             % db_m_dt = zeros(3,1);
 
@@ -649,6 +659,7 @@ classdef Airdrop_Filter < Abstract_Filter
             dxdt(obj.x_inds.b_g) = db_g_dt;
             dxdt(obj.x_inds.b_a) = db_a_dt;
             dxdt(obj.x_inds.b_p) = db_p_dt;
+            dxdt(obj.x_inds.b_b) = db_b_dt;
 
             % If you add b_m to x_inds, you just uncomment:
             % dxdt(obj.x_inds.b_m) = db_m_dt;
@@ -670,6 +681,7 @@ classdef Airdrop_Filter < Abstract_Filter
         function y = h(obj, meas_idx)
             P_E = obj.get_P_E();
             b_p = obj.get_b_p();
+            b_b = obj.get_b_b();
 
             p_pred = P_E + b_p;
 
@@ -679,7 +691,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % w_pred = w_b + b_g;
 
-            alt_pred = obj.altitude();
+            alt_pred = obj.altitude() + b_b;
 
             q = obj.get_e();
 
@@ -737,6 +749,7 @@ classdef Airdrop_Filter < Abstract_Filter
         function H = H_alt(obj)
             H = zeros(1, obj.num_states);
             H(:, obj.x_inds.P_E(3)) = 1;
+            H(:, obj.x_inds.b_b) = 1;
         end
 
         % --- UTILS ---

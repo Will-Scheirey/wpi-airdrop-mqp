@@ -130,7 +130,7 @@ dt_min_gyro  = min(diff(data_gyro.time));
 dt_min_baro  = min(diff(data_baro.time));
 
 if ~isempty(data_gps_all)
-    measurements = {data_gps, data_mag};
+    measurements = {data_gps, data_mag, data_baro};
     dt_min_gps   = min(diff(data_gps.time));
     dt          = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
 
@@ -158,7 +158,7 @@ R_pos = eye(3) * Rp^2;
 Rm = 1e-1;
 R_mag = eye(3) * Rm^2;
 
-Rb = 1e6;
+Rb = 1e0;
 R_baro = Rb^2;
 
 R = blkdiag( ...
@@ -167,24 +167,27 @@ R = blkdiag( ...
     R_baro ...
     );
 
-sigma_a = 1e-1;
+sigma_a = 3e-1;
 Q_V = eye(3) * (dt*sigma_a)^2;
 Q_P = eye(3) * (0.5*dt^2*sigma_a)^2;
 
 Qe = 1e-1;
 Q_e = eye(4) * (dt*Qe)^2;
 
-Qwb = 1e-6;
+Qwb = 1e-4;
 Q_wb = eye(3) * Qwb^2;
 
-Qab = 1e-6;
+Qab = 1e-4;
 Q_ab = eye(3) * Qab^2;
 
-Qpb = 1e-6;
+Qpb = 1e-4;
 Q_pb = eye(3) * Qpb^2;
 
-sigma_bm = 1e-1;
+sigma_bm = 1e-3;
 Q_mb = eye(3) * (sigma_bm^2);
+
+sigma_bb = 1e-2;
+Q_bb = sigma_bb^2;
 
 Q = blkdiag(...
     Q_P,... % P
@@ -193,7 +196,8 @@ Q = blkdiag(...
     Q_wb, ... % w
     Q_ab, ... % ab
     Q_pb, ...
-    Q_mb ...
+    Q_mb, ...
+    Q_bb ...
     );
 
 P0 = blkdiag( ...
@@ -203,7 +207,8 @@ P0 = blkdiag( ...
     1e-2 * eye(3), ...
     1e-2 * eye(3), ...
     1e-2* eye(3), ...
-    1e-2 * eye(3) ...
+    1e-2 * eye(3), ...
+    1e-2 ...
     );
 
 Q = (Q + Q.')/2;                     % enforce symmetry
