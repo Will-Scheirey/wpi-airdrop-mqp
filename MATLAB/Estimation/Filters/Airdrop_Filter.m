@@ -104,7 +104,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 "P_E", 3; ... % Position in Inertial Frame
                 "V_E", 3; ... % Velocity in Inertial Frame
                 "e",   4; ... % Quaternion
-                 ... % "w_b", 3; ... % Angular Velocity
+                ... % "w_b", 3; ... % Angular Velocity
                 "b_g", 3; ... % Gyro Bias
                 "b_a", 3; ... % Accelerometer Bias
                 "b_p", 3; ... % GPS Position Bias
@@ -332,13 +332,14 @@ classdef Airdrop_Filter < Abstract_Filter
                 t0 = timesteps(i);
                 t1 = t0 + dt_;  % forward: t1>t0, backward: t1<t0
 
-                
+
                 if t0 > drop_time
                     % obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
                     % obj.R(11, 11)   = 300;
-                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-8 * eye(3);
-                    obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-20 * eye(3);
-                    obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = 1e-20 * eye(3);
+                    % obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-24 * eye(3);
+                    % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
+                    % % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
+                    % obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = 1e-24 * eye(3);
                 end
 
                 % Define bin as [tmin, tmax)
@@ -487,78 +488,53 @@ classdef Airdrop_Filter < Abstract_Filter
             P  = obj.x_inds.P_E(:);   % 3
             V  = obj.x_inds.V_E(:);   % 3
             E  = obj.x_inds.e(:);     % 4  (e0 e1 e2 e3)
-            % W  = obj.x_inds.w_b(:);   % 3  (w0 w1 w2)
             BG = obj.x_inds.b_g(:);   % 3
             BA = obj.x_inds.b_a(:);   % 3
-            BP = obj.x_inds.b_p(:);   % 3
 
-            % ---- your gating logic for accel-bias coupling (same as current code) ----
-            a_b_mult = true;
-            %{
-            if obj.altitude() > obj.alt_gate || obj.speed() > obj.speed_gate
-                a_b_mult = false;
-            end
-            %}
-
-            % --- pull current state (same variable names) ---
             e  = obj.get_e();      e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
 
-            w_meas_b = u.gyro';
             b_g = obj.get_b_g();
-            w = w_meas_b + b_g;
-            w0=w(1); w1=w(2); w2=w(3);
-
             b_a = obj.get_b_a();
 
-            % body-frame specific force being rotated by q (same as yours)
-            a_b = (u.accel' + b_a);
+            w_meas = u.gyro(:);
+            a_meas = u.accel(:);
+
+            w = w_meas - b_g;
+            w0=w(1); w1=w(2); w2=w(3);
+
+            a_b = a_meas - b_a;
             a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
 
             % rotation used for dV/db_a block (same as yours)
             C_bi = ecef2body_rotm(e);     % body -> inertial
-            C_EB = C_bi * a_b_mult;       % if gate false => zero
 
-            J11 = obj.J(1,1);
-            J22 = obj.J(2,2);
-            J33 = obj.J(3,3);
-
-            % =========================================================================
-            % Pdot = V  => dPdot/dV = I
-            % (this replaces your dx0dx/dx1dx/dx2dx rows)
-            % =========================================================================
             A(P, V) = eye(3);
 
-            % =========================================================================
-            % Vdot Jacobian rows (this replaces dx3dx/dx4dx/dx5dx)
-            % Your existing equations are exactly preserved.
-            % =========================================================================
-
-            % Row for d(V0)/dx  (your dx3dx)
+            % Row for d(V0)/dx
             A(V(1), E)  = [ ...
                 2*a0*e0 - 2*a1*e3 + 2*a2*e2, ...
                 2*a0*e1 + 2*a1*e2 + 2*a2*e3, ...
                 2*a1*e1 - 2*a0*e2 + 2*a2*e0, ...
                 2*a2*e1 - 2*a0*e3 - 2*a1*e0 ...
                 ];
-            A(V(1), BA) = -C_EB(1,:);   % (-C_EB(1,:).')'  same content
 
-            % Row for d(V1)/dx  (your dx4dx)
+            % Row for d(V1)/dx
             A(V(2), E)  = [ ...
                 2*a1*e0 + 2*a0*e3 - 2*a2*e1, ...
                 2*a0*e2 - 2*a1*e1 - 2*a2*e0, ...
                 2*a0*e1 + 2*a1*e2 + 2*a2*e3, ...
                 2*a0*e0 - 2*a1*e3 + 2*a2*e2 ...
                 ];
-            A(V(2), BA) = -C_EB(2,:);
 
-            % Row for d(V2)/dx  (your dx5dx)
+            % Row for d(V2)/dx
             A(V(3), E)  = [ ...
                 2*a1*e1 - 2*a0*e2 + 2*a2*e0, ...
                 2*a1*e0 + 2*a0*e3 - 2*a2*e1, ...
                 2*a1*e3 - 2*a0*e0 - 2*a2*e2, ...
                 2*a0*e1 + 2*a1*e2 + 2*a2*e3 ...
                 ];
-            A(V(3), BA) = -C_EB(3,:);
+
+            A(V, BA) = -C_bi';
 
             % =========================================================================
             % Quaternion kinematics Jacobian rows (dx6dx..dx9dx)
@@ -567,51 +543,21 @@ classdef Airdrop_Filter < Abstract_Filter
             % =========================================================================
 
             % Row for de0/dx  (your dx6dx)
-            A(E(1), E) = [0, -0.5*w0, -0.5*w1, -0.5*w2];
-            % A(E(1), W) = [-0.5*e1, -0.5*e2, -0.5*e3];
+            A(E(1), E) = [0,      -0.5*w0, -0.5*w1, -0.5*w2];
+            A(E(2), E) = [0.5*w0,  0,       0.5*w2, -0.5*w1];
+            A(E(3), E) = [0.5*w1, -0.5*w2,  0,       0.5*w0];
+            A(E(4), E) = [0.5*w2,  0.5*w1, -0.5*w0,  0];
 
-            % Row for de1/dx  (your dx7dx)
-            A(E(2), E) = [0.5*w0, 0, 0.5*w2, -0.5*w1];
-            % A(E(2), W) = [0.5*e0, -0.5*e3, 0.5*e2];
+            ev = [e1; e2; e3];
 
-            % Row for de2/dx  (your dx8dx)
-            A(E(3), E) = [0.5*w1, -0.5*w2, 0, 0.5*w0];
-            % A(E(3), W) = [0.5*e3, 0.5*e0, -0.5*e1];
+            S_ev = [   0, -e3,  e2;
+                e3,   0, -e1;
+                -e2,  e1,   0 ];
 
-            % Row for de3/dx  (your dx9dx)
-            A(E(4), E) = [0.5*w2, 0.5*w1, -0.5*w0, 0];
-            % A(E(4), W) = [-0.5*e2, 0.5*e1, 0.5*e0];
+            dqdot_dw = [ -0.5*ev.';          % 1x3
+                0.5*(e0*eye(3) + S_ev) ];  % 3x3
 
-            % =========================================================================
-            % Rigid body rotational dynamics Jacobian rows (dx10dx..dx12dx)
-            % dw/dt = J^{-1}(-w x (Jw)) with your simplified partials
-            % =========================================================================
-            % Row for dw0/dx (your dx10dx)
-            %{
-            A(W(1), W) = [ ...
-                0, ...
-                w2 * (J22 - J33) / J11, ...
-                w1 * (J22 - J33) / J11 ...
-                ];
-
-            % Row for dw1/dx (your dx11dx)
-            A(W(2), W) = [ ...
-                w2 * (J33 - J11) / J22, ...
-                0, ...
-                w0 * (J33 - J11) / J22 ...
-                ];
-
-            % Row for dw2/dx (your dx12dx)
-            A(W(3), W) = [ ...
-                w1 * (J11 - J22) / J33, ...
-                w0 * (J11 - J22) / J33, ...
-                0 ...
-                ];
-            %}
-            % =========================================================================
-            % Bias random walks: db/dt = 0  => rows already zero
-            % (BG, BA, BP, and any extra states like b_m remain zero)
-            % =========================================================================
+            A(E, BG) = -dqdot_dw;
         end
 
         function dxdt = f(obj, u)
@@ -646,7 +592,6 @@ classdef Airdrop_Filter < Abstract_Filter
             db_g_dt = zeros(3,1);
             db_a_dt = zeros(3,1);
             db_p_dt = zeros(3,1);
-            db_b_dt = 0;
             % If you later add mag bias b_m:
             % db_m_dt = zeros(3,1);
 
@@ -659,7 +604,6 @@ classdef Airdrop_Filter < Abstract_Filter
             dxdt(obj.x_inds.b_g) = db_g_dt;
             dxdt(obj.x_inds.b_a) = db_a_dt;
             dxdt(obj.x_inds.b_p) = db_p_dt;
-            dxdt(obj.x_inds.b_b) = db_b_dt;
 
             % If you add b_m to x_inds, you just uncomment:
             % dxdt(obj.x_inds.b_m) = db_m_dt;
@@ -672,7 +616,7 @@ classdef Airdrop_Filter < Abstract_Filter
             switch meas_idx
                 case 1, H = obj.H_pos();
                 case 2, H = obj.H_mag();
-                % case 3, H = obj.H_gyro();
+                    % case 3, H = obj.H_gyro();
                 case 3, H = obj.H_alt();
                 otherwise, error("bad meas_idx");
             end
@@ -737,7 +681,7 @@ classdef Airdrop_Filter < Abstract_Filter
             H(:, obj.x_inds.b_m) = eye(3);
         end
         %}
-        
+
         function H = H_mag(obj)
             H = zeros(3, obj.num_states);
             q  = obj.get_e();

@@ -34,11 +34,19 @@ end
 
 figure(fig_idx); fig_idx = fig_idx + 1;
 clf
-plot(data_accel.time, data_accel.data(:, 1), 'DisplayName', '0'); hold on
-plot(data_accel.time, data_accel.data(:, 2), 'DisplayName', '1')
-plot(data_accel.time, data_accel.data(:, 3), 'DisplayName', '2')
-legend
-title("Accel")
+subplot(2,2,1)
+plot(data_accel.time, data_accel.data(:, 1));
+title('0')
+subplot(2,2,2)
+plot(data_accel.time, data_accel.data(:, 2));
+title('1')
+subplot(2,2,3)
+plot(data_accel.time, data_accel.data(:, 3));
+title('2')
+subplot(2,2,4)
+plot(data_accel.time, vecnorm(data_accel.data, 2, 2));
+title('Norm')
+sgtitle("Accel")
 xlim([tspan(1), tspan(end)])
 
 figure(fig_idx); fig_idx = fig_idx + 1;

@@ -1,4 +1,4 @@
-clearvars -except data_accel_all data_gyro_all data_mag_all data_gps_all data_baro_all data_gps_vel_all data_sensors_all data_gpsTrack_all old_dir; clc;
+clearvars -except data_accel_all data_gyro_all data_mag_all data_gps_all data_baro_all data_gps_vel_all data_sensors_all data_gpsTrack_all old_dir data_stationary data_moving; clc;
 %% Load HPRC Data
 % [data_accel, data_gyro, data_mag, data_gps, data_baro] = get_HPRC_data_2();
 
@@ -32,27 +32,38 @@ if load_data
     sensor_filename = fullfile(full_dir, "SENSOR.CSV");
     gps_filename = fullfile(full_dir, "TRACK.CSV");
 
-    [data_accel_all,...
-        data_gyro_all,... 
-        data_mag_all,...
-        data_gps_all,...
-        data_baro_all,...
-        data_gps_vel_all,...
-        data_sensors_all,...
-        data_gpsTrack_all,...
-        ] = get_and_trim_flysight(sensor_filename, gps_filename);
-    % 
+    
+[data_accel,...
+    data_gyro,...
+    data_mag,...
+    data_gps,...
+    data_baro,...
+    data_gps_vel,...
+    data_flysight_sensor,...
+    data_flysight_gps] = get_flysight_data(sensor_filename, gps_filename, false);
+
+[data_stationary, data_moving] = trim_flysight(data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, data_flysight_sensor, data_flysight_gps);
+
+    data_accel_all = data_moving.data_accel;
+    data_gyro_all = data_moving.data_gyro;
+    data_mag_all = data_moving.data_mag;
+    data_gps_all = data_moving.data_gps;
+    data_baro_all = data_moving.data_baro;
+    data_gps_vel_all = data_moving.data_gps_vel;
+    data_sensors_all = data_moving.data_flysight_sensor;
+    data_gpsTrack_all = data_moving.data_flysight_gps;
+
     mean_window = 1;
     data_gyro_all.data  = movmean(data_gyro_all.data, mean_window, 1);
-    % % data_baro_all.data  = movmean(data_baro_all.data, mean_window, 1);
     data_accel_all.data = movmean(data_accel_all.data, mean_window, 1);
-    %{
-    if ~isempty(data_gps_all)
-        data_gps_all.data = movmean(data_gps_all.data, mean_window, 1);
-    ende
-    %}
     old_dir = full_dir;
 end
+
+[var_accel, var_gyro, var_gps, var_mag, var_baro] = calibrate_sensors(data_stationary);
+
+% fig_idx = plot_meas(data_stationary.data_gps, data_stationary.data_accel, data_stationary.data_gyro, data_stationary.data_mag, data_stationary.data_mag, data_stationary.data_gps_vel);
+
+% return
 
 drop_info = get_drop_info(data_accel_all,...
         data_gyro_all,... 
@@ -155,11 +166,9 @@ Rp = 10;
 R_pos = eye(3) * Rp^2;
 
 % Rm = sensor.mag_std_dev * 1e2;
-Rm = 1e-1;
-R_mag = eye(3) * Rm^2;
+R_mag = blkdiag(var_mag(1), var_mag(2), var_mag(3)).^2;
 
-Rb = 1e0;
-R_baro = Rb^2;
+R_baro = var_baro^2;
 
 R = blkdiag( ...
     R_pos, ...
@@ -167,23 +176,24 @@ R = blkdiag( ...
     R_baro ...
     );
 
-sigma_a = 3e-1;
-Q_V = eye(3) * (dt*sigma_a)^2;
-Q_P = eye(3) * (0.5*dt^2*sigma_a)^2;
+sigma_a = eye(3) * sqrt(norm(var_accel)) * 1e1;
 
-Qe = 1e-1;
-Q_e = eye(4) * (dt*Qe)^2;
+Q_V = (dt*sigma_a).^2;
+Q_P = (0.5*dt^2*sigma_a).^2;
 
-Qwb = 1e-4;
+sigma_w = sqrt(norm(var_gyro));
+Q_e = eye(4) * (dt*sigma_w)^2;
+
+Qwb = 1e-5;
 Q_wb = eye(3) * Qwb^2;
 
-Qab = 1e-4;
+Qab = 1e-5;
 Q_ab = eye(3) * Qab^2;
 
 Qpb = 1e-4;
 Q_pb = eye(3) * Qpb^2;
 
-sigma_bm = 1e-3;
+sigma_bm = 1e-2;
 Q_mb = eye(3) * (sigma_bm^2);
 
 sigma_bb = 1e-2;
@@ -253,6 +263,7 @@ w_b_est = x_est(:, kf.x_inds.b_g);
 a_b_est = x_est(:, kf.x_inds.b_a);
 p_b_est = x_est(:, kf.x_inds.b_p);
 m_b_est = x_est(:, kf.x_inds.b_m);
+b_b_est = x_est(:, kf.x_inds.b_b);
 
 t_plot = tspan(1:end-1);
 drop_times     = 9050 : dt : 9500;
@@ -319,16 +330,6 @@ legend
 title("GPS Accuracy")
 xlabel("Time (s)")
 ylabel("Accuracy (m)")
-
-fig_idx = new_fig(fig_idx);
-clf
-plot(t_plot, p_b_est(:, 1), 'DisplayName', 'X', 'LineWidth', 1.5); hold on
-plot(t_plot, p_b_est(:, 2), 'DisplayName', 'Y', 'LineWidth', 1.5);
-plot(t_plot, p_b_est(:, 3), 'DisplayName', 'Z', 'LineWidth', 1.5);
-xlabel("Time (s)")
-ylabel("Bias Estimate (m)")
-title("Position Bias Estimate vs Time")
-xlim(t_plot_drop)
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -399,68 +400,6 @@ ylabel("Bias Estimate (gauss)")
 title("Magnetometer Bias Estimate vs Time")
 xlim(t_plot_drop)
 
-%{
-fig_idx = new_fig(fig_idx);
-clf
-plot(t_plot, w_est, 'LineWidth', 2)
-legend("w_0^B", "w_1^B", "w_2^B")
-xlabel("Time (s)")
-ylabel("Angular Velocity (rad/s)")
-title("Body Angular Velocity vs. Time")
-xlim(t_plot_drop)
-
-fig_idx = new_fig(fig_idx);
-clf
-subplot(3,1,1)
-plot(data_gyro.time, data_gyro.data(:, 1), '.', 'MarkerSize', 10); hold on
-plot(t_plot, w_est(:,1), 'LineWidth', 2); hold on;
-legend("Measurement", "Estimate")
-xlabel("Time (s)")
-ylabel("Angular Velocity (rad/s)")
-title("\omega_1^E vs. Time")
-xlim([t_plot(1), t_plot(end)])
-xlim(t_plot_drop)
-
-subplot(3,1,2)
-plot(data_gyro.time, data_gyro.data(:, 2), '.', 'MarkerSize', 10); hold on
-plot(t_plot, w_est(:,2), 'LineWidth', 2); hold on;
-legend("Measurement", "Estimate")
-xlabel("Time (s)")
-ylabel("Angular Velocity (rad/s)")
-title("\omega_2^E vs. Time")
-xlim([t_plot(1), t_plot(end)])
-xlim(t_plot_drop)
-
-subplot(3,1,3)
-plot(data_gyro.time, data_gyro.data(:, 3), '.', 'MarkerSize', 10); hold on
-plot(t_plot, w_est(:,3), 'LineWidth', 2); hold on;
-legend("Measurement", "Estimate")
-xlabel("Time (s)")
-ylabel("Angular Velocity (rad/s)")
-title("\omega_3^E vs. Time")
-xlim([t_plot(1), t_plot(end)])
-xlim(t_plot_drop)
-%}
-%{
-
-fig_idx = new_fig(fig_idx);
-clf
-
-inno = kf.inno_hist(kf.measurement_ranges{3}(1), :);
-good = ~isnan(inno);
-
-% subplot(3,1,1)
-plot(inno(good), 'DisplayName', 'Innovation'); hold on
-plot_cov(kf.P_hist(kf.x_inds.w_b(1),kf.x_inds.w_b(1),:));
-lim = max(kf.P_hist(kf.x_inds.w_b(1),kf.x_inds.w_b(1),:));
-ylim([-lim, lim])
-
-legend
-title("Gyro Innovation")
-xlabel("Time (s)")
-ylabel("Gyro Innovation (rad/s)")
-xlim(t_plot_drop)
-%}
 fig_idx = new_fig(fig_idx);
 clf
 plot(tspan, kf.accel_calc_all, 'LineWidth', 2); hold on
@@ -488,6 +427,15 @@ ylabel("Bias (m/s^2)")
 xlim([t_plot(1)+1, t_plot(end)])
 
 title("Acceleration Bias Estimates")
+
+fig_idx = new_fig(fig_idx);
+clf
+plot(t_plot, b_b_est, 'LineWidth', 1.5); hold on
+xlabel("Time (s)")
+ylabel("Bias (m)")
+xlim([t_plot(1)+1, t_plot(end)])
+
+title("Barometer Bias Estimates")
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -628,7 +576,7 @@ xlim(t_plot_drop)
 
 %% Plot Cross-Covariance
 
-%{
+
 fig_idx = new_fig(fig_idx);
 clf
 idx1 = kf.x_inds.P_E(1);
@@ -658,7 +606,7 @@ for n=1:100:num_steps
     colorbar
     drawnow
 end
-%}
+
 
 %{
 %% Plot Smoothed and Unsmoothed
@@ -688,6 +636,7 @@ return
 %}
 
 %% HEADING
+%{
 fig_idx = new_fig(fig_idx);
 clf
 heading = atan2d(v_est(:,1), v_est(:,2));
@@ -703,7 +652,28 @@ end
 
 euler_angles = rad2deg(quat2eul(quat_data));
 plot(euler_angles(:, 1), 'DisplayName', 'Quat')
+%}
+clf
 
+Fs = 1 / dt_min_accel;
+x  = data_mag.data(:,3);
+L  = length(x);
+
+Y = fft(x);
+
+% Frequency axis (one-sided)
+f = Fs*(0:(L/2))/L;
+
+% One-sided amplitude spectrum
+P2 = abs(Y)/L;
+P1 = P2(1:L/2+1);
+P1(2:end-1) = 2*P1(2:end-1);
+
+semilogy(f, P1, 'LineWidth', 3)
+grid on
+xlabel('Frequency (Hz)')
+ylabel('Amplitude')
+title('One-Sided FFT of Accelerometer Signal')
 %% MEASUREMENTS
 fig_idx = plot_meas(data_gps_all, data_accel_all, data_gyro_all, data_mag_all, data_baro_all, data_gps_vel_all, fig_idx);
 
