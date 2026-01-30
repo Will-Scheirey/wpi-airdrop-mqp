@@ -1,7 +1,11 @@
 clear; clc;
 
+addpath(genpath("MATLAB"));
+addpath(genpath("weather"));
+addpath(genpath("haars_data"));
+
 parent_dir = "haars_data";
-drop_dir = "DN172_Lt3_n12_08072025_side_2";
+drop_dir = "DN153_Lt1_n16_08052025_Inside";
 full_dir = fullfile(parent_dir, drop_dir);
 
 %% Run Data
@@ -24,24 +28,26 @@ v_est = data_out.estimates.vel(:, 1:2);
 wind_speed_interp = interp1(the_weather.alt_agl, the_weather.win_speed, alt_est);
 wind_angle_interp = interp1(the_weather.alt_agl, the_weather.wind_direction, alt_est);
 
-wind_vec = wind_speed_interp .* [cosd(wind_angle_interp), sind(wind_angle_interp)];
+wind_vec = wind_speed_interp .* [sind(wind_angle_interp), cosd(wind_angle_interp)];
 
 groundspeed = vecnorm(v_est, 2, 2);
 
-windspeed_vec = v_est + wind_vec;
+wind_sign = 1;
+
+windspeed_vec = v_est + wind_vec*wind_sign;
 windspeed = vecnorm(windspeed_vec, 2, 2);
 
-v_meas = [data_out.measurements.gps_all.GNSS.velN, data_out.measurements.gps_all.GNSS.velE];
-alt_meas = data_out.measurements.gps_all.GNSS.hMSL;
+v_meas = [data_out.measurements.gps_vel.data(:, 1), data_out.measurements.gps_vel.data(:, 2)];
+alt_meas = data_out.measurements.gps.data(:, 3);
 
 wind_speed_interp = interp1(the_weather.alt_agl, the_weather.win_speed, alt_meas);
 wind_angle_interp = interp1(the_weather.alt_agl, the_weather.wind_direction, alt_meas);
 
-wind_vec = wind_speed_interp .* [cosd(wind_angle_interp), sind(wind_angle_interp)];
+wind_vec = wind_speed_interp .* [sind(wind_angle_interp), cosd(wind_angle_interp)];
 
 groundspeed_meas = vecnorm(v_meas, 2, 2);
 
-windspeed_vec = v_meas + wind_vec;
+windspeed_vec = v_meas + wind_vec*wind_sign;
 windspeed_meas = vecnorm(windspeed_vec, 2, 2);
 
 fig_idx = new_fig(fig_idx);
@@ -53,7 +59,7 @@ legend
 
 fig_idx = new_fig(fig_idx);
 clf
-plot(data_out.measurements.gps_all.GNSS.time, windspeed_meas, 'DisplayName', 'Windspeed', 'LineWidth', 1.5); hold on
-plot(data_out.measurements.gps_all.GNSS.time, groundspeed_meas, 'DisplayName', 'Groundspeed', 'LineWidth', 1.5);
+plot(data_out.measurements.gps.time, windspeed_meas, 'DisplayName', 'Windspeed', 'LineWidth', 1.5); hold on
+plot(data_out.measurements.gps.time, groundspeed_meas, 'DisplayName', 'Groundspeed', 'LineWidth', 1.5);
 xlim(data_out.t_plot_drop)
 legend

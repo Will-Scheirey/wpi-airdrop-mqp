@@ -1,6 +1,6 @@
 function data_out = get_flight_estimates(full_dir)
 
-smooth_window = 10;
+smooth_window = 20;
 alt_mean_window = 100;
 
 [dt, ...
@@ -29,10 +29,13 @@ R = blkdiag( ...
     R_baro ...
     );
 
-sigma_a = eye(3) * sqrt(norm(sensor_var.accel));
+% accel noise covariance
+sigma_a = sqrt(sensor_var.accel(:)) * 1e3;   % 3x1 std (no 1e2)
+Sa = diag(sigma_a.^2);                 % 3x3
 
-Q_V = (dt*sigma_a).^2;
-Q_P = (0.5*dt^2*sigma_a).^2;
+Q_PV = [ (dt^4/4)*Sa, (dt^3/2)*Sa;
+         (dt^3/2)*Sa, (dt^2)*Sa ];
+
 
 sigma_w = sqrt(norm(sensor_var.gyro));
 Q_e = eye(4) * (dt*sigma_w)^2;
@@ -40,7 +43,7 @@ Q_e = eye(4) * (dt*sigma_w)^2;
 Qwb = 1e-5;
 Q_wb = eye(3) * Qwb^2;
 
-Qab = 1e-5;
+Qab = 1e-10;
 Q_ab = eye(3) * Qab^2;
 
 Qpb = 1e-4;
@@ -53,8 +56,8 @@ sigma_bb = 1e-2;
 Q_bb = sigma_bb^2;
 
 Q = blkdiag(...
-    Q_P,... % P
-    Q_V,... % V
+    Q_PV, ... % P
+    ... % Q_V,... % V
     Q_e, ... % e
     Q_wb, ... % w
     Q_ab, ... % ab
