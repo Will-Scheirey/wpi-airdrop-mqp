@@ -112,7 +112,11 @@ data_mag.meas_idx   = repmat(2, length(data_mag.time), 1);
 
 data_gyro = data_gyro_all;
 data_gyro.meas_idx  = repmat(-1, length(data_gyro.time), 1);
+
 data_baro.meas_idx  = repmat(3, length(data_baro.time), 1);
+
+data_vel = data_gps_vel_all;
+data_vel.meas_idx  = repmat(4, length(data_vel.time), 1);
 
 %% Trim Data Again
 if isempty(data_gps_all)
@@ -160,15 +164,19 @@ dt_min_mag   = min(diff(data_mag.time));
 dt_min_gyro  = min(diff(data_gyro.time));
 dt_min_baro  = min(diff(data_baro.time));
 
+data_vel.data = data_vel.data(:, 1:2);
+
+dt_mult = 1;
+
 if ~isempty(data_gps_all)
-    measurements = {data_gps, data_mag, data_baro};
+    measurements = {data_gps, data_mag, data_baro, data_vel};
     % measurements = {data_gps, data_mag(data_mag.time < drop_info.time_drop, :), data_baro};
     dt_min_gps   = min(diff(data_gps.time));
-    dt          = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
+    dt          = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) * dt_mult;
 
 else
     measurements = {data_mag, data_gyro};
-    dt          = min([dt_min_accel, dt_min_mag, dt_min_gyro, dt_min_baro]) / 4;
+    dt          = min([dt_min_accel, dt_min_mag, dt_min_gyro, dt_min_baro]) * dt_mult;
 end
 inputs = table(data_accel.time, data_accel.data, data_gyro.data, ...
     'VariableNames', {'time', 'accel', 'gyro'});

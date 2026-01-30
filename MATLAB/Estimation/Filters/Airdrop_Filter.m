@@ -99,6 +99,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 "b_p", 3; ... % GPS Position Bias
                 "b_m", 3; ... % Magnetometer Bias
                 "b_b", 1; ... % Baro Bias
+                "b_v", 2; ... % GPS Vel Bias
                 };
 
             state_idx = 1;
@@ -116,7 +117,9 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.meas_defs = struct( ...
                 "pos", struct("idx",1,"dim",3), ...
                 "mag", struct("idx",2,"dim",3), ...
-                "alt", struct("idx",3,"dim",1));
+                "alt", struct("idx",3,"dim",1), ...
+                "vel", struct("idx",4,"dim",2) ...
+                );
 
             r = 1;
             for k = 1:numel(fieldnames(obj.meas_defs))
@@ -130,6 +133,8 @@ classdef Airdrop_Filter < Abstract_Filter
         function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas)
             obj.update_bias = true;
             pos_inds = obj.x_inds.P_E;
+
+            obj.x_curr = zeros(obj.num_states, 1);
 
             % Initialize position to the GPS measurement
             obj.x_curr(pos_inds(1:2)) = gps_meas(1:2);
@@ -213,6 +218,10 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function b_b_out = get_b_b(obj)
             b_b_out = obj.x_curr(obj.x_inds.b_b);
+        end
+
+        function b_v_out = get_b_v(obj)
+            b_v_out = obj.x_curr(obj.x_inds.b_v);
         end
 
         function alt_out = altitude(obj)
@@ -315,14 +324,16 @@ classdef Airdrop_Filter < Abstract_Filter
 
                 if t0 > drop_time - 5
                     % obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
+                    %{
                     baro_idx = obj.measurement_ranges{obj.meas_defs.alt.idx};
                     obj.R(baro_idx, baro_idx)   = 200 ^ 2;
 
                     alt_idx = obj.measurement_ranges{obj.meas_defs.pos.idx}(3);
                     obj.R(alt_idx, alt_idx)   = 100 ^ 2;
+                    %}
 
-                    obj.update_bias = false;
-                    % obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-24 * eye(3);
+                    % obj.update_bias = false;
+                    % obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-8 * eye(3);
                     % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
                     % % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
                     % obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = 1e-24 * eye(3);
@@ -596,6 +607,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 case 1, H = obj.H_pos();
                 case 2, H = obj.H_mag();
                 case 3, H = obj.H_alt();
+                case 4, H = obj.H_vel();
                 otherwise, error("bad meas_idx");
             end
         end
@@ -604,6 +616,7 @@ classdef Airdrop_Filter < Abstract_Filter
             P_E = obj.get_P_E();
             b_p = obj.get_b_p();
             b_b = obj.get_b_b();
+            b_v = obj.get_b_v();
 
             p_pred = P_E + b_p;
 
@@ -622,11 +635,14 @@ classdef Airdrop_Filter < Abstract_Filter
             C_ib  = C_bi.';              % i2b
             m_pred = C_ib * obj.m_ref_i + b_m; % predicted mag in body
 
+            vel = obj.get_V_E();
+            vel_pred = vel(1:2) + b_v;
+
             y_all = [
                 p_pred;
                 m_pred;
-                % w_pred;
-                alt_pred
+                alt_pred;
+                vel_pred;
                 ];
 
             y = y_all(obj.measurement_ranges{meas_idx});
@@ -653,6 +669,12 @@ classdef Airdrop_Filter < Abstract_Filter
             H = zeros(1, obj.num_states);
             H(:, obj.x_inds.P_E(3)) = 1;
             H(:, obj.x_inds.b_b) = 1;
+        end
+
+        function H = H_vel(obj)
+            H = zeros(2, obj.num_states);
+            H(:, obj.x_inds.V_E(1:2)) = eye(2);
+            H(:, obj.x_inds.b_v) = eye(2);
         end
 
         % --- UTILS ---

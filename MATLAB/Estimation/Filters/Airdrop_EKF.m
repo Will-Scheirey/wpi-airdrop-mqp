@@ -38,7 +38,7 @@ classdef Airdrop_EKF < Airdrop_Filter
                 obj.Q_hist = NaN(nx,nx,100000);
             end
             obj.F_hist(:,:,k) = Phi;
-            obj.Q_hist(:,:,k) = Qd;
+            % obj.Q_hist(:,:,k) = Qd;
 
             obj.x_curr = obj.x_curr + obj.dt * obj.f(u);
 
