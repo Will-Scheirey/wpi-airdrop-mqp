@@ -5,3 +5,4 @@ Python/Datasets/**/*.csv
 *.zip
 /haars_data
 *.mp4
+/weather

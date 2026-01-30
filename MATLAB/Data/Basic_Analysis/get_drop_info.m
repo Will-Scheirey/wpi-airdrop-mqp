@@ -3,7 +3,7 @@ function drop_info = get_drop_info(data_accel, data_gyro, data_mag, data_gps, da
 accel_mean_window = 10;
 accel_norm = movmean(vecnorm(data_accel.data, 2, 2), accel_mean_window, 1);
 accel_drop = 15;
-step_back = 10;
+step_back = 2;
 
 vel_land = 2;
 step_forward = 2;

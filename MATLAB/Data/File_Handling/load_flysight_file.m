@@ -5,9 +5,9 @@ function data_out = load_flysight_file(filename)
 %   - Single pass (no line-count prepass)
 %   - Progress based on file position (bytes), throttled
 %   - Per-type chunk buffering (no [A;row] growth)
-%   - Minimal overhead in loop
 %
-% Output: struct of tables, first column "time" numeric seconds.
+% Adds:
+%   - For GNSS with ISO timestamps, adds datetime column: GNSS.datetime_utc (UTC)
 
 inputFile = filename;
 if ~isfile(inputFile)
@@ -27,14 +27,13 @@ colsMap          = containers.Map();   % TYPE -> column names
 typeColCount     = containers.Map();   % TYPE -> nFields
 typeHasIsoTime   = containers.Map();   % TYPE -> logical
 typeGnssDualTime = containers.Map();   % TYPE -> logical
-isoBaseTime      = datetime.empty;
+isoBaseTime      = datetime.empty;     % first ISO time encountered (UTC)
 
 % ----- per-type buffers -----
-% We'll store rows in chunks (cell array), then cat at end.
 bufMap   = containers.Map(); % TYPE -> cell array of numeric matrices
 bufCount = containers.Map(); % TYPE -> count rows buffered in current chunk
 
-CHUNK = 20000;  % rows per chunk per sensor type
+CHUNK = 20000;
 
 % progress throttling
 t0 = tic;
@@ -57,7 +56,7 @@ while ~feof(fid)
     % Find first comma fast (tag)
     c1 = find(line==',', 1, 'first');
     if isempty(c1), continue; end
-    tag = line(2:c1-1); % between '$' and first comma
+    tag = line(2:c1-1);
 
     % Metadata lines
     if strcmpi(tag,'COL')
@@ -73,7 +72,6 @@ while ~feof(fid)
 
     type = tag;
 
-    % Split only once here; still some overhead, but manageable with chunking
     parts = strsplit(line, ',');
     nFields = numel(parts) - 1;
     if nFields <= 0, continue; end
@@ -99,13 +97,12 @@ while ~feof(fid)
         typeGnssDualTime(type) = isDual;
 
         if ~isKey(colsMap, type) || (strcmpi(type,'GNSS') && isDual)
-            % If GNSS dual-time and COL exists, pass it in to align "rest" names
             colMeta = {};
             if isKey(colsMap, type), colMeta = colsMap(type); end
             colsMap(type) = default_colnames(type, nFields, hasIso, isDual, colMeta);
         end
 
-        % init buffers for this type
+        % init buffers
         bufMap(type) = {zeros(CHUNK, nFields)};
         bufCount(type) = 0;
     end
@@ -119,7 +116,6 @@ while ~feof(fid)
         parts = parts(1 : 1+nExpected);
     end
 
-    % Parse row quickly
     hasIso = typeHasIsoTime(type);
     isDual = typeGnssDualTime(type);
 
@@ -134,9 +130,9 @@ while ~feof(fid)
 
         if strcmpi(type,'GNSS') && isDual
             % input: [utc_iso, lat, t_on, lon, rest...]
-            row(1) = str2double(parts{4}); % time = t_on
-            row(2) = str2double(parts{3}); % lat
-            row(3) = str2double(parts{5}); % lon
+            row(1) = str2double(parts{4});  % time = seconds since power-on
+            row(2) = str2double(parts{3});  % lat
+            row(3) = str2double(parts{5});  % lon
 
             outIdx = 4;
             for k = 6:numel(parts)
@@ -147,7 +143,7 @@ while ~feof(fid)
             end
             row(end) = utc_sec; % time_utc at end
         else
-            row(1) = utc_sec;
+            row(1) = utc_sec;   % time (UTC seconds since first ISO)
             for k = 3:numel(parts)
                 v = str2double(parts{k});
                 if ~isnan(v), row(k-1) = v; end
@@ -160,7 +156,7 @@ while ~feof(fid)
         end
     end
 
-    % Append to chunk buffer (no dynamic growth)
+    % Append to chunk buffer
     chunks = bufMap(type);
     ci = numel(chunks);
     nInChunk = bufCount(type) + 1;
@@ -174,11 +170,9 @@ while ~feof(fid)
     chunks{ci}(nInChunk,:) = row;
     bufCount(type) = nInChunk;
     bufMap(type) = chunks;
-
 end
 
 fclose(fid);
-% fprintf('\rReading %s: 100.0%%\n', inputFile);
 
 % ----- build tables -----
 types = keys(bufMap);
@@ -190,7 +184,7 @@ for i = 1:numel(types)
     chunks = bufMap(type);
     nExpected = typeColCount(type);
 
-    % Trim last chunk to actual filled rows
+    % Trim last chunk
     lastN = bufCount(type);
     if isempty(chunks)
         mat = nan(0, nExpected);
@@ -212,7 +206,29 @@ for i = 1:numel(types)
     safeNames{1} = 'time';
     safeNames = matlab.lang.makeUniqueStrings(safeNames, {}, namelengthmax);
 
-    data_out.(type) = array2table(mat, 'VariableNames', safeNames);
+    T = array2table(mat, 'VariableNames', safeNames);
+
+    % ------------------------------
+    % Add GNSS datetime_utc column
+    % ------------------------------
+    if strcmpi(type,'GNSS') && isKey(typeHasIsoTime,'GNSS') && typeHasIsoTime('GNSS') && ~isempty(isoBaseTime)
+        % Dual-time GNSS uses time_utc; normal ISO GNSS uses time
+        if any(strcmpi(T.Properties.VariableNames, 'time_utc'))
+            utcSec = T.time_utc;
+            afterVar = 'time_utc';
+        else
+            utcSec = T.time;
+            afterVar = 'time';
+        end
+
+        dtUtc = isoBaseTime + seconds(utcSec);
+        dtUtc.TimeZone = 'UTC';
+
+        newName = make_unique_name(T.Properties.VariableNames, 'datetime_utc');
+        T = addvars(T, dtUtc, 'After', afterVar, 'NewVariableNames', newName);
+    end
+
+    data_out.(type) = T;
 end
 
 end
@@ -221,6 +237,18 @@ end
 function tf = is_iso8601_utc(s)
 s = strtrim(s);
 tf = ~isempty(regexp(s, '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$', 'once'));
+end
+
+function nm = make_unique_name(existing, base)
+% Return a name not in "existing" by appending _1, _2, ...
+existingLower = lower(string(existing));
+base = char(base);
+nm = base;
+k = 1;
+while any(existingLower == lower(string(nm)))
+    nm = sprintf('%s_%d', base, k);
+    k = k + 1;
+end
 end
 
 function names = default_colnames(type, nFields, hasIso, isDualGnss, colMeta)

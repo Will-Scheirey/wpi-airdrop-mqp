@@ -2,24 +2,13 @@ classdef Airdrop_Filter < Abstract_Filter
 
     properties
         % --- Constants ---
-        J
         g_norm      = 9.80665;
-        accel_gate  = 1e0;
-        alt_gate    = 1e10;
-        speed_gate  = 3
         g_vec_e
         dt
         I
 
         % --- Measurement Matrices ---
         measurement_ranges
-
-        dhdx_p
-        dhdx_mag
-        dhdx_w
-        dhdx_alt
-        dhdx_w_no_bias
-        dhdx_pos_no_bias
 
         % --- Filter Properties
 
@@ -37,7 +26,7 @@ classdef Airdrop_Filter < Abstract_Filter
         last_down
         last_u
 
-        m_ref_i  % 3x1 reference mag in inertial
+        m_ref_i
 
         % --- Histories ---
         hist_idx
@@ -51,6 +40,8 @@ classdef Airdrop_Filter < Abstract_Filter
         S_hist
 
         inno_hist
+
+        update_bias
     end
 
     methods (Abstract)
@@ -70,8 +61,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
     methods
 
-        function obj = Airdrop_Filter(R, Q, H0, P0, dt, J)
-            obj.J = J;
+        function obj = Airdrop_Filter(R, Q, H0, P0, dt)
             obj.R = R;
             obj.Q = Q;
             obj.H = H0;
@@ -104,7 +94,6 @@ classdef Airdrop_Filter < Abstract_Filter
                 "P_E", 3; ... % Position in Inertial Frame
                 "V_E", 3; ... % Velocity in Inertial Frame
                 "e",   4; ... % Quaternion
-                ... % "w_b", 3; ... % Angular Velocity
                 "b_g", 3; ... % Gyro Bias
                 "b_a", 3; ... % Accelerometer Bias
                 "b_p", 3; ... % GPS Position Bias
@@ -127,7 +116,6 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.meas_defs = struct( ...
                 "pos", struct("idx",1,"dim",3), ...
                 "mag", struct("idx",2,"dim",3), ...
-                ... % "gyro",struct("idx",3,"dim",3), ...
                 "alt", struct("idx",3,"dim",1));
 
             r = 1;
@@ -140,6 +128,7 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas)
+            obj.update_bias = true;
             pos_inds = obj.x_inds.P_E;
 
             % Initialize position to the GPS measurement
@@ -156,10 +145,6 @@ classdef Airdrop_Filter < Abstract_Filter
             % Rescale accel to have the expected norm
             accel_meas_corr = obj.g_norm * accel_meas / norm(accel_meas);
 
-            % Change alt gate so we can calculate the down vector
-            old_alt_gate = obj.alt_gate;
-            obj.alt_gate = 1e10;
-
             % Estimate the orientation from accel and mag measurments
             q_meas = obj.quat_from_acc_mag(accel_meas_corr, mag_meas);
 
@@ -173,11 +158,6 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % m_b = C_ib * m_i  =>  m_i = C_bi * m_b
             obj.m_ref_i = C_bi * m_b0;         % inertial reference mag
-
-            % debug_mag_convention_once(accel_meas_corr, mag_meas, obj.m_ref_i);
-
-            % Change alt gate back
-            obj.alt_gate = old_alt_gate;
 
             % Initialize velocity and angular velocity to zero
             obj.x_curr(obj.x_inds.V_E) = zeros(3,1);
@@ -333,9 +313,15 @@ classdef Airdrop_Filter < Abstract_Filter
                 t1 = t0 + dt_;  % forward: t1>t0, backward: t1<t0
 
 
-                if t0 > drop_time
+                if t0 > drop_time - 5
                     % obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
-                    % obj.R(11, 11)   = 300;
+                    baro_idx = obj.measurement_ranges{obj.meas_defs.alt.idx};
+                    obj.R(baro_idx, baro_idx)   = 200 ^ 2;
+
+                    alt_idx = obj.measurement_ranges{obj.meas_defs.pos.idx}(3);
+                    obj.R(alt_idx, alt_idx)   = 100 ^ 2;
+
+                    obj.update_bias = false;
                     % obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-24 * eye(3);
                     % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
                     % % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
@@ -586,27 +572,20 @@ classdef Airdrop_Filter < Abstract_Filter
             % Use gyro as input:
             w_corr = (w_meas_b - b_g);
             de_dt  = -0.5 * quat_kinematic_matrix(w_corr) * e;
-            % dw_dt = obj.J \ (-cross(w_b, obj.J * w_b));               % rigid body (no torque)
 
             % ---- Bias models (same as your current: random walk / constant) ----
             db_g_dt = zeros(3,1);
             db_a_dt = zeros(3,1);
             db_p_dt = zeros(3,1);
-            % If you later add mag bias b_m:
-            % db_m_dt = zeros(3,1);
 
             % ---- Write into dxdt using indices (no hard-coded positions) ----
             dxdt(obj.x_inds.P_E) = dP_dt;
             dxdt(obj.x_inds.V_E) = dV_dt;
             dxdt(obj.x_inds.e)   = de_dt;
-            % dxdt(obj.x_inds.w_b) = dw_dt;
 
             dxdt(obj.x_inds.b_g) = db_g_dt;
             dxdt(obj.x_inds.b_a) = db_a_dt;
             dxdt(obj.x_inds.b_p) = db_p_dt;
-
-            % If you add b_m to x_inds, you just uncomment:
-            % dxdt(obj.x_inds.b_m) = db_m_dt;
 
             % ---- Logging (keep exactly what you had) ----
             obj.accel_calc_all(obj.hist_idx, :) = dV_dt.';
@@ -616,7 +595,6 @@ classdef Airdrop_Filter < Abstract_Filter
             switch meas_idx
                 case 1, H = obj.H_pos();
                 case 2, H = obj.H_mag();
-                    % case 3, H = obj.H_gyro();
                 case 3, H = obj.H_alt();
                 otherwise, error("bad meas_idx");
             end
@@ -661,32 +639,13 @@ classdef Airdrop_Filter < Abstract_Filter
             H(:, obj.x_inds.b_p) = eye(3);
         end
 
-        function H = H_gyro(obj)
-            H = zeros(3, obj.num_states);
-            H(:, obj.x_inds.w_b) = eye(3);
-            H(:, obj.x_inds.b_g) = eye(3);
-        end
-
-        %{
-        function H = H_mag(obj)
-            H = zeros(3, obj.num_states);
-
-            q  = obj.get_e();
-            m  = obj.m_ref_i;
-
-            % analytic:
-            Jq = obj.dC_times_m_dq_wxyz_i2b(q, m);   % 3x4
-
-            H(:, obj.x_inds.e)   = Jq;
-            H(:, obj.x_inds.b_m) = eye(3);
-        end
-        %}
-
         function H = H_mag(obj)
             H = zeros(3, obj.num_states);
             q  = obj.get_e();
             Jq = obj.dmag_dq_numeric(q);          % 3x4
             H(:, obj.x_inds.e)   = Jq;
+
+
             H(:, obj.x_inds.b_m) = eye(3);
         end
 
@@ -710,16 +669,9 @@ classdef Airdrop_Filter < Abstract_Filter
             a_e  = C_bi * (a - b_a) + obj.g_vec_e;
         end
 
-        function [q_meas, trust_accel] = quat_from_acc_mag(obj, a_b, m_b)
-            a_norm = norm(a_b);
-            trust_accel = (abs(a_norm - obj.g_norm) < obj.accel_gate) && (obj.altitude() < obj.alt_gate);
-
-            if trust_accel
-                d_b = -a_b / norm(a_b);
-                obj.last_down = d_b;
-            else
-                d_b = obj.last_down;
-            end
+        function q_meas = quat_from_acc_mag(obj, a_b, m_b)
+            d_b = -a_b / norm(a_b);
+            obj.last_down = d_b;
 
             obj.down_vec_all(obj.hist_idx, :) = d_b;
 

@@ -7,8 +7,8 @@ classdef Airdrop_EKF < Airdrop_Filter
 
     methods
 
-        function obj = Airdrop_EKF(R, Q, H0, P0, dt, J)
-            obj = obj@Airdrop_Filter(R, Q, H0, P0, dt, J);
+        function obj = Airdrop_EKF(R, Q, H0, P0, dt)
+            obj = obj@Airdrop_Filter(R, Q, H0, P0, dt);
         end
 
         function [innovation, K, S] = update_impl(obj, y, y_pred, H, R_meas)
