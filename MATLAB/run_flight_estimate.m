@@ -5,7 +5,7 @@ addpath(genpath("weather"));
 addpath(genpath("haars_data"));
 
 parent_dir = "haars_data";
-drop_dir = "DN153_Lt1_n16_08052025_Inside";
+drop_dir = "DN171_Lt3_n11_08072025_side_2";
 full_dir = fullfile(parent_dir, drop_dir);
 
 %% Run Data
@@ -29,7 +29,15 @@ wind_speed_interp = interp1(the_weather.alt_agl, the_weather.win_speed, alt_est)
 wind_angle_interp = interp1(the_weather.alt_agl, the_weather.wind_direction, alt_est);
 
 wind_vec = wind_speed_interp .* [sind(wind_angle_interp), cosd(wind_angle_interp)];
+wind_vec_est = data_out.kf.x_hist(24:25, 1:end-1);
 
+figure(1)
+clf
+plot(data_out.t_plot, wind_vec); hold on
+plot(data_out.t_plot, wind_vec_est)
+
+
+%{
 groundspeed = vecnorm(v_est, 2, 2);
 
 wind_sign = 1;
@@ -63,3 +71,4 @@ plot(data_out.measurements.gps.time, windspeed_meas, 'DisplayName', 'Windspeed',
 plot(data_out.measurements.gps.time, groundspeed_meas, 'DisplayName', 'Groundspeed', 'LineWidth', 1.5);
 xlim(data_out.t_plot_drop)
 legend
+%}

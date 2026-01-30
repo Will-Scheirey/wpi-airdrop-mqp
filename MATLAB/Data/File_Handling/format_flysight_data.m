@@ -164,7 +164,7 @@ dt_min_mag   = min(diff(data_mag.time));
 dt_min_gyro  = min(diff(data_gyro.time));
 dt_min_baro  = min(diff(data_baro.time));
 
-data_vel.data = data_vel.data(:, 1:2);
+data_vel.data = data_vel.data;
 
 dt_mult = 1;
 

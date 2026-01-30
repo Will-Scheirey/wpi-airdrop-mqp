@@ -30,7 +30,7 @@ R_mag = blkdiag(sensor_var.mag(1), sensor_var.mag(2), sensor_var.mag(3)).^2;
 R_baro = (sensor_var.baro * 1e1)^2;
 
 Rv = 2;
-R_vel = eye(2) * Rv^2;
+R_vel = eye(3) * Rv^2;
 
 R = blkdiag( ...
     R_pos, ...
@@ -40,13 +40,13 @@ R = blkdiag( ...
     );
 
 % accel noise covariance
-sigma_a = sqrt(sensor_var.accel(:)) * 1e2;
+sigma_a = sqrt(sensor_var.accel(:)) * 5e2;
 Sa = diag(sigma_a.^2);
 
 Q_PV = [ (dt^4/4)*Sa, (dt^3/2)*Sa;
          (dt^3/2)*Sa, (dt^2)*Sa ];
 
-sigma_w = sqrt(norm(sensor_var.gyro)) * 1e2;
+sigma_w = sqrt(norm(sensor_var.gyro));
 Q_e = eye(4) * (dt*sigma_w)^2;
 
 Qwb = 1e-5;
@@ -61,11 +61,11 @@ Q_pb = eye(3) * Qpb^2;
 sigma_bm = 1e-2;
 Q_mb = eye(3) * (sigma_bm^2);
 
-sigma_bb = 1e-4;
+sigma_bb = 1e-2;
 Q_bb = sigma_bb^2;
 
-sigma_vv = 1e-4;
-Q_vv = sigma_vv^2 * eye(2);
+sigma_vv = 1e-3;
+Q_vv = sigma_vv^2 * eye(3);
 
 Q = blkdiag(...
     Q_PV, ... % P
@@ -88,7 +88,7 @@ P0 = blkdiag( ...
     1e-2* eye(3), ...
     1e-2 * eye(3), ...
     1e-2, ...
-    1e-2 * eye(2) ...
+    1e-2 * eye(3) ...
     );
 
 Q = (Q + Q.')/2;                     % enforce symmetry

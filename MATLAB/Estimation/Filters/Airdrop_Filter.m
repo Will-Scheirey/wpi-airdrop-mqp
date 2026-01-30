@@ -99,7 +99,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 "b_p", 3; ... % GPS Position Bias
                 "b_m", 3; ... % Magnetometer Bias
                 "b_b", 1; ... % Baro Bias
-                "b_v", 2; ... % GPS Vel Bias
+                "b_v", 3; ... % GPS Vel Bias
                 };
 
             state_idx = 1;
@@ -118,7 +118,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 "pos", struct("idx",1,"dim",3), ...
                 "mag", struct("idx",2,"dim",3), ...
                 "alt", struct("idx",3,"dim",1), ...
-                "vel", struct("idx",4,"dim",2) ...
+                "vel", struct("idx",4,"dim",3) ...
                 );
 
             r = 1;
@@ -636,7 +636,7 @@ classdef Airdrop_Filter < Abstract_Filter
             m_pred = C_ib * obj.m_ref_i + b_m; % predicted mag in body
 
             vel = obj.get_V_E();
-            vel_pred = vel(1:2) + b_v;
+            vel_pred = vel + b_v;
 
             y_all = [
                 p_pred;
@@ -672,9 +672,9 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function H = H_vel(obj)
-            H = zeros(2, obj.num_states);
-            H(:, obj.x_inds.V_E(1:2)) = eye(2);
-            H(:, obj.x_inds.b_v) = eye(2);
+            H = zeros(3, obj.num_states);
+            H(:, obj.x_inds.V_E) = eye(3);
+            H(:, obj.x_inds.b_v) = eye(3);
         end
 
         % --- UTILS ---
