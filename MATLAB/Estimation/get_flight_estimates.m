@@ -135,6 +135,13 @@ b_b_est = x_est(:, kf.x_inds.b_b);
 
 t_plot = tspan(1:end-1);
 t_plot_drop = [drop_time, land_time];
+% Speed, heading angle, altitude, windspeed and direction
+
+time_utc = all_measurements.gps_all.GNSS.datetime_utc(end);
+
+[~, weather] =load_weather(time_utc);
+
+%% Get CARP Inputs
 
 estimates = struct( ...
     'all', x_est, ...
@@ -155,5 +162,12 @@ data_out = struct( ...
     'cov', covariances, ...
     'kf', kf, ...
     'measurements', flight_measurements, ...
-    'drop_info', drop_info);
+    'drop_info', drop_info, ...
+    'time_utc', time_utc, ...
+    'weather', weather);
+
+carp = get_carp_params(data_out);
+
+data_out.carp = carp;
+
 end
