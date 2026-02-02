@@ -5,7 +5,7 @@ addpath(genpath("weather"));
 addpath(genpath("haars_data"));
 
 parent_dir = "haars_data";
-drop_dir = "DN171_Lt3_n11_08072025_side_2";
+drop_dir = "DN149_Lt1_n12_08052025_side";
 full_dir = fullfile(parent_dir, drop_dir);
 
 %% Run Data
