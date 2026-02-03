@@ -68,19 +68,6 @@ legend
 title("Mag")
 xlim([tspan(1), tspan(end)])
 
-
-figure(fig_idx); fig_idx = fig_idx + 1;
-clf
-
-data_mag.data = data_mag.data ./ vecnorm(data_mag.data, 2, 2);
-
-plot(data_mag.time, data_mag.data(:, 1), 'DisplayName', '0'); hold on
-plot(data_mag.time, data_mag.data(:, 2), 'DisplayName', '1')
-plot(data_mag.time, data_mag.data(:, 3), 'DisplayName', '2')
-legend
-title("Mag")
-xlim([tspan(1), tspan(end)])
-
 figure(fig_idx); fig_idx = fig_idx + 1;
 clf
 plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', 'Baro', 'LineWidth', 1); hold on

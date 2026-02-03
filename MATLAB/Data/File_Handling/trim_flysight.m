@@ -26,7 +26,9 @@ stop_time = data_gps_vel.time(stop_idx) + dur_forward;
 
 trim_fcn_moving = @(data) data(find(data.time > start_time, 1):find(data.time > stop_time, 1), :);
 
-trim_fcn_stationary = @(data) data(50:find(data.time > start_time, 1), :);
+stationary_dur = 180; % [sec]
+
+trim_fcn_stationary = @(data) data(find(data.time > start_time - stationary_dur, 1):find(data.time > start_time - 5, 1), :);
 
 data_moving = struct( ...
     'data_accel', trim_fcn_moving(data_accel), ...

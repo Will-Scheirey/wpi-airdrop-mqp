@@ -11,8 +11,25 @@ full_dir = fullfile(parent_dir, drop_dir);
 %% Run Data
 data_out = get_flight_estimates(full_dir);
 
+
 %% Plot Data
 fig_idx = plot_estimates(data_out);
+
+fig_idx = plot_meas(data_out.measurements.gps, ...
+    data_out.measurements.accel, ...
+    data_out.measurements.gyro, ...
+    data_out.measurements.mag, ...
+    data_out.measurements.baro, ...
+    data_out.measurements.gps_vel, fig_idx);
+
+fig_idx = plot_meas(data_out.stationary_measurements.data_gps, ...
+    data_out.stationary_measurements.data_accel, ...
+    data_out.stationary_measurements.data_gyro, ...
+    data_out.stationary_measurements.data_mag, ...
+    data_out.stationary_measurements.data_baro, ...
+    data_out.stationary_measurements.data_gps_vel, fig_idx);
+w
+return
 
 time = data_out.measurements.gps_all.GNSS.datetime_utc(end);
 
@@ -30,12 +47,6 @@ wind_angle_interp = interp1(the_weather.alt_agl, the_weather.wind_direction, alt
 
 wind_vec = wind_speed_interp .* [sind(wind_angle_interp), cosd(wind_angle_interp)];
 wind_vec_est = data_out.kf.x_hist(24:25, 1:end-1);
-
-figure(1)
-clf
-plot(data_out.t_plot, wind_vec); hold on
-plot(data_out.t_plot, wind_vec_est)
-
 
 %{
 groundspeed = vecnorm(v_est, 2, 2);
