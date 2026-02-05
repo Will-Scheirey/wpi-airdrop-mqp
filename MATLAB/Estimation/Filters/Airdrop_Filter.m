@@ -321,24 +321,6 @@ classdef Airdrop_Filter < Abstract_Filter
                 t0 = timesteps(i);
                 t1 = t0 + dt_;  % forward: t1>t0, backward: t1<t0
 
-
-                if t0 > drop_time - 5
-                    % obj.R(4:7, 4:7) = (eye(4,4) * 1e-6) .^2;
-                    %{
-                    baro_idx = obj.measurement_ranges{obj.meas_defs.alt.idx};
-                    obj.R(baro_idx, baro_idx)   = 200 ^ 2;
-
-                    alt_idx = obj.measurement_ranges{obj.meas_defs.pos.idx}(3);
-                    obj.R(alt_idx, alt_idx)   = 100 ^ 2;
-                    %}
-
-                    % obj.update_bias = false;
-                    % obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = 1e-8 * eye(3);
-                    % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
-                    % % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = 1e-24 * eye(3);
-                    % obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = 1e-24 * eye(3);
-                end
-
                 % Define bin as [tmin, tmax)
                 tmin = min(t0, t1);
                 tmax = max(t0, t1);
