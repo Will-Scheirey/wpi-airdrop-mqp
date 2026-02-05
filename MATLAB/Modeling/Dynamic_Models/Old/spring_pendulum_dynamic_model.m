@@ -1,4 +1,4 @@
-function x_dot = spring_drag_dynamic_model(~, x_curr, P0)
+x`function x_dot = spring_drag_dynamic_model(~, x_curr, P0)
 % ======================
 % --- Current States ---
 % ======================

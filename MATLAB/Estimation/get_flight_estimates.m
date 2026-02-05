@@ -1,0 +1,174 @@
+function data_out = get_flight_estimates(full_dir)
+
+smooth_window = 20;
+alt_mean_window = 100;
+
+[dt, ...
+    tspan, ...
+    all_measurements, ...
+    flight_measurements, ...
+    measurements, ...
+    inputs, ...
+    sensor_var, ...
+    drop_info, data_stationary] = format_flysight_data(full_dir, smooth_window, alt_mean_window);
+
+drop_time = drop_info.time_drop;
+land_time = drop_info.time_land;
+
+%% Noise Parameters
+Rp = 10;
+R_pos = eye(3) * Rp^2;
+
+% sensor_var.mag = sensor_var.mag * 1e1;
+% sensor_var.baro = sensor_var.baro * 1e1;
+% sensor_var.gyro = sensor_var.gyro * 1e1;
+% sensor_var.accel = sensor_var.accel * 1e1;
+% % sensor_var.mag = sensor_var.mag * 1e1;
+
+R_mag = blkdiag(sensor_var.mag(1), sensor_var.mag(2), sensor_var.mag(3)).^2;
+
+R_baro = (sensor_var.baro * 1e1)^2;
+
+Rv = 2;
+R_vel = eye(3) * Rv^2;
+
+R = blkdiag( ...
+    R_pos, ...
+    R_mag, ...
+    R_baro, ...
+    R_vel ...
+    );
+
+% accel noise covariance
+sigma_a = sqrt(sensor_var.accel(:)) * 5e2;
+Sa = diag(sigma_a.^2);
+
+Q_PV = [ (dt^4/4)*Sa, (dt^3/2)*Sa;
+         (dt^3/2)*Sa, (dt^2)*Sa ];
+
+sigma_w = sqrt(norm(sensor_var.gyro));
+Q_e = eye(4) * (dt*sigma_w)^2;
+
+Qwb = 1e-5;
+Q_wb = eye(3) * Qwb^2;
+
+Qab = 1e-5;
+Q_ab = eye(3) * Qab^2;
+
+Qpb = 1e-5;
+Q_pb = eye(3) * Qpb^2;
+
+sigma_bm = 1e-2;
+Q_mb = eye(3) * (sigma_bm^2);
+
+sigma_bb = 1e-2;
+Q_bb = sigma_bb^2;
+
+sigma_vv = 1e-3;
+Q_vv = sigma_vv^2 * eye(3);
+
+Q = blkdiag(...
+    Q_PV, ... % P
+    ... % Q_V,... % V
+    Q_e, ... % e
+    Q_wb, ... % w
+    Q_ab, ... % ab
+    Q_pb, ...
+    Q_mb, ...
+    Q_bb, ...
+    Q_vv ...
+    );
+
+P0 = blkdiag( ...
+    1e-2 * eye(3), ...
+    1e-2 * eye(3), ...
+    1e-2 * eye(4), ...
+    1e-2 * eye(3), ...
+    1e-2 * eye(3), ...
+    1e-2* eye(3), ...
+    1e-2 * eye(3), ...
+    1e-2, ...
+    1e-2 * eye(3) ...
+    );
+
+Q = (Q + Q.')/2;                     % enforce symmetry
+q_floor = 1e-12;                     % pick a floor in variance units
+Q = Q + q_floor * eye(size(Q));      % jitter to make invertible
+
+%% Run the Kalman Filter
+kf = Airdrop_EKF(R, Q, 0, P0, dt);
+
+acc_gps = flight_measurements.acc_gps;
+
+kf.initialize(true, flight_measurements.accel.data(1, :)', ...
+    flight_measurements.gyro.data(1, :)', ...
+    flight_measurements.mag.data(1, :)', ...
+    flight_measurements.gps.data(1, :)', ...
+    flight_measurements.baro.data(1, :)');
+
+kf.run_filter(measurements, inputs, tspan, acc_gps, drop_time, 1, true);
+
+%{
+%% Run the Smoother
+
+sm = Forward_Backward_Smoother(R, Q, 0, P0, dt, payload.I());  % match your kf ctor
+sm.is_initialized = true;
+sm.set_forward_results(kf.x_hist, kf.P_hist, kf.F_hist, kf.Q_hist);
+sm.smooth(measurements, inputs, tspan, acc_gps, true);
+
+%% Fuse Data
+[x_s, P_s] = sm.fuse();
+%}
+%% Exract Values
+
+covariances = kf.P_hist;
+
+x_est = kf.x_hist(:, 2:end)';
+p_est = x_est(:, kf.x_inds.P_E);
+v_est = x_est(:, kf.x_inds.V_E);
+e_est = x_est(:, kf.x_inds.e);
+w_b_est = x_est(:, kf.x_inds.b_g);
+a_b_est = x_est(:, kf.x_inds.b_a);
+p_b_est = x_est(:, kf.x_inds.b_p);
+m_b_est = x_est(:, kf.x_inds.b_m);
+b_b_est = x_est(:, kf.x_inds.b_b);
+
+t_plot = tspan(1:end-1);
+t_plot_drop = [drop_time, land_time];
+% Speed, heading angle, altitude, windspeed and direction
+
+time_utc = all_measurements.gps_all.GNSS.datetime_utc(end);
+
+[~, weather] =load_weather(time_utc);
+
+%% Get CARP Inputs
+
+estimates = struct( ...
+    'all', x_est, ...
+    'pos', p_est, ...
+    'vel', v_est, ...
+    'quat', e_est, ...
+    'gyro_bias', w_b_est, ...
+    'accel_bias', a_b_est, ...
+    'pos_bias', p_b_est, ...
+    'mag_bias', m_b_est, ...
+    'baro_bias', b_b_est);
+
+data_out = struct( ...
+    't_plot', t_plot, ...
+    't_plot_drop', t_plot_drop, ...
+    'tspan', tspan, ...
+    'estimates', estimates, ...
+    'cov', covariances, ...
+    'kf', kf, ...
+    'measurements', flight_measurements, ...
+    'stationary_measurements', data_stationary, ...
+    'drop_info', drop_info, ...
+    'time_utc', time_utc, ...
+    'weather', weather);
+
+carp = get_carp_params(data_out);
+
+data_out.carp = carp;
+
+end

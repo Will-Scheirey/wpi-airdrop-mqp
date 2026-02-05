@@ -1,17 +1,44 @@
-classdef Extended_Kalman_Filter < Kalman_Filter
+classdef Extended_Kalman_Filter < handle
     %EXTENDED_KALMAN_FILTER Summary of this class goes here
     %   Detailed explanation goes here
 
     properties
         dt
         x_inds
+
+        R
+        Q
+
+        H
+        F
+
+        x_curr
+
+        P_curr
+
+        I
+
+        P_hist
+        x_hist
+        S_hist
+
+        inno_hist
     end
 
     methods
         function obj = Extended_Kalman_Filter(R, Q, H, x0, P0, dt, x_inds)
-            
+
             F0 = zeros(numel(x0), numel(x0));
-            obj = obj@Kalman_Filter(R, Q, H, F0, x0, P0);
+            
+            obj.R = R;
+            obj.Q = Q;
+            obj.H = H;
+            obj.F = F0;
+
+            obj.x_curr = x0;
+            obj.P_curr = P0;
+
+            obj.I = eye(size(F0));
 
             obj.x_inds = x_inds;
 

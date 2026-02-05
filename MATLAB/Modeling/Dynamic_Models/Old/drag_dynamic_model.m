@@ -57,7 +57,7 @@ g_vec_b = C_BE * g_vec_e; % Gravity vector in Body Frame
 V = norm(V_b); % Speed of object;
 Q = 1/2*rho*V^2; % Aerodynamic pressure;
 
-F_d = -Q*Cd * V_b/max(V, 0.00001);
+F_d = -Q*Cd * S * V_b/max(V, 0.00001);
 
 F_g = g_vec_b * m; % Force of gravity
 
