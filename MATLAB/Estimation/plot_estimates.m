@@ -1,21 +1,19 @@
-function fig_idx = plot_estimates(data_in, fig_idx)
+function fig_idx = plot_estimates(data_in, t_plot, tspan, estimate_name, fig_idx)
 
-if nargin < 2
+if nargin < 5
     fig_idx = 1;
 end
 
-t_plot = data_in.t_plot;
 t_plot_drop = data_in.t_plot_drop;
-tspan = data_in.tspan;
 
-p_est = data_in.estimates.pos;
-v_est = data_in.estimates.vel;
-e_est = data_in.estimates.quat;
-w_b_est = data_in.estimates.gyro_bias;
-a_b_est = data_in.estimates.accel_bias;
-p_b_est = data_in.estimates.pos_bias;
-m_b_est = data_in.estimates.mag_bias;
-b_b_est = data_in.estimates.baro_bias;
+p_est = data_in.(estimate_name).pos;
+v_est = data_in.(estimate_name).vel;
+e_est = data_in.(estimate_name).quat;
+w_b_est = data_in.(estimate_name).gyro_bias;
+a_b_est = data_in.(estimate_name).accel_bias;
+p_b_est = data_in.(estimate_name).pos_bias;
+m_b_est = data_in.(estimate_name).mag_bias;
+b_b_est = data_in.(estimate_name).baro_bias;
 
 data_gps = data_in.measurements.gps;
 acc_gps = data_in.measurements.acc_gps;

@@ -5,7 +5,7 @@ addpath(genpath("weather"));
 addpath(genpath("haars_data"));
 
 parent_dir = "haars_data";
-drop_dir = "DN171_Lt3_n11_08072025_side_2";
+drop_dir = "DN172_Lt3_n12_08072025_side_2";
 full_dir = fullfile(parent_dir, drop_dir);
 
 %% Run Data
@@ -13,7 +13,9 @@ data_out = get_flight_estimates(full_dir);
 
 
 %% Plot Data
-fig_idx = plot_estimates(data_out);
+% fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates_smoothed");
+fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates");
+
 
 fig_idx = plot_meas(data_out.measurements.gps, ...
     data_out.measurements.accel, ...
@@ -28,7 +30,7 @@ fig_idx = plot_meas(data_out.stationary_measurements.data_gps, ...
     data_out.stationary_measurements.data_mag, ...
     data_out.stationary_measurements.data_baro, ...
     data_out.stationary_measurements.data_gps_vel, fig_idx);
-w
+
 return
 
 time = data_out.measurements.gps_all.GNSS.datetime_utc(end);
