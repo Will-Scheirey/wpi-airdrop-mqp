@@ -11,10 +11,9 @@ full_dir = fullfile(parent_dir, drop_dir);
 %% Run Data
 data_out = get_flight_estimates(full_dir);
 
-
 %% Plot Data
-% fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates_smoothed");
-fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates");
+fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates_smoothed");
+% fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates");
 
 
 fig_idx = plot_meas(data_out.measurements.gps, ...
