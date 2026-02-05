@@ -1,3 +1,3 @@
-function kms = mph2kms(mph)
-    kms = 0.000447*mph;
+function ms = mph2ms(mph)
+    ms = 0.44704*mph;
 end

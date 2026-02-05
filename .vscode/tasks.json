@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "shell",
+      "label": "Build airdrop CV (main + grid)",
+      "command": "/bin/bash",
+      "args": [
+        "-lc",
+        "clang++ -std=c++17 -g \"${workspaceFolder}/Computer Vision/main.cpp\" $(pkg-config --cflags --libs opencv4) -o \"${workspaceFolder}/Computer Vision/main\""
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
+
+  

@@ -4,8 +4,8 @@ clear; clc; close all;
 
 
 
-% %% Send to FlightGear
-% 
+%% Send to FlightGear
+
 % lat0  = 42.273836;  % [deg]
 % long0 = -71.809809; % [deg]
 % h0    = 168.48;       % [m]

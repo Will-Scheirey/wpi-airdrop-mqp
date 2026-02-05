@@ -20,11 +20,23 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             % ======================
             % --- Current States ---
             % ======================
-            worc_wind = [6, 270]; % Average wind data in Worcester, MA ([mph], [deg])
+
+            % if (x(3) >  2000)
+            %     worc_wind = [10, 270]; % Average wind data in Worcester, MA ([mph], [deg])
+            % elseif (x(3) > 1000)
+            %     worc_wind = [6, 250]; % Average wind data in Worcester, MA ([mph], [deg])
+            %     disp("Switch");
+            % else
+            %     worc_wind = [3, 210]; % Average wind data in Worcester, MA ([mph], [deg])
+            %     disp("Switch")
+            % end
+
+            worc_wind = [10,0]; % [m s]
+
             mag = worc_wind(1); dir = worc_wind(2);
 
-            e = mph2kms(mag*sind(dir));
-            n = mph2kms(mag*cosd(dir));
+            e = mag*sind(dir);
+            n = mag*cosd(dir);
 
             wind = [e; n; 0];              % Wind,             ECEF [m   s]
 
