@@ -4,7 +4,7 @@ addpath(genpath("weather"));
 addpath(genpath("haars_data"));
 
 parent_dir = "haars_data";
-drop_dir = "DN143_Lt1_nxx_08052025_side";
+drop_dir = "DN153_Lt1_n16_08052025_Inside";
 full_dir = fullfile(parent_dir, drop_dir);
 
 %% Run Data
@@ -19,8 +19,7 @@ all_results = cell(num_sims, 1);
 
 %% CARP
 for i = 1:num_sims
-    all_results{i} = Carp_Estimator('carp_data',carp_data);
-    
+    all_results{i} = Carp_Estimator('carp_data', carp_data);
    
     if mod(i, 10) == 0
         fprintf('Completed %d/%d simulations\n', i, num_sims);

@@ -24,21 +24,31 @@ function results = Carp_Estimator(NameValueArgs)
     carp_results = Carp_Calculator(NameValueArgs);
     
     %% STEP 2: Create Parachute System
-    parachute_system = Create_Parachute(...
-        NameValueArgs.num_parachutes);
+    parachute_system1 = Create_Parachute(...
+        NameValueArgs.num_parachutes, 3);
+    parachute_system1.R = 2;
+
+    parachute_system2 = Create_Parachute(...
+    NameValueArgs.num_parachutes, 30);
 
     %%STEP 3: Create Payload System
     payload = Create_Payload(NameValueArgs.w, NameValueArgs.l, NameValueArgs.h,NameValueArgs.m);
     
     %% STEP 4: Convert CARP Results to Propagator Initial Conditions
     x0 = Carp_To_Propagator(carp_results, NameValueArgs.carp_data);
+
+    [~, the_weather] = load_weather(NameValueArgs.carp_data.time_UTC);
+    the_weather.win_speed = ks2mps(the_weather.win_speed);
+    the_weather.alt_agl = ft2m(1000 * the_weather.alt_agl);
+    the_weather.alt_agl(1) = 0;
     
     %% STEP 5: Run High-Fidelity Propagator 
     [t, y, model_obj] = propagate_model(...
         'x0', x0, ...
         'tspan', NameValueArgs.tspan, ...
-        'parachute', parachute_system, ...
-        'payload', payload);
+        'parachute', parachute_system1, ...
+        'parachute2', parachute_system2, ...
+        'payload', payload, 'weather', the_weather, 'model', @Two_Stage_Model);
 
     %% STEP 5: Extract Final State 
     results = Results(carp_results, t, y, model_obj, NameValueArgs.num_parachutes);

@@ -7,7 +7,7 @@ function x0 = Carp_To_Propagator(carp, carp_data)
     
     % Initial horizontal velocity (convert knots to m/s)
     gs_ms = carp_data.groundspeed * 0.514444;  % knots to m/s
-    heading_rad = deg2rad(carp_data.heading);
+    heading_rad = -deg2rad(carp_data.heading);
     
     % ENU velocity components (aircraft velocity at release)
     V_east = gs_ms * sin(heading_rad);

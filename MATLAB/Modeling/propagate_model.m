@@ -4,12 +4,14 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         NameValueArgs.use_drag
         NameValueArgs.payload
         NameValueArgs.parachute
+        NameValueArgs.parachute2
         NameValueArgs.x0
         NameValueArgs.tspan
         NameValueArgs.model
         NameValueArgs.riser
         NameValueArgs.variable_parachute_mass
         NameValueArgs.damping
+        NameValueArgs.weather
     end
 
     if isfield(NameValueArgs, 'use_drag')
@@ -133,6 +135,6 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         model = @Parachute_Model_Simple;
     end
 
-    model_obj = model(payload, parachute, x0);
+    model_obj = model(payload, parachute, NameValueArgs.parachute2, x0, NameValueArgs.weather);
     [t, y] = model_obj.run_model(x0, tspan);
 end

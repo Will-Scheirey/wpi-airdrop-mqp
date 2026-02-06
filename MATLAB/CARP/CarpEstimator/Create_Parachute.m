@@ -1,6 +1,6 @@
 function parachute = Create_Parachute(num_parachutes, t_deploy)
     if nargin < 2
-        t_deploy = 20;  % Default: immediate deployment
+        t_deploy = 0;  % Default: immediate deployment
     end
     
     % Single G-12D parameters
