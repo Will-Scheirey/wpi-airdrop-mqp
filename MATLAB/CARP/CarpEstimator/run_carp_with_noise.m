@@ -72,31 +72,11 @@ legend('Trajectories', 'CARP Landing Point', 'Impact Points', 'Location', 'best'
 view(45, 30);
 hold off;
 
+axis equal
+
 % Calculate impact statistics
-all_impacts = zeros(num_sims, 3);
-for i = 1:num_sims
-    all_impacts(i, :) = all_results{i}.propagator.trajectory(end, :);
-end
-return
-
-plot3(carp_data.relative_traj(:, 1), carp_data.relative_traj(:, 2), carp_data.relative_traj(:, 3))
-
-xlabel('East [m]');
-ylabel('North [m]');
-zlabel('Altitude [m]');
-title(sprintf('%d Airdrop Simulations with CARP Estimate', num_sims));
-legend('Trajectories', 'CARP Landing Point', 'Impact Points', 'Location', 'best');
-view(45, 30);
-hold off;
 
 vel_inertial = zeros(length(all_results{1}.propagator.t_plot), 3);
-
-% Calculate impact statistics
-all_impacts = zeros(num_sims, 3);
-for i = 1:num_sims
-    all_impacts(i, :) = all_results{i}.propagator.trajectory(end, :);
-end
-axis equal
 
 for idx = 1:length(all_results{1}.propagator.t_plot)
 
