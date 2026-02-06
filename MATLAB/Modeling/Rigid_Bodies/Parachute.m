@@ -17,6 +17,8 @@ classdef Parachute < Rigid_Body
 
         Cd_0
         variable_ma
+        is_deployed    % NEW: deployment flag
+        t_deploy
     end
 
     methods
@@ -57,11 +59,26 @@ classdef Parachute < Rigid_Body
             else
                 obj.variable_ma = false;
             end
-
+            % Default to deployed immediately
+            obj.is_deployed = false;
+            obj.t_deploy = 0;
         end
 
-        function Cd_out = Cd(obj, ~); Cd_out = obj.Cd_0 * obj.eta; end
-        function S_out = S(obj, ~); S_out = obj.A; end
+        function Cd_out = Cd(obj, ~)
+            if obj.is_deployed
+                Cd_out = obj.Cd_0 * obj.eta;
+            else
+                Cd_out = 0;  % No drag before deployment
+            end
+        end
+
+        function S_out = S(obj, ~)
+            if obj.is_deployed
+                S_out = obj.A;
+            else
+                S_out = 0;  % No area before deployment
+            end
+        end
 
         function ma_out = added_mass(obj, rho)
             p = obj.porosity;
@@ -77,7 +94,7 @@ classdef Parachute < Rigid_Body
 
             m_out = obj.mc + obj.added_mass(rho);
         end
-        
+
         function I_out = I(obj, rho)
             if ~obj.variable_ma
                 rho = 1.225;
@@ -87,17 +104,17 @@ classdef Parachute < Rigid_Body
             I_XX = 83/320*m*obj.R^2; % Moment of inertia of a hemisphere [kg m^2]
             I_YY = I_XX;             % Moment of inertia of a hemisphere [kg m^2]
             I_ZZ = 2/5*m*obj.R^2;    % Moment of inertia of a hemisphere [kg m^2]
-            
+
             I_XY = 0;         % Moment of inertia of a hemisphere [kg m^2]
             I_XZ = 0;         % Moment of inertia of a hemisphere [kg m^2]
             I_YZ = 0;         % Moment of inertia of a hemisphere [kg m^2]
-            
+
             % Inertia Tensor
             I_out = [
-             I_XX, -I_XY, -I_XZ;
-            -I_XY,  I_YY, -I_YZ;
-            -I_XZ, -I_YZ,  I_ZZ;
-            ];
+                I_XX, -I_XY, -I_XZ;
+                -I_XY,  I_YY, -I_YZ;
+                -I_XZ, -I_YZ,  I_ZZ;
+                ];
         end
 
     end

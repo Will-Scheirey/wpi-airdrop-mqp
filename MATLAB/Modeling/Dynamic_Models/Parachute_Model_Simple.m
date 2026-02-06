@@ -50,7 +50,14 @@ classdef Parachute_Model_Simple < Dynamic_Model
         end
 
         function x_dot = ode_fcn(obj, t, x)
+
             disp(t)
+            % Check if parachute should deploy
+            if t >= obj.parachute.t_deploy && ~obj.parachute.is_deployed
+                obj.parachute.is_deployed = true;
+                fprintf('*** PARACHUTE DEPLOYED at t = %.2f seconds ***\n', t);
+            end
+
             obj.get_states(x);
 
             [F_p, F_c, M_p, M_c] = obj.equations_of_motion();
@@ -119,7 +126,7 @@ classdef Parachute_Model_Simple < Dynamic_Model
             % ======================
 
             % --- Payload ---
-            obj.P_p   = x(1:3);            % Position,         ECEF [m]
+            obj.P_p = x(1:3);              % Position,         ECEF [m]
             obj.V_p = x(4:6);              % Velocity,         Body [m   s^-1]
 
             obj.e_p = x(7:10) / norm(x(7:10));   % Orientation,      ECEF
@@ -134,9 +141,7 @@ classdef Parachute_Model_Simple < Dynamic_Model
 
             % --- Additional States ---
 
-            h = obj.P_p(3);
-            % h = 0;
-            obj.rho = StandardAtmosphereModel.Density(h); % Density of air  [kg m^-3]
+            obj.rho = StandardAtmosphereModel.Density(obj.P_p(3)); % Density of air  [kg m^-3]
 
             obj.m_payload   = obj.payload.  m(obj.rho);
             obj.m_parachute = obj.parachute.m(obj.rho);
@@ -150,7 +155,7 @@ classdef Parachute_Model_Simple < Dynamic_Model
         end
 
         function calc_mass(obj)
-            obj.m_payload = obj.payload.m(obj.rho);
+            obj.m_payload   = obj.payload.m(obj.rho);
             obj.m_parachute = obj.parachute.m(obj.rho);
         end
 
