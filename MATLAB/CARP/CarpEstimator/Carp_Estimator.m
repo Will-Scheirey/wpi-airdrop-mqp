@@ -28,15 +28,18 @@ function results = Carp_Estimator(NameValueArgs)
     %% STEP 2: Create Parachute System
     parachute_system1 = Create_Parachute(...
         NameValueArgs.num_parachutes, 5, 2);
+    parachute_system1.t_cut = 38;
 
     parachute_system2 = Create_Parachute(...
-    NameValueArgs.num_parachutes, 38, single_radius);
+    NameValueArgs.num_parachutes, 41, single_radius);
 
     %%STEP 3: Create Payload System
     payload = Create_Payload(NameValueArgs.w, NameValueArgs.l, NameValueArgs.h,NameValueArgs.m);
     
     %% STEP 4: Convert CARP Results to Propagator Initial Conditions
     x0 = Carp_To_Propagator(carp_results, NameValueArgs.carp_data);
+
+    % x0(4:6) = x0(4:6) * 2;
 
     [~, the_weather] = load_weather(NameValueArgs.carp_data.time_UTC);
     the_weather.win_speed = ks2mps(the_weather.win_speed);

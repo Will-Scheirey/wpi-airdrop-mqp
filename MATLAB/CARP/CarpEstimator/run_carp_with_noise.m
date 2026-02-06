@@ -4,7 +4,7 @@ addpath(genpath("weather"));
 addpath(genpath("haars_data"));
 
 parent_dir = "haars_data";
-drop_dir = "DN149_Lt1_n12_08052025_side";
+drop_dir = "DN152_Lt1_n15_08052025_side";
 full_dir = fullfile(parent_dir, drop_dir);
 
 %% Get flight Estimates
@@ -72,11 +72,11 @@ title(sprintf('%d Airdrop Simulations with CARP Estimate', num_sims));
 legend('Trajectories', 'CARP Landing Point', 'Impact Points', 'Location', 'best');
 view(45, 30);
 
-%{
+
 num = length(data_out.weather.win_speed);
 wind_vec = ks2mps(data_out.weather.win_speed) / 1000 .* -[sind(data_out.weather.wind_direction), cosd(data_out.weather.wind_direction)];
-quiver3(zeros(num, 1), zeros(num, 1), ft2m(data_out.weather.alt_agl * 1000), wind_vec(:, 1), wind_vec(:, 2), zeros(num, 1))
-%}
+% quiver3(zeros(num, 1), zeros(num, 1), ft2m(data_out.weather.alt_agl * 1000), wind_vec(:, 1), wind_vec(:, 2), zeros(num, 1))
+
 
 hold off;
 

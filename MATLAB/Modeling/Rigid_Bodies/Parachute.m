@@ -19,6 +19,7 @@ classdef Parachute < Rigid_Body
         variable_ma
         is_deployed    % NEW: deployment flag
         t_deploy
+        t_cut
     end
 
     methods

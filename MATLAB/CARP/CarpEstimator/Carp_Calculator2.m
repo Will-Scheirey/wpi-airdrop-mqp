@@ -23,8 +23,8 @@ exit_time = 4.2;                      % sec from parachute ballistics
 DQ = 2.7;
 
 ballistic_wind = carp_data.wind_speed;
-wind_speed =carp_data.wind_speed;  % ft/s
-DZ_course = carp_data.heading;
+wind_speed = carp_data.wind_speed;  % ft/s
+DZ_course = -carp_data.heading;
 drift_correction = 0;
 
 % Altitude Calculations
