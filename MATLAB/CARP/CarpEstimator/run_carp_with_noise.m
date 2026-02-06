@@ -73,6 +73,8 @@ legend('Trajectories', 'CARP Landing Point', 'Impact Points', 'Location', 'best'
 view(45, 30);
 hold off;
 
+vel_inertial = zeros(length(all_results{1}.propagator.t_plot), 3);
+
 % Calculate impact statistics
 all_impacts = zeros(num_sims, 3);
 for i = 1:num_sims
@@ -80,3 +82,41 @@ for i = 1:num_sims
 end
 axis equal
 
+for idx = 1:length(all_results{1}.propagator.t_plot)
+
+    vel = all_results{1}.propagator.y_sim(idx, 4:6)';
+    quat = all_results{1}.propagator.y_sim(idx, 7:10);
+    rotm_p = ecef2body_rotm(quat);
+
+    vel_inertial(idx, :) = rotm_p * vel;
+end
+
+figure(2)
+clf
+subplot(3,1,1);
+plot(data_out.drop_t_plot, data_out.drop_estimates_smoothed.vel(:, 1), 'LineWidth', 1.5, 'DisplayName', 'Actual'); hold on
+plot(all_results{1}.propagator.t_plot, vel_inertial(:, 1), 'LineWidth', 1.5, 'DisplayName', 'Simulated')
+legend
+xlabel("Time (s)")
+ylabel("Velocity (m/s)")
+title("Vel X")
+xlim([data_out.drop_t_plot(1), data_out.drop_t_plot(end)])
+
+subplot(3,1,2);
+plot(data_out.drop_t_plot, data_out.drop_estimates_smoothed.vel(:, 2), 'LineWidth', 1.5, 'DisplayName', 'Actual'); hold on
+plot(all_results{1}.propagator.t_plot, vel_inertial(:, 2), 'LineWidth', 1.5, 'DisplayName', 'Simulated')
+legend
+xlabel("Time (s)")
+ylabel("Velocity (m/s)")
+title("Vel Y")
+xlim([data_out.drop_t_plot(1), data_out.drop_t_plot(end)])
+
+
+subplot(3,1,3);
+plot(data_out.drop_t_plot, data_out.drop_estimates_smoothed.vel(:, 3), 'LineWidth', 1.5, 'DisplayName', 'Actual'); hold on
+plot(all_results{1}.propagator.t_plot, vel_inertial(:, 3), 'LineWidth', 1.5, 'DisplayName', 'Simulated')
+legend
+xlabel("Time (s)")
+ylabel("Velocity (m/s)")
+title("Vel Z")
+xlim([data_out.drop_t_plot(1), data_out.drop_t_plot(end)])

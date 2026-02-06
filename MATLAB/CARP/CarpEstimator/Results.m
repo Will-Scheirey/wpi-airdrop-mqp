@@ -10,6 +10,9 @@ if isempty(final_idx)
     warning('Payload did not reach ground! Final altitude: %.2f m', payload_altitude(end));
 end
 
+prop.t_plot = t;
+prop.y_sim = y;
+
 % Store trajectory data for visualization
 prop.time = t(1:final_idx);
 prop.trajectory = y(1:final_idx, 1:3);  % East, North, Up (ENU position)

@@ -22,14 +22,15 @@ function results = Carp_Estimator(NameValueArgs)
 
     %% STEP 1: Run CARP Calculator (Mission Planning Tool)
     carp_results = Carp_Calculator(NameValueArgs);
+
+    single_radius = 9.7536;      % m (64 ft diameter / 2)
     
     %% STEP 2: Create Parachute System
     parachute_system1 = Create_Parachute(...
-        NameValueArgs.num_parachutes, 3);
-    parachute_system1.R = 2;
+        NameValueArgs.num_parachutes, 1.3, 2);
 
     parachute_system2 = Create_Parachute(...
-    NameValueArgs.num_parachutes, 30);
+    NameValueArgs.num_parachutes, 30, single_radius);
 
     %%STEP 3: Create Payload System
     payload = Create_Payload(NameValueArgs.w, NameValueArgs.l, NameValueArgs.h,NameValueArgs.m);

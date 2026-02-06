@@ -21,27 +21,25 @@ classdef Two_Stage_Model < Parachute_Model_Wind
         end
 
         function x_dot = ode_fcn(obj, t, x)
-            disp(t)
             % Check if parachute should deploy
-
             if t >= obj.parachute2.t_deploy
                 if ~obj.parachute2.is_deployed
                     fprintf('*** PARACHUTE 2 DEPLOYED at t = %.2f seconds ***\n', t);
                 end
                 obj.parachute2.is_deployed = true;
                 obj.parachute = obj.parachute2;
+
             elseif t >= obj.parachute1.t_deploy
                 if ~obj.parachute1.is_deployed
                     fprintf('*** PARACHUTE 1 DEPLOYED at t = %.2f seconds ***\n', t);
                 end
                 obj.parachute1.is_deployed = true;
                 obj.parachute = obj.parachute1;
-            else
-                obj.parachute1.is_deployed = false;
-                obj.parachute = obj.parachute1;
             end
                 
             x_dot = ode_fcn@Parachute_Model_Wind(obj, t, x);
+
+            % obj.parachute.R
         end
     end
 end

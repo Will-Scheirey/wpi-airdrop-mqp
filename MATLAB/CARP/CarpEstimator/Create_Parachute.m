@@ -1,10 +1,9 @@
-function parachute = Create_Parachute(num_parachutes, t_deploy)
+function parachute = Create_Parachute(num_parachutes, t_deploy, r)
     if nargin < 2
         t_deploy = 0;  % Default: immediate deployment
     end
     
     % Single G-12D parameters
-    single_radius = 9.7536;      % m (64 ft diameter / 2)
     single_mass = 57;            % kg (125 lb per chute)
     riser_length = 18.28;        % m (60 ft published)
     riser_k = 26000;             % N/m per riser
@@ -17,7 +16,7 @@ function parachute = Create_Parachute(num_parachutes, t_deploy)
     
     use_drag = true;
     
-    parachute = Parachute(single_radius, ...
+    parachute = Parachute(r, ...
         single_mass, ...
         riser_length, ...
         riser_k, ...
