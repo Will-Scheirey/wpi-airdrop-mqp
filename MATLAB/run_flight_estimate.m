@@ -11,10 +11,11 @@ full_dir = fullfile(parent_dir, drop_dir);
 %% Run Data
 data_out = get_flight_estimates(full_dir);
 
-
 %% Plot Data
-fig_idx = plot_estimates(data_out);
+fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates_smoothed");
+% fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates");
 
+return
 fig_idx = plot_meas(data_out.measurements.gps, ...
     data_out.measurements.accel, ...
     data_out.measurements.gyro, ...
@@ -28,7 +29,7 @@ fig_idx = plot_meas(data_out.stationary_measurements.data_gps, ...
     data_out.stationary_measurements.data_mag, ...
     data_out.stationary_measurements.data_baro, ...
     data_out.stationary_measurements.data_gps_vel, fig_idx);
-w
+
 return
 
 time = data_out.measurements.gps_all.GNSS.datetime_utc(end);

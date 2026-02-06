@@ -33,12 +33,18 @@ classdef Dynamic_Model < matlab.System
                 abs_tol = 1e-12;
             end
 
-            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol); % Set solver tolerance
+            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol, 'Events', @myEvent); % Set solver tolerance
 
             [t, y] = ode15s(@obj.ode_fcn, tspan, x0, options);
 
             obj.time_history  = t;
             obj.state_history = y;
+
+            function [value, isterminal, direction] = myEvent(t, y)
+                value = y(3) > 0;
+                isterminal = 1;     % Stop the integration
+                direction = 0;      % Any direction
+            end
         end
 
         function [a_b, alpha_b] = calc_accel(~, V_b, w_b, m, I, F_b, M_b)

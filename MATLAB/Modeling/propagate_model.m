@@ -4,12 +4,14 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         NameValueArgs.use_drag
         NameValueArgs.payload
         NameValueArgs.parachute
+        NameValueArgs.parachute2
         NameValueArgs.x0
         NameValueArgs.tspan
         NameValueArgs.model
         NameValueArgs.riser
         NameValueArgs.variable_parachute_mass
         NameValueArgs.damping
+        NameValueArgs.weather
     end
 
     if isfield(NameValueArgs, 'use_drag')
@@ -93,15 +95,16 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'x0')
         x0 = NameValueArgs.x0;
     else
+        v0 = 300;
         % --- Payload ---
-        P0   = [0; 0; 5500];              % ENU position      [m]
+        P0   = [v0; 0; 3000];              % ENU position      [m]
         V_p0 = [300; 0; 0];                % ENU velocity      [m   s^-1]
         e_p0 = eul2quat([0, 0, 0])'; % Orientation
         w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
         
         % --- Parachute ---
-        P0_c = P0 + [0; 2; 10];           % ENU Position      [m]
-        V_c0 = [280; 0; 0] * 0;                % ENU velocity      [m   s^-1]
+        P0_c = P0 + [0; 0; parachute.l0];           % ENU Position      [m]
+        V_c0 = [v0; 0; 0] * 0;                % ENU velocity      [m   s^-1]
         e_c0 = eul2quat([0, 0, 0])';  % Orientation
         w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
         
@@ -129,9 +132,9 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'model')
         model = NameValueArgs.model;
     else
-        model = @Parachute_Model_Wind;
+        model = @Parachute_Model_Simple;
     end
 
-    model_obj = model(payload, parachute, x0);
+    model_obj = model(payload, parachute, NameValueArgs.parachute2, x0, NameValueArgs.weather);
     [t, y] = model_obj.run_model(x0, tspan);
 end
