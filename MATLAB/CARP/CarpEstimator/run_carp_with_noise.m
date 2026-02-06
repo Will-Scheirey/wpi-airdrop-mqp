@@ -7,11 +7,12 @@ parent_dir = "haars_data";
 drop_dir = "DN149_Lt1_n12_08052025_side";
 full_dir = fullfile(parent_dir, drop_dir);
 
-%% Run Data
+%% Get flight Estimates
 data_out = get_flight_estimates(full_dir);
 
 carp_data = data_out.carp;
 
+%% Run Simulations
 % Number of simulations
 num_sims = 1;
 
@@ -70,6 +71,13 @@ zlabel('Altitude [m]');
 title(sprintf('%d Airdrop Simulations with CARP Estimate', num_sims));
 legend('Trajectories', 'CARP Landing Point', 'Impact Points', 'Location', 'best');
 view(45, 30);
+
+%{
+num = length(data_out.weather.win_speed);
+wind_vec = ks2mps(data_out.weather.win_speed) / 1000 .* -[sind(data_out.weather.wind_direction), cosd(data_out.weather.wind_direction)];
+quiver3(zeros(num, 1), zeros(num, 1), ft2m(data_out.weather.alt_agl * 1000), wind_vec(:, 1), wind_vec(:, 2), zeros(num, 1))
+%}
+
 hold off;
 
 axis equal
@@ -106,7 +114,6 @@ xlabel("Time (s)")
 ylabel("Velocity (m/s)")
 title("Vel Y")
 xlim([data_out.drop_t_plot(1), data_out.drop_t_plot(end)])
-
 
 subplot(3,1,3);
 plot(data_out.drop_t_plot, data_out.drop_estimates_smoothed.vel(:, 3), 'LineWidth', 1.5, 'DisplayName', 'Actual'); hold on
