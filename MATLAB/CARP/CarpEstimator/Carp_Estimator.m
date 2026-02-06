@@ -21,7 +21,7 @@ function results = Carp_Estimator(NameValueArgs)
     end
 
     %% STEP 1: Run CARP Calculator (Mission Planning Tool)
-    carp_results = Carp_Calculator(NameValueArgs);
+    carp_results = Carp_Calculator2(NameValueArgs.carp_data);
 
     single_radius = 9.7536;      % m (64 ft diameter / 2)
     
@@ -49,11 +49,12 @@ function results = Carp_Estimator(NameValueArgs)
         'tspan', NameValueArgs.tspan, ...
         'parachute', parachute_system1, ...
         'parachute2', parachute_system2, ...
-        'payload', payload, 'weather', the_weather, 'model', @Two_Stage_Model);
+        'payload', payload, ...
+        'weather', the_weather, ...
+        'model', @Two_Stage_Model);
 
     %% STEP 5: Extract Final State 
     results = Results(carp_results, t, y, model_obj, NameValueArgs.num_parachutes);
-
 end
 
 
