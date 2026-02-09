@@ -31,6 +31,8 @@ classdef Airdrop_Filter < Abstract_Filter
         % --- Histories ---
         hist_idx
         accel_calc_all
+        accel_meas_all
+        accel_rot_all
         trust_accel_all
         quat_meas_all
         down_vec_all
@@ -194,10 +196,6 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function e_out = get_e(obj)
             e_out   = obj.x_curr(obj.x_inds.e);
-        end
-
-        function w_b_out = get_w_b(obj)
-            w_b_out  = obj.x_curr(obj.x_inds.w_b);
         end
 
         function b_g_out = get_b_g(obj)
@@ -553,6 +551,7 @@ classdef Airdrop_Filter < Abstract_Filter
             w_meas_b = u.gyro';
 
             b_g = obj.get_b_g();
+            w_corr = (w_meas_b - b_g);
 
             % ---- Allocate output ----
             nx   = numel(obj.x_curr);
@@ -563,7 +562,6 @@ classdef Airdrop_Filter < Abstract_Filter
             dV_dt = obj.calc_accel(a_meas_b);                         % C_bi*(a - b_a) + g_vec_e
 
             % Use gyro as input:
-            w_corr = (w_meas_b - b_g);
             de_dt  = -0.5 * quat_kinematic_matrix(w_corr) * e;
 
             % ---- Bias models (same as your current: random walk / constant) ----
@@ -582,6 +580,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % ---- Logging (keep exactly what you had) ----
             obj.accel_calc_all(obj.hist_idx, :) = dV_dt.';
+            obj.accel_meas_all(obj.hist_idx, :) = a_meas_b;
         end
 
         function H = h_jacobian_states(obj, meas_idx)
@@ -666,7 +665,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function a_e = calc_accel(obj, a)
             e = obj.get_e();
-            C_bi = ecef2body_rotm(e);          % body -> inertial
+            C_bi = ecef2body_rotm(e);
 
             b_a = obj.get_b_a();
 

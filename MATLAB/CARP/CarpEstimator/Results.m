@@ -33,6 +33,7 @@ prop.landing_time = t(final_idx);
 prop.east_displacement = y(final_idx, 1);
 prop.north_displacement = y(final_idx, 2);
 prop.total_horizontal_displacement = sqrt(prop.east_displacement^2 + prop.north_displacement^2);
+prop.model_obj = model_obj;
 
 % Descent rate analysis
 if final_idx > 1

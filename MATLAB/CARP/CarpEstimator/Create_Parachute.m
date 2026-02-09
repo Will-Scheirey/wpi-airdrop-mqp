@@ -1,13 +1,12 @@
-function parachute = Create_Parachute(num_parachutes, t_deploy, r)
+function parachute = Create_Parachute(num_parachutes, t_deploy, r, m)
     if nargin < 2
         t_deploy = 0;  % Default: immediate deployment
     end
     
     % Single G-12D parameters
-    single_mass = 57;            % kg (125 lb per chute)
     riser_length = 18.28;        % m (60 ft published)
-    riser_k = 1000;             % N/m per riser
-    riser_c = 1000;               % N·s/m system damping
+    riser_k = 26000;             % N/m per riser
+    riser_c = 700;               % N·s/m system damping
     
     % REALISTIC PARACHUTE PARAMETERS
     % using vertical-only drag, these can be physically realistic
@@ -17,7 +16,7 @@ function parachute = Create_Parachute(num_parachutes, t_deploy, r)
     use_drag = true;
     
     parachute = Parachute(r, ...
-        single_mass, ...
+        m, ...
         riser_length, ...
         riser_k, ...
         riser_c, ...

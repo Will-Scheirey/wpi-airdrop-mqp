@@ -7,8 +7,8 @@ classdef Parachute < Rigid_Body
         A          % Area
         V          % Volume
         l0         % Riser rest length
-        k_riser    % Riser spring stiffness
-        c_riser    % Riser spring damping coefficient
+        k_riser0    % Riser spring stiffness
+        c_riser0    % Riser spring damping coefficient
         P_attach_B % Attachment point of riser in body frame
         porosity   % Parachute porosity
         eta % Parachute efficiency
@@ -32,8 +32,8 @@ classdef Parachute < Rigid_Body
 
             obj.P_attach_B = [R*1.5; 0; 0];
 
-            obj.k_riser = k;
-            obj.c_riser = c;
+            obj.k_riser0 = k;
+            obj.c_riser0 = c;
 
             obj.mc = mc;
 
@@ -65,12 +65,18 @@ classdef Parachute < Rigid_Body
             obj.t_deploy = 0;
         end
 
-        function Cd_out = Cd(obj, ~)
+        function Cd_out = Cd(obj, aoa)
             if obj.is_deployed
-                Cd_out = obj.Cd_0 * obj.eta;
+                % aoa: angle between canopy axis (+x_B) and relative wind
+                % Blend between normal-incidence Cd0 and edge-on Cedge
+                Cd0   = 1.42;   % hemi-parachute normal-incidence: depending on porosity, reefing, and inflation
+                Cedge = 0.05;   % small edge-on residual: depending on line count, risers, and fittings
+                c  = cos(aoa); s = sin(aoa);
+                Cd_out = Cd0*(c*c) + Cedge*(s*s);
             else
                 Cd_out = 0;  % No drag before deployment
             end
+            Cd_out = Cd_out * obj.eta;
         end
 
         function S_out = S(obj, ~)
@@ -116,6 +122,24 @@ classdef Parachute < Rigid_Body
                 -I_XY,  I_YY, -I_YZ;
                 -I_XZ, -I_YZ,  I_ZZ;
                 ];
+        end
+
+        function k_out = k_riser(obj)
+            if obj.is_deployed
+                k_out = obj.k_riser0;
+            else
+                k_out = 0;
+            end
+            % k_out = obj.k_riser0;
+        end
+        
+        function c_out = c_riser(obj)
+            if obj.is_deployed
+                c_out = obj.c_riser0;
+            else
+                c_out = 0;
+            end
+            c_out = obj.c_riser0;
         end
 
     end

@@ -126,7 +126,6 @@ sm.initialize(true, flight_measurements.accel.data(1, :)', ...
 
 sm.set_forward_results(kf.x_hist, kf.P_hist, kf.F_hist, kf.Q_hist);
 
-
 % tspan_s = tspan(find(tspan > drop_time, 1):find(tspan > land_time, 1));
 tspan_s = tspan(1:find(tspan > drop_time, 1));
 

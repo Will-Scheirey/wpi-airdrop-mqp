@@ -11,12 +11,12 @@ function results = Carp_Estimator(NameValueArgs)
         NameValueArgs.DZ_course (1,1) double = 302           % degrees
         NameValueArgs.num_parachutes (1,1) double = 1       % Number of parachutes
         NameValueArgs.parachute_deploy_time (1,1) double = 0  % Parachute deployment time
-        NameValueArgs.tspan = linspace(0, 90, 2000)
+        NameValueArgs.tspan = linspace(0, 100, 1e4)
         NameValueArgs.visualize (1,1) logical = true
         NameValueArgs.w (1,1) double = 48 %dimensions of payload in inches
         NameValueArgs.l (1,1) double = 83
         NameValueArgs.h (1,1) double = 43
-        NameValueArgs.m (1,1) double = 500 %mass of payload in lbs
+        NameValueArgs.m (1,1) double = 1200 %mass of payload in lbs
         NameValueArgs.carp_data = []
     end
 
@@ -27,11 +27,13 @@ function results = Carp_Estimator(NameValueArgs)
     
     %% STEP 2: Create Parachute System
     parachute_system1 = Create_Parachute(...
-        NameValueArgs.num_parachutes, 5, 2);
+        NameValueArgs.num_parachutes, 2, 2, 10);
     parachute_system1.t_cut = 38;
 
+    single_mass = 57;            % kg (125 lb per chute)
+
     parachute_system2 = Create_Parachute(...
-    NameValueArgs.num_parachutes, 41, single_radius);
+    NameValueArgs.num_parachutes, 40, single_radius, single_mass);
 
     %%STEP 3: Create Payload System
     payload = Create_Payload(NameValueArgs.w, NameValueArgs.l, NameValueArgs.h,NameValueArgs.m);
@@ -45,6 +47,8 @@ function results = Carp_Estimator(NameValueArgs)
     the_weather.win_speed = ks2mps(the_weather.win_speed);
     the_weather.alt_agl = ft2m(1000 * the_weather.alt_agl);
     the_weather.alt_agl(1) = 0;
+
+    the_weather.alt_agl = the_weather.alt_agl;
     
     %% STEP 5: Run High-Fidelity Propagator 
     [t, y, model_obj] = propagate_model(...

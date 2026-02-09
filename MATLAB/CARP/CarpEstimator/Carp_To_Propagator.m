@@ -12,7 +12,7 @@ function x0 = Carp_To_Propagator(carp, carp_data)
     % ENU velocity components (aircraft velocity at release)
     V_east = gs_ms * sin(heading_rad);
     V_north = gs_ms * cos(heading_rad);
-    V_up = 0;  % Level flight - NO VERTICAL VELOCITY at release
+    V_up = 4;  % Level flight - NO VERTICAL VELOCITY at release
     
     % --- Payload Initial Conditions ---
     P0 = [0; 0; alt_m];                     % ENU position [m]
@@ -29,9 +29,9 @@ function x0 = Carp_To_Propagator(carp, carp_data)
     P0_c = P0 + [0; 0; 1];  % 1m above payload (within riser length)
     
     % Parachute already deployed and descending
-    initial_descent = 0;  %starts at rest
+    initial_descent = 4;  %starts at rest
     V_c0_ENU = [V_east; V_north; initial_descent];
-    e_c0 = e_p0;  % Canopy facing up (no rotation)
+    e_c0 = eul2quat([0, 0, pi/2 + heading_rad], 'XYZ')';  % Canopy facing up (no rotation)
     w_c0 = [0; 0; 0];
     
     % Also pass parachute velocity in ENU frame (no transformation)

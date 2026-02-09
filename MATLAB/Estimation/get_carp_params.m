@@ -3,6 +3,7 @@ function carp_out = get_carp_params(data)
 t_drop_idx = find(data.t_plot > data.drop_info.time_drop, 1);
 
 v_drop   = mps2ks(data.estimates.vel(t_drop_idx, 1:2));
+% alt_drop = data.estimates.pos(t_drop_idx, 3) - data.estimates.pos(end, 3);
 alt_drop = data.estimates.pos(t_drop_idx, 3) - data.estimates.pos(end, 3);
 
 heading = atan2d(v_drop(1), v_drop(2));

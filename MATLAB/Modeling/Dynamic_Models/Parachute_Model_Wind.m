@@ -4,6 +4,8 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
 
     properties
         wind_data
+
+        windspeed_c
     end
 
     methods
@@ -20,6 +22,7 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
         function x_dot = ode_fcn(obj, t, x)
             % Check if parachute should deploy
 
+            % disp(t)
             obj.get_states(x);
 
             [F_p, F_c, M_p, M_c] = obj.equations_of_motion();
@@ -84,6 +87,8 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
 
         function wind_vec = get_wind(obj, alt)
             wind_speed_interp = interp1(obj.wind_data.alt_agl, obj.wind_data.win_speed,      alt);
+            % wind_speed_interp = wind_speed_interp;
+            
             wind_angle_interp = interp1(obj.wind_data.alt_agl, obj.wind_data.wind_direction, alt);
             
             wind_vec = -wind_speed_interp .* [sind(wind_angle_interp); cosd(wind_angle_interp); 0];
@@ -135,19 +140,16 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
 
         function [f_p, f_c] = calc_drag(obj)
 
-            alt = obj.P_p(3);  % WARNING: only valid if your "E" frame z is actually AGL
+            alt = obj.P_p(3);
 
-            wind_e = obj.get_wind(alt);     % wind expressed in E/world frame
+            wind_e = obj.get_wind(alt);
 
-
-            % Convert body velocities to E/world for relative wind subtraction
             Vp_e = obj.C_EB_p' * obj.V_p;
             Vc_e = obj.C_EB_c' * obj.V_c;
 
             v_rel_p_e = Vp_e - wind_e;
             v_rel_c_e = Vc_e - wind_e;
 
-            % Convert relative air velocity back to body for AoA + drag direction
             v_rel_p_b = obj.C_EB_p * v_rel_p_e;
             v_rel_c_b = obj.C_EB_c * v_rel_c_e;
 
@@ -159,6 +161,15 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
 
             if any(isnan(f_p)), f_p = [0;0;0]; end
             if any(isnan(f_c)), f_c = [0;0;0]; end
+
+            obj.aoa_p_curr = aoa_p;
+            obj.aoa_c_curr = aoa_c;
+
+            obj.drag_force_p = f_p;
+            obj.drag_force_c = f_c;
+
+            obj.windspeed_c = v_rel_c_e;
+            obj.aoa_c_curr = aoa_c;
         end
 
         function [f_p, f_c] = calc_riser_force(obj)
@@ -182,8 +193,8 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
                 );
 
             spring = struct('l0', obj.parachute.l0, ...
-                'k', obj.parachute.k_riser, ...
-                'c', obj.parachute.c_riser);
+                'k', obj.parachute.k_riser(), ...
+                'c', obj.parachute.c_riser());
 
             F_spring_e = spring_force(obj1, obj2, spring, true);
 

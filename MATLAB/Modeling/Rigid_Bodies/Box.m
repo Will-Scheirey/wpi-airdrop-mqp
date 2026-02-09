@@ -26,7 +26,7 @@ classdef Box < Rigid_Body
 
             if nargin == 5
                 if drag
-                    obj.Cd_0 = 0.9; % Rough approx.
+                    obj.Cd_0 = 0.9;
                 else
                     obj.Cd_0 = 0;
                 end

@@ -29,7 +29,7 @@ function [varargout] = get_model_property(t, y, model, varargin)
     end
 
     for i = 1:num_steps
-        model.ode_fcn(t, y(i, :)');
+        model.ode_fcn(t(i), y(i, :)');
 
         for n = 1:num_properties
             property_name = varargin{n};

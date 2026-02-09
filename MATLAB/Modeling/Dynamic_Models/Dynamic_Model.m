@@ -26,16 +26,17 @@ classdef Dynamic_Model < matlab.System
         function [t, y] = run_model(obj, x0, tspan, rel_tol, abs_tol)
             obj.x0 = x0;
 
+            tol = 1e-10;
             if nargin < 4
-                rel_tol = 1e-12;
+                rel_tol = tol;
             end
             if nargin < 5
-                abs_tol = 1e-12;
+                abs_tol = tol;
             end
 
-            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol, 'Events', @myEvent); % Set solver tolerance
+            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol, 'MinStep', 1e-12, 'Events', @myEvent); % Set solver tolerance
 
-            [t, y] = ode15s(@obj.ode_fcn, tspan, x0, options);
+            [t, y] = ode78(@obj.ode_fcn, tspan, x0, options);
 
             obj.time_history  = t;
             obj.state_history = y;
@@ -56,13 +57,5 @@ classdef Dynamic_Model < matlab.System
     methods (Abstract)
         get_states(obj, x);
         x_dot = ode_fcn(obj, t, x_curr);
-    end
-
-    methods (Access = protected)
-        function y = stepImpl(obj,u)
-            % Implement algorithm. Calculate y as a function of input u and
-            % internal states.
-            y = u;
-        end
     end
 end
