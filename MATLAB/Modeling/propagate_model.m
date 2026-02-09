@@ -135,6 +135,13 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         model = @Parachute_Model_Simple;
     end
 
-    model_obj = model(payload, parachute, NameValueArgs.parachute2, x0, NameValueArgs.weather);
+    if isfield(NameValueArgs, 'parachute2')
+        model_obj = model(payload, parachute, NameValueArgs.parachute2, x0, NameValueArgs.weather);
+    elseif isfield(NameValueArgs, 'weather')
+        model_obj = model(payload, parachute, NameValueArgs.weatherx);
+    else
+        model_obj = model(payload, parachute, x0);
+    end
+
     [t, y] = model_obj.run_model(x0, tspan);
 end
