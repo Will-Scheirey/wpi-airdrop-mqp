@@ -133,6 +133,7 @@ xlim(t_plot_drop)
 fig_idx = new_fig(fig_idx);
 clf
 plot(tspan, kf.accel_calc_all, 'LineWidth', 2); hold on
+plot(tspan, vecnorm(kf.accel_calc_all, 2, 2));
 legend("a_1", "a_2", "a_3")
 xlim([t_plot(1)+1, t_plot(end)])
 % xlim(t_plot_drop)
@@ -200,7 +201,7 @@ idx = 1;
 plot_cov(kf.P_hist(idx,idx,:)); hold on
 plot(pos_inno_tstep(good_pos_inno), x_pos_inno)
 xlabel("Timestep")
-ylabel("Variance (rm/s)")
+ylabel("Variance (m/s)")
 title("X Position Variance and Innovation")
 % xlim([0, 26313])
 ylim([-7, 7])
@@ -213,8 +214,18 @@ idx = 2;
 plot_cov(kf.P_hist(idx,idx,:)); hold on
 plot(pos_inno_tstep(good_pos_inno), y_pos_inno)
 xlabel("Timestep")
-ylabel("Variance (rm/s)")
+ylabel("Variance (m/s)")
 title("X_1 Position Variance")
+
+fig_idx = new_fig(fig_idx);
+clf
+y_pos_inno = pos_inno(good_pos_inno, 3);
+idx = 3;
+plot_cov(kf.P_hist(idx,idx,:)); hold on
+plot(pos_inno_tstep(good_pos_inno), y_pos_inno)
+xlabel("Timestep")
+ylabel("Variance (m/s)")
+title("Altitude Variance")
 
 fig_idx = new_fig(fig_idx);
 clf
