@@ -49,5 +49,5 @@ function example_HALO_Manual()
     outputs = HARPComputer.compute(data_out);
     
     % Plot
-    plotHARP(outputs, outputs.inputs);
+    plotHARP2(outputs, outputs.inputs);
 end
