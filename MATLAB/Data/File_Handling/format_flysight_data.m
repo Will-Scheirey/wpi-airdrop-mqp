@@ -77,8 +77,7 @@ drop_info = get_drop_info(data_accel_all,...
 mean_window = smooth_window;
 data_gyro_all.data  = movmean(data_gyro_all.data, mean_window, 1);
 data_accel_all.data = movmean(data_accel_all.data, mean_window, 1);
-data_gps_all.data = movmean(data_gps_all.data, mean_window, 1);
-
+% data_gps_all.data = movmean(data_gps_all.data, mean_window, 1);
 
 %% Calculate Time Span
 if isempty(drop_info)
@@ -166,21 +165,30 @@ dt_min_baro  = min(diff(data_baro.time));
 
 data_vel.data = data_vel.data;
 
-dt_mult = 1;
+dt_mult = 1/4;
 
 if ~isempty(data_gps_all)
-    measurements = {data_gps, data_mag, data_vel};
-    % measurements = {data_gps, data_mag(data_mag.time < drop_info.time_drop, :), data_baro};
+    measurements = {data_gps, data_mag(data_mag.time < drop_info.time_drop, :), data_baro, data_vel};
     dt_min_gps   = min(diff(data_gps.time));
     dt          = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) * dt_mult;
-
 else
     measurements = {data_mag, data_gyro};
     dt          = min([dt_min_accel, dt_min_mag, dt_min_gyro, dt_min_baro]) * dt_mult;
 end
-inputs = table(data_accel.time, data_accel.data, data_gyro.data, ...
-    'VariableNames', {'time', 'accel', 'gyro'});
 
 tspan = t_start : dt : t_start + t_dur;
+
+accel_interp = interp1(data_accel.time, data_accel.data, tspan);
+gyro_interp = interp1(data_gyro.time, data_gyro.data, tspan);
+
+good = ~isnan(accel_interp(:, 1));
+
+accel_interp = accel_interp(good, :);
+gyro_interp = gyro_interp(good, :);
+
+inputs = table(tspan(good)', accel_interp, gyro_interp, ...
+    'VariableNames', {'time', 'accel', 'gyro'});
+
+
 
 end

@@ -5,7 +5,7 @@ addpath(genpath("weather"));
 addpath(genpath("haars_data"));
 
 parent_dir = "haars_data";
-drop_dir = "DN149_Lt1_n12_08052025_side";
+drop_dir = "DN153_Lt1_n16_08052025_Inside";
 full_dir = fullfile(parent_dir, drop_dir);
 
 %% Run Data
@@ -15,7 +15,7 @@ data_out = get_flight_estimates(full_dir);
 fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates_smoothed");
 % fig_idx = plot_estimates(data_out, data_out.t_plot, data_out.tspan, "estimates");
 
-return
+%{
 fig_idx = plot_meas(data_out.measurements.gps, ...
     data_out.measurements.accel, ...
     data_out.measurements.gyro, ...
@@ -23,13 +23,19 @@ fig_idx = plot_meas(data_out.measurements.gps, ...
     data_out.measurements.baro, ...
     data_out.measurements.gps_vel, fig_idx);
 
+fig_idx = new_fig(fig_idx);
+plot(data_out.inputs.time, data_out.inputs.accel); hold on
+%}
+% data_out.measurements.accel
+
+%{
 fig_idx = plot_meas(data_out.stationary_measurements.data_gps, ...
     data_out.stationary_measurements.data_accel, ...
     data_out.stationary_measurements.data_gyro, ...
     data_out.stationary_measurements.data_mag, ...
     data_out.stationary_measurements.data_baro, ...
     data_out.stationary_measurements.data_gps_vel, fig_idx);
-
+%}
 return
 
 time = data_out.measurements.gps_all.GNSS.datetime_utc(end);

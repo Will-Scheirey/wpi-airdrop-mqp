@@ -196,10 +196,6 @@ classdef Airdrop_Filter < Abstract_Filter
             e_out   = obj.x_curr(obj.x_inds.e);
         end
 
-        function w_b_out = get_w_b(obj)
-            w_b_out  = obj.x_curr(obj.x_inds.w_b);
-        end
-
         function b_g_out = get_b_g(obj)
             b_g_out = obj.x_curr(obj.x_inds.b_g);
         end
@@ -329,7 +325,14 @@ classdef Airdrop_Filter < Abstract_Filter
                     fprintf("%d / %d (t=%.6f)\n", ii, num_steps, t0);
                 end
 
-                % Log state before propagation (matches your original style)
+                %{
+                if t0 > drop_time
+                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = eye(3) * 1e-6;
+                    obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = eye(3) * 1e-4;
+                    obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = eye(3) * 1e-4;
+                end
+                %}
+
                 obj.x_hist(:, i) = obj.x_curr;
 
                 % Helper lambdas to keep code readable
@@ -513,7 +516,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 2*a0*e1 + 2*a1*e2 + 2*a2*e3 ...
                 ];
 
-            A(V, BA) = -C_bi';
+            A(V, BA) = -C_bi;
 
             % =========================================================================
             % Quaternion kinematics Jacobian rows (dx6dx..dx9dx)
@@ -860,7 +863,6 @@ classdef Airdrop_Filter < Abstract_Filter
             % y = C*m  => dy/dq = (dC/dq)*m
             Jq = [dC_dw*m, dC_dx*m, dC_dy*m, dC_dz*m];
         end
-
     end
 
 end

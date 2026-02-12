@@ -288,8 +288,8 @@ y_pos = p_est(drop_idx, 2) - p_est(find(drop_idx, 1), 2);
 z_pos = p_est(drop_idx, 3);
 
 yyaxis left
-plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), x_pos, 'LineWidth', 1.5, 'DisplayName', 'X'); hold on;
-plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), y_pos, 'LineWidth', 1.5, 'DisplayName', 'Y'); hold on;
+plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), x_pos, '.-b', 'DisplayName', 'X', 'MarkerSize', 6); hold on;
+plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), y_pos,  '.-g','DisplayName', 'Y', 'MarkerSize', 6); hold on;
 ylabel("X, Y Position (m)")
 
 yyaxis right
