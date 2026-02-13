@@ -64,7 +64,7 @@ Q_mb = eye(3) * (sigma_bm^2);
 sigma_bb = 1e-2;
 Q_bb = sigma_bb^2;
 
-sigma_vv = 1e-3;
+sigma_vv = 1e-5;
 Q_vv = sigma_vv^2 * eye(3);
 
 Q = blkdiag(...
