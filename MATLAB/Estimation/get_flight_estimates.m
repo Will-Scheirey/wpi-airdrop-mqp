@@ -1,6 +1,6 @@
 function data_out = get_flight_estimates(full_dir)
 
-smooth_window = 20;
+smooth_window = 1;
 alt_mean_window = 100;
 
 [dt, ...
@@ -27,7 +27,7 @@ R_pos = eye(3) * Rp^2;
 
 R_mag = blkdiag(sensor_var.mag(1), sensor_var.mag(2), sensor_var.mag(3)).^2;
 
-R_baro = (sensor_var.baro * 1e1)^2;
+R_baro = (sensor_var.baro * 1e2)^2;
 
 Rv = 2;
 R_vel = eye(3) * Rv^2;
@@ -40,7 +40,7 @@ R = blkdiag( ...
     );
 
 % accel noise covariance
-sigma_a = sqrt(sensor_var.accel(:)) * 5e2;
+sigma_a = sqrt(sensor_var.accel(:)) * 1e3;
 Sa = diag(sigma_a.^2);
 
 Q_PV = [ (dt^4/4)*Sa, (dt^3/2)*Sa;
