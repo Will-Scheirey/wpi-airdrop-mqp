@@ -324,15 +324,13 @@ classdef Airdrop_Filter < Abstract_Filter
                 if verbose && mod(ii, 1) == 0
                     fprintf("%d / %d (t=%.6f)\n", ii, num_steps, t0);
                 end
-
-                %{
+                
                 if t0 > drop_time
-                    obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = eye(3) * 1e-6;
-                    obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = eye(3) * 1e-4;
-                    obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = eye(3) * 1e-4;
+                    % obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = eye(3) * 1e-8;
+                    % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = eye(3) * 1e-4;
+                    % obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = eye(3) * 1e-4;
                 end
-                %}
-
+                
                 obj.x_hist(:, i) = obj.x_curr;
 
                 % Helper lambdas to keep code readable

@@ -165,10 +165,11 @@ dt_min_baro  = min(diff(data_baro.time));
 
 data_vel.data = data_vel.data;
 
-dt_mult = 1/6;
+dt_mult = 1;
 
 if ~isempty(data_gps_all)
     measurements = {data_gps, data_mag, data_baro, data_vel};
+    % measurements = {data_gps, data_baro, data_vel};
     dt_min_gps   = min(diff(data_gps.time));
     dt          = min([dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro]) * dt_mult;
 else
