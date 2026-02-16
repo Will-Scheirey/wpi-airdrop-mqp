@@ -4,8 +4,8 @@ function inputs = convertDataOutToInputs(data_out)
             inputs = struct();
             data_out.mission.type = 'HALO';
             data_out.mission.method = 'crew';
-            data_out.parachute = 'G-15'; 
-
+            data_out.parachute = loadParachuteDatabase('G-15'); 
+            data_out.parachute.weight = data_out.system_data.total_weight - data_out.system_data.payload_weight;
             %% MISSION CONFIGURATION
             if isfield(data_out, 'mission') && isfield(data_out.mission, 'type')
                 inputs.mission.type = data_out.mission.type;
