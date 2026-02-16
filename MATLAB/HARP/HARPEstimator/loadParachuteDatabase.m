@@ -44,6 +44,20 @@ function parachute = loadParachuteDatabase(parachuteType, weight)
             parachute.et = 1.0;
             parachute.dq = 2.0;
             parachute.forwardDrive = 0;  % Non-gliding
+
+        case 'G-15'
+            parachute = struct();
+            parachute.type = 'G-15';
+            parachute.weight = weight;
+            parachute.hvRoF = 0;  % Static line only
+            parachute.deployedRoF = 23.0;  % G-15 has slower descent than T-11
+            parachute.vd = 150;
+            parachute.dd = 0;
+            parachute.dt = 0;
+            parachute.tfc = 3.5;
+            parachute.et = 1.0;
+            parachute.dq = 2.0;
+            parachute.forwardDrive = 0;  % Non-gliding
             
         otherwise
             error('Parachute type %s not in database. Add to loadParachuteDatabase function.', parachuteType);
