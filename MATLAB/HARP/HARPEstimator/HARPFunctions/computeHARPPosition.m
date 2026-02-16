@@ -1,4 +1,4 @@
-function harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs, winds)
+function harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs)
             % Compute HARP position relative to PI
             
             harp = struct();

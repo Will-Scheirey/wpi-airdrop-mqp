@@ -2,7 +2,10 @@ function inputs = convertDataOutToInputs(data_out)
             % Convert data_out structure to HARP inputs format
             
             inputs = struct();
-            
+            data_out.mission.type = 'HALO';
+            data_out.mission.method = 'crew';
+            data_out.parachute = 'G-15'; 
+
             %% MISSION CONFIGURATION
             if isfield(data_out, 'mission') && isfield(data_out.mission, 'type')
                 inputs.mission.type = data_out.mission.type;
