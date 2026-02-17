@@ -19,7 +19,7 @@ function altitudes = computeAltitudes(inputs, constants)
             end
             
             % Item 7: Drop Absolute Altitude
-            altitudes.dropAbsolute = altitudes.dropTrue - inputs.altitude.piElevation;
+            altitudes.dropAbsolute = altitudes.dropTrue; %- inputs.altitude.piElevation;
             
             % Item 9: Stabilization Altitude
             altitudes.stabilization = altitudes.dropAbsolute - inputs.parachute.vd;

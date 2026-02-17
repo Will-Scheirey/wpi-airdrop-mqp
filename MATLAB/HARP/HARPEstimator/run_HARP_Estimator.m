@@ -15,8 +15,6 @@ carp_data = data_out.carp;
 inputs = convertDataOutToInputs(data_out);
 outputs = computeHARP(inputs); 
 
-disp('Results structure:');
-disp(all_results);
 
 %% PLOT
 % Create 3D plot

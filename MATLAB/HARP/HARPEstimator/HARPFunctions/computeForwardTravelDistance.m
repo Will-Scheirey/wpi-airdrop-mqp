@@ -1,4 +1,4 @@
-function ftd = computeForwardTravelDistance(inputs, altitudes, winds, constants)
+function ftd = computeForwardTravelDistance(inputs, constants)
             % Compute forward travel distance
             
             ftd = struct();
@@ -7,8 +7,8 @@ function ftd = computeForwardTravelDistance(inputs, altitudes, winds, constants)
             ftd.ftt = inputs.parachute.et + inputs.parachute.dq;
             
             % Compute groundspeed
-            windDir = winds.dropAltitude(1);
-            windSpd = winds.dropAltitude(2);
+            windDir = inputs.winds.profile(2);
+            windSpd = inputs.winds.profile(3);
             trueCourse = inputs.aircraft.magneticCourse;
             
             % Wind correction angle

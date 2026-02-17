@@ -24,7 +24,7 @@ function outputs = computeHARP(inputs)
             deployedVector = computeDeployedVector(inputs, altitudes, arof, winds, constants);
             
             % Section 6: Compute Forward Travel Distance
-            ftd = computeForwardTravelDistance(inputs, altitudes, winds, constants);
+            ftd = computeForwardTravelDistance(inputs, constants);
             
             % Section 7: Compute Total Wind Effect and HARP
             harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs);
@@ -51,4 +51,5 @@ function outputs = computeHARP(inputs)
             
             % Display summary
             displayHARPSummary(outputs, inputs);
+            plotHARP2(outputs, inputs);
         end
