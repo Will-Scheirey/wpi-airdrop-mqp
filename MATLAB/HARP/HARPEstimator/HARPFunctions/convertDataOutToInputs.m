@@ -1,11 +1,17 @@
 function inputs = convertDataOutToInputs(data_out)
             % Convert data_out structure to HARP inputs format
-            
-            inputs = struct();
+           
             data_out.mission.type = 'HALO';
             data_out.mission.method = 'crew';
-            data_out.parachute = loadParachuteDatabase('G-15'); 
-            data_out.parachute.weight = data_out.system_data.total_weight - data_out.system_data.payload_weight;
+            data_out.Parachute_weight = data_out.system_data.total_weight - data_out.system_data.payload_weight;
+            data_out.parachute = loadParachuteDatabase('G-15', data_out.Parachute_weight); 
+            data_out.dz.altimeter_setting = 29.92; %Not given in Data, this is the typical value
+            data_out.dz.pi_elevation = data_out.system_data.dz_alt;
+            data_out.halo.actuation_altitude = data_out.system_data.planned_activation;
+            
+            inputs = struct();
+           
+            
             %% MISSION CONFIGURATION
             if isfield(data_out, 'mission') && isfield(data_out.mission, 'type')
                 inputs.mission.type = data_out.mission.type;
@@ -20,54 +26,30 @@ function inputs = convertDataOutToInputs(data_out)
             end
             
             %% PARACHUTE DATA
-            if isfield(data_out, 'parachute')
-                inputs.parachute = data_out.parachute;
+            
+            inputs.parachute = data_out.parachute;
                 
-                % Validate required fields
-                required = {'type', 'weight', 'hvRoF', 'deployedRoF', 'vd', ...
-                           'dd', 'dt', 'tfc', 'et', 'dq', 'forwardDrive'};
-                for i = 1:length(required)
-                    if ~isfield(inputs.parachute, required{i})
-                        error('Missing parachute parameter: %s', required{i});
-                    end
-                end
-            else
-                error('Parachute data must be provided in data_out.parachute');
-            end
+               
             
             %% ALTITUDES
             inputs.altitude = struct();
             
             % Drop altitude
-            if isfield(data_out, 'carp') && isfield(data_out.carp, 'altitude')
-                inputs.altitude.dropIndicatedTrue = data_out.carp.altitude;
-            else
-                error('Drop altitude required in data_out.carp.altitude');
-            end
+            inputs.altitude.dropIndicatedTrue = data_out.carp.altitude;
+            
             
             % DZ altimeter setting
-            if isfield(data_out, 'dz') && isfield(data_out.dz, 'altimeter_setting')
-                inputs.altitude.dzAltimeter = data_out.dz.altimeter_setting;
-            else
-                error('DZ altimeter setting required in data_out.dz.altimeter_setting');
-            end
+            
+            inputs.altitude.dzAltimeter = data_out.dz.altimeter_setting;
+           
             
             % PI elevation
-            if isfield(data_out, 'dz') && isfield(data_out.dz, 'pi_elevation')
-                inputs.altitude.piElevation = data_out.dz.pi_elevation;
-            elseif isfield(data_out, 'carp') && isfield(data_out.carp, 'land_location')
-                % Try to extract from land_location if it contains elevation
-                if isstruct(data_out.carp.land_location) && ...
-                   isfield(data_out.carp.land_location, 'elevation')
-                    inputs.altitude.piElevation = data_out.carp.land_location.elevation;
-                else
-                    error('PI elevation required');
-                end
-            else
-                error('PI elevation required in data_out.dz.pi_elevation');
-            end
+            
+            inputs.altitude.piElevation = data_out.dz.pi_elevation;
+            
             
             % Terrain elevation
+            
             if isfield(data_out, 'dz') && isfield(data_out.dz, 'terrain_elevation')
                 inputs.altitude.dzTerrain = data_out.dz.terrain_elevation;
             else
@@ -84,25 +66,19 @@ function inputs = convertDataOutToInputs(data_out)
             end
             
             % Actuation altitude (HALO only)
-            if strcmp(inputs.mission.type, 'HALO')
-                if isfield(data_out, 'halo') && isfield(data_out.halo, 'actuation_altitude')
-                    inputs.altitude.actuationAGL = data_out.halo.actuation_altitude;
-                else
-                    error('Actuation altitude required for HALO in data_out.halo.actuation_altitude');
-                end
-            end
+            
+                inputs.altitude.actuationAGL = data_out.halo.actuation_altitude;
+                
             
             %% TEMPERATURES
             inputs.temps = struct();
             
             if isfield(data_out, 'temps')
-                inputs.temps.drop = data_out.temps.drop;
-                inputs.temps.surface = data_out.temps.surface;
+                inputs.temps.drop = data_out.weather.temperature;
+                inputs.temps.surface = data_out.weather.temperature; %data_out.temps.surface;
                 if strcmp(inputs.mission.type, 'HALO')
-                    inputs.temps.actuation = data_out.temps.actuation;
-                else
-                    inputs.temps.actuation = data_out.temps.drop;
-                end
+                    inputs.temps.actuation = data_out.weather.temperature; %data_out.temps.actuation;
+                
             else
                 error('Temperature data required in data_out.temps');
             end
