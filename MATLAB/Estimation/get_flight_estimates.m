@@ -97,6 +97,7 @@ drop_t_plot = t_plot(drop_idx_start:drop_idx_stop) - t_plot(drop_idx_start);
 time_utc = all_measurements.gps_all.GNSS.datetime_utc(end);
 
 [~, weather] = load_weather(time_utc);
+weather.alt_agl(1) = 0;
 
 
 %% Get CARP Inputs
@@ -162,5 +163,14 @@ carp = get_carp_params(data_out);
 carp.system_data = system_data;
 
 data_out.carp = carp;
+
+winds = [weather.alt_agl, weather.direction, weather.win_speed];
+data_out.winds.profile = winds;
+
+drop_temp = interp1(weather.alt_agl, weather.temperature, carp.altitude / 1000);
+activation_temp = interp1(weather.alt_agl, weather.temperature, system_data.planned_activation / 1000);
+
+data_out.carp.drop_temp = drop_temp;
+data_out.carp.activation_temp = activation_temp;
 
 end

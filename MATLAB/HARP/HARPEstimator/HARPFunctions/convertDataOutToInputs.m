@@ -73,15 +73,15 @@ function inputs = convertDataOutToInputs(data_out)
             %% TEMPERATURES
             inputs.temps = struct();
             
-            if isfield(data_out, 'temps')
-                inputs.temps.drop = data_out.weather.temperature;
-                inputs.temps.surface = data_out.weather.temperature; %data_out.temps.surface;
+            % if isfield(data_out, 'temps')
+                inputs.temps.drop = data_out.carp.drop_temp;
+                inputs.temps.surface = data_out.weather.temperature(1); %data_out.temps.surface;
                 if strcmp(inputs.mission.type, 'HALO')
-                    inputs.temps.actuation = data_out.weather.temperature; %data_out.temps.actuation;
-                
-            else
-                error('Temperature data required in data_out.temps');
-            end
+                    inputs.temps.actuation = data_out.carp.activation_temp; %data_out.temps.actuation;
+                else
+                    error('Temperature data required in data_out.temps');
+                end
+            % end
             
             %% WINDS
             inputs.winds = struct();

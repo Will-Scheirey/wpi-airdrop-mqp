@@ -34,7 +34,7 @@ function altitudes = computeAltitudes(inputs, constants)
                                                    inputs.altitude.piElevation;
                 
                 % Item 11c: Actuation Pressure Altitude
-                tempCorrection = (inputs.temps.actuation + 273.15) / 288.15;
+                % tempCorrection = (inputs.temps.actuation + 273.15) / 288.15;
                 altitudes.actuationPressure = altitudes.actuationIndicatedTrue + altitudes.pav;
                 
                 % Item 11d: Absolute Actuation Altitude

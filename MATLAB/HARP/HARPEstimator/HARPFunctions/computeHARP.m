@@ -27,7 +27,7 @@ function outputs = computeHARP(inputs)
             ftd = computeForwardTravelDistance(inputs, altitudes, winds, constants);
             
             % Section 7: Compute Total Wind Effect and HARP
-            harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs, winds);
+            harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs);
             
             % Section 8: Compute Launch Acceptability Region
             lar = computeLAR(inputs, deployedVector, constants);
