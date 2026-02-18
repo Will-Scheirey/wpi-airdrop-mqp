@@ -15,8 +15,12 @@ carp_data = data_out.carp;
 inputs = convertDataOutToInputs(data_out);
 outputs = computeHARP(inputs); 
 
-disp('Results structure:');
-disp(all_results);
+plot(outputs.harp.position_x, outputs.harp.position_y, 'rx'); hold on
+plot(data_out.carp.relative_traj(end, 1), data_out.carp.relative_traj(end, 2), 'bx');
+
+
+% disp('Results structure:');
+% disp(all_results);
 
 %% PLOT
 % Create 3D plot
