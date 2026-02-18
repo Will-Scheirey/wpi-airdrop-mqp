@@ -9,7 +9,7 @@ function plotHARP2(outputs, inputs)
     
     harp_x = outputs.harp.position_x;
     harp_y = outputs.harp.position_y;
-    harp_z = inputs.altitude; % Release altitude
+    harp_z = inputs.altitude.dropIndicatedTrue; % Release altitude
     
     % Calculate intermediate points for trajectory
     dweDir = outputs.deployedVector.direction + 180;
@@ -23,11 +23,11 @@ function plotHARP2(outputs, inputs)
         mid_x = dwe_x + hvde_x;
         mid_y = dwe_y + hvde_y;
         % Approximate altitude for HALO (HV drift occurs at high altitude)
-        mid_z = inputs.altitude * 0.7;  %Rough estimate
+        mid_z = inputs.altitude.dropIndicatedTrue * 0.7;  %Rough estimate
     else
         mid_x = dwe_x;
         mid_y = dwe_y;
-        mid_z = inputs.altitude * 0.5; % Midpoint altitude
+        mid_z = inputs.altitude.dropIndicatedTrue * 0.5; % Midpoint altitude
     end
     
     ftdDir = inputs.aircraft.magneticCourse + 180;
