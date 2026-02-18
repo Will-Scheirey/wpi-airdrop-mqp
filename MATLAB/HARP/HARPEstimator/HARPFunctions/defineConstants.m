@@ -3,6 +3,7 @@ function constants = defineConstants()
             constants = struct();
             constants.knotsToMPS = 0.51444;           % knots to meters/second
             constants.knotsToYPS = 0.56;              % knots to yards/second
+            constants.knotsToFPS = 0.56 * 3;
             constants.knotsToMetersPerSec = 1.94;     % Formula conversion (from manual)
             constants.metersToYards = 1.0936;         % meters to yards
             constants.metersToNM = 1/1852;            % meters to nautical miles

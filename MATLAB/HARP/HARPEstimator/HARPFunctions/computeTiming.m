@@ -14,7 +14,7 @@ function timing = computeTiming(inputs, harp, lar, winds, constants)
             timing.groundspeed = inputs.aircraft.airspeed + headwind;
             
             % Item 54: Usable Green Light Time
-            timing.greenLightTime = lar.usableLength / (timing.groundspeed * constants.knotsToMetersPerSec);
+            timing.greenLightTime = lar.usableLength / (timing.groundspeed * constants.knotsToFPS);
             
             % Item 55: Red Light Time
             timing.redLightTime = harp.stopwatchTime + timing.greenLightTime;

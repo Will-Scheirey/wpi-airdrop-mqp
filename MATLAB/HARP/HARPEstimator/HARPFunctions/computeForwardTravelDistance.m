@@ -20,5 +20,5 @@ function ftd = computeForwardTravelDistance(inputs, constants)
             ftd.groundspeed = inputs.aircraft.airspeed + headwind;
             
             % Item 47: Forward Travel Distance
-            ftd.distance = ftd.groundspeed * ftd.ftt * constants.knotsToMetersPerSec;
+            ftd.distance = ftd.groundspeed * ftd.ftt * constants.knotsToFPS;
         end
