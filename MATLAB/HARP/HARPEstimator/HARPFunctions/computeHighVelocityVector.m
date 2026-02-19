@@ -10,6 +10,6 @@ function hvVector = computeHighVelocityVector(inputs, altitudes, arof, winds, co
             hvVector.totalTof = hvVector.tof + inputs.parachute.tfc;
             
             % Item 21: High Velocity Drift Effect
-            hvVector.de = winds.hvBallistic(2) * hvVector.totalTof * constants.knotsToMetersPerSec;
+            hvVector.de = winds.hvBallistic(2) * hvVector.totalTof * constants.knotsToFPS;
             hvVector.direction = winds.hvBallistic(1);
         end

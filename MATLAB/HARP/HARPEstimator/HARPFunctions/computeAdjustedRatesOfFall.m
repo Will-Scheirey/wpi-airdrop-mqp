@@ -1,4 +1,4 @@
-function arof = computeAdjustedRatesOfFall(inputs, altitudes, constants)
+function arof = computeAdjustedRatesOfFall(inputs, altitudes, ~)
             % Compute density-corrected rates of fall (Items 14-16, 28-30)
             
             arof = struct();

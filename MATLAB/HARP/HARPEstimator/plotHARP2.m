@@ -3,13 +3,13 @@ function plotHARP2(outputs, inputs)
     figure('Position', [50, 50, 1600, 1200]);
     
     % Extract key positions
-    pi_x = 0;
-    pi_y = 0;
+    pi_x = inputs.altitude.landing_location(:,1);
+    pi_y = inputs.altitude.landing_location(:,2);
     pi_z = 0; % Ground level
     
     harp_x = outputs.harp.position_x;
     harp_y = outputs.harp.position_y;
-    harp_z = inputs.altitude; % Release altitude
+    harp_z = inputs.altitude.dropIndicatedTrue; % Release altitude
     
     % Calculate intermediate points for trajectory
     dweDir = outputs.deployedVector.direction + 180;
@@ -23,11 +23,11 @@ function plotHARP2(outputs, inputs)
         mid_x = dwe_x + hvde_x;
         mid_y = dwe_y + hvde_y;
         % Approximate altitude for HALO (HV drift occurs at high altitude)
-        mid_z = inputs.altitude * 0.7;  %Rough estimate
+        mid_z = inputs.altitude.dropIndicatedTrue * 0.7;  %Rough estimate
     else
         mid_x = dwe_x;
         mid_y = dwe_y;
-        mid_z = inputs.altitude * 0.5; % Midpoint altitude
+        mid_z = inputs.altitude.dropIndicatedTrue * 0.5; % Midpoint altitude
     end
     
     ftdDir = inputs.aircraft.magneticCourse + 180;
@@ -86,9 +86,9 @@ function plotHARP2(outputs, inputs)
     text(pi_x, pi_y, pi_z + 500, 'PI', 'FontSize', 10, 'FontWeight', 'bold');
     text(harp_x, harp_y, harp_z + 500, 'HARP', 'FontSize', 10, 'FontWeight', 'bold');
     
-    xlabel('East (m)', 'FontSize', 10);
-    ylabel('North (m)', 'FontSize', 10);
-    zlabel('Altitude (m)', 'FontSize', 10);
+    xlabel('East (ft)', 'FontSize', 10);
+    ylabel('North (ft)', 'FontSize', 10);
+    zlabel('Altitude (ft)', 'FontSize', 10);
     title('3D Trajectory View', 'FontSize', 12, 'FontWeight', 'bold');
     legend('Trajectory', 'PI', 'HARP', 'LAR (Adjusted)', 'LAR (Max)', 'Location', 'best');
     hold off;
@@ -120,8 +120,8 @@ function plotHARP2(outputs, inputs)
     xlim_vals = xlim;
     plot(xlim_vals, [0, 0], 'k-', 'LineWidth', 2);
     
-    xlabel('East (m)', 'FontSize', 10);
-    ylabel('Altitude (m)', 'FontSize', 10);
+    xlabel('East (ft)', 'FontSize', 10);
+    ylabel('Altitude (ft)', 'FontSize', 10);
     title('Side View (East-Altitude)', 'FontSize', 12, 'FontWeight', 'bold');
     legend('Trajectory', 'PI', 'HARP', 'Location', 'best');
     hold off;
@@ -167,8 +167,8 @@ function plotHARP2(outputs, inputs)
     % Run-in heading line
     plot([0, run_x], [0, run_y], 'k:', 'LineWidth', 1);
     
-    xlabel('East (m)', 'FontSize', 10);
-    ylabel('North (m)', 'FontSize', 10);
+    xlabel('East (ft)', 'FontSize', 10);
+    ylabel('North (ft)', 'FontSize', 10);
     title('Top-Down View', 'FontSize', 12, 'FontWeight', 'bold');
     legend('PI', 'HARP', sprintf('LAR (%.0f%% DDD)', inputs.safety.percentage*100), ...
         'LAR (100% DDD)', 'Location', 'best');
@@ -227,9 +227,9 @@ function plotHARP2(outputs, inputs)
         title_str = '3D Effect Vectors';
     end
     
-    xlabel('East (m)', 'FontSize', 10);
-    ylabel('North (m)', 'FontSize', 10);
-    zlabel('Altitude (m)', 'FontSize', 10);
+    xlabel('East (ft)', 'FontSize', 10);
+    ylabel('North (ft)', 'FontSize', 10);
+    zlabel('Altitude (ft)', 'FontSize', 10);
     title(title_str, 'FontSize', 12, 'FontWeight', 'bold');
     
     % Set axis limits for better visualization

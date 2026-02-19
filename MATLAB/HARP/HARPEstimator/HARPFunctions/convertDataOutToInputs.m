@@ -46,6 +46,7 @@ function inputs = convertDataOutToInputs(data_out)
             % PI elevation
             
             inputs.altitude.piElevation = data_out.dz.pi_elevation;
+            inputs.altitude.landing_location = data_out.carp.land_location;
             
             
             % Terrain elevation

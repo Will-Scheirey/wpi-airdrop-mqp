@@ -1,4 +1,4 @@
-function lar = computeLAR(inputs, deployedVector, constants)
+function lar = computeLAR(inputs, deployedVector, ~)
             % Compute Launch Acceptability Region
             
             lar = struct();
