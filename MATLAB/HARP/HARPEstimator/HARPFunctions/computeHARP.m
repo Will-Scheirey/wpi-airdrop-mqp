@@ -1,4 +1,4 @@
-function outputs = computeHARP(inputs)
+function [outputs, inputs] = computeHARP(inputs)
             % Main HARP computation following AFMAN 11-231 Chapter 5
             
             % Get constants
@@ -48,8 +48,4 @@ function outputs = computeHARP(inputs)
             outputs.harp = harp;
             outputs.lar = lar;
             outputs.timing = timing;
-            
-            % Display summary
-            displayHARPSummary(outputs, inputs);
-            plotHARP2(outputs, inputs);
         end

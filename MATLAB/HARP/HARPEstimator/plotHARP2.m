@@ -1,4 +1,4 @@
-function plotHARP2(outputs, inputs)
+function plotHARP2(outputs, inputs, flight_traj)
     % Plot HARP with 4 views: 3D trajectory, side view, top view, and wind vectors
     figure('Position', [50, 50, 1600, 1200]);
     
@@ -77,10 +77,16 @@ function plotHARP2(outputs, inputs)
     plot3(lar_max_x, lar_max_y, zeros(size(lar_max_x)), 'g:', 'LineWidth', 1);
     
     % Plot vertical line from HARP to ground
-    plot3([harp_x, harp_x], [harp_y, harp_y], [harp_z, 0], 'k:', 'LineWidth', 1);
+    % plot3([harp_x, harp_x], [harp_y, harp_y], [harp_z, 0], 'k:', 'LineWidth', 1);
     
     % Plot run-in line at altitude
-    plot3([0, run_x], [0, run_y], [harp_z, harp_z], 'k:', 'LineWidth', 1);
+    % plot3([0, run_x], [0, run_y], [harp_z, harp_z], 'k:', 'LineWidth', 1);
+
+    flight_traj = flight_traj + ([harp_x, harp_y, harp_z] - flight_traj(1, :));
+    plot3(flight_traj(:, 1), flight_traj(:, 2), flight_traj(:, 3), '-m', 'LineWidth', 1)
+
+    err = [pi_x, pi_y, pi_z] - flight_traj(end, :);
+    fprintf("Position Error: %0.2f ft - (%0.2f, %0.2f) ft", norm(err), err(1), err(2));
     
     % Labels
     text(pi_x, pi_y, pi_z + 500, 'PI', 'FontSize', 10, 'FontWeight', 'bold');
@@ -90,7 +96,7 @@ function plotHARP2(outputs, inputs)
     ylabel('North (ft)', 'FontSize', 10);
     zlabel('Altitude (ft)', 'FontSize', 10);
     title('3D Trajectory View', 'FontSize', 12, 'FontWeight', 'bold');
-    legend('Trajectory', 'PI', 'HARP', 'LAR (Adjusted)', 'LAR (Max)', 'Location', 'best');
+    legend('Trajectory', 'PI', 'HARP', 'LAR (Adjusted)', 'LAR (Max)', 'Estimated Trajectory', 'Location', 'best');
     hold off;
     
     %% SUBPLOT 2: Side View (East-Altitude)
