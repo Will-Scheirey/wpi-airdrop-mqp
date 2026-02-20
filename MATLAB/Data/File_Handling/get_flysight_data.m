@@ -50,7 +50,7 @@ function [data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, da
     data_mag = table(mag_time, [data_flysight_sensor.MAG.x, data_flysight_sensor.MAG.y, data_flysight_sensor.MAG.z], 'VariableNames', {'time', 'data'});
 
     baro_alt = atmospalt(data_flysight_sensor.BARO.pressure);
-    baro_alt = baro_alt - baro_alt(1);
+    % baro_alt = baro_alt - baro_alt(1);
     baro_time = (data_flysight_sensor.BARO.time - data_flysight_sensor.BARO.time(1));
     data_baro = table(baro_time, baro_alt, 'VariableNames', {'time', 'data'});
 
