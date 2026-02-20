@@ -12,12 +12,12 @@ function plotHARP2(outputs, inputs, flight_traj)
     harp_z = inputs.altitude.dropIndicatedTrue; % Release altitude
     
     % Calculate intermediate points for trajectory
-    dweDir = outputs.deployedVector.direction + 180;
+    dweDir = -outputs.deployedVector.direction + 180;
     dwe_x = outputs.deployedVector.windEffect * sind(dweDir);
     dwe_y = outputs.deployedVector.windEffect * cosd(dweDir);
     
     if strcmp(inputs.mission.type, 'HALO') && outputs.hvVector.de > 0
-        hvdeDir = outputs.hvVector.direction + 180;
+        hvdeDir = -outputs.hvVector.direction + 180;
         hvde_x = outputs.hvVector.de * sind(hvdeDir);
         hvde_y = outputs.hvVector.de * cosd(hvdeDir);
         mid_x = dwe_x + hvde_x;
@@ -30,7 +30,7 @@ function plotHARP2(outputs, inputs, flight_traj)
         mid_z = inputs.altitude.dropIndicatedTrue * 0.5; % Midpoint altitude
     end
     
-    ftdDir = inputs.aircraft.magneticCourse + 180;
+    ftdDir = -inputs.aircraft.magneticCourse + 180;
     ftd_x = outputs.ftd.distance * sind(ftdDir);
     ftd_y = outputs.ftd.distance * cosd(ftdDir);
     
@@ -78,7 +78,7 @@ function plotHARP2(outputs, inputs, flight_traj)
     
     % Plot run-in line at altitude
     % plot3([0, run_x], [0, run_y], [harp_z, harp_z], 'k:', 'LineWidth', 1);
-
+    flight_traj  = flight_traj(60:end,:); 
     flight_traj = flight_traj + ([harp_x, harp_y, harp_z] - flight_traj(1, :));
     plot3(flight_traj(:, 1), flight_traj(:, 2), flight_traj(:, 3), '-m', 'LineWidth', 1)
 
@@ -114,6 +114,8 @@ function plotHARP2(outputs, inputs, flight_traj)
              'b-', 'LineWidth', 2);
     end
     
+    plot(flight_traj(:, 1), flight_traj(:, 3), '-m', 'LineWidth', 1)
+
     % Plot key points
     plot(pi_x, pi_z, 'r*', 'MarkerSize', 15, 'LineWidth', 2);
     plot(harp_x, harp_z, 'bo', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'b');
@@ -128,7 +130,7 @@ function plotHARP2(outputs, inputs, flight_traj)
     xlabel('East (ft)', 'FontSize', 10);
     ylabel('Altitude (ft)', 'FontSize', 10);
     title('Side View (East-Altitude)', 'FontSize', 12, 'FontWeight', 'bold');
-    legend('Trajectory', 'PI', 'Release Point', 'Location', 'best');
+    legend('Trajectory', 'Actual Trajectory', 'PI', 'Release Point', 'Location', 'best');
     hold off;
     
     %% SUBPLOT 3: Top-Down View (Original 2D map)
