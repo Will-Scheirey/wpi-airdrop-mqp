@@ -173,7 +173,7 @@ carp.system_data = system_data;
 
 data_out.carp = carp;
 
-winds = [weather.alt_agl * 1e3, mod(weather.direction + 180, 360), ks2mps(weather.win_speed)];
+winds = [weather.alt_agl * 1e3, mod(weather.direction + 180, 360), weather.win_speed];
 data_out.winds.profile = winds;
 
 drop_temp = interp1(weather.alt_agl, weather.temperature, carp.altitude / 1000);
