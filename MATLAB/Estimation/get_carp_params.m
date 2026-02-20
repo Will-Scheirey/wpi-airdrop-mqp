@@ -30,11 +30,11 @@ time_utc = data.measurements.gps_all.GNSS.datetime_utc(end);
 carp_out = struct(...
     'airspeed', airspeed, ...                  % kts
     'groundspeed', norm(v_drop),...
-    'heading', heading, ...              % deg
-    'altitude', altitude, ...            % ft
-    'wind_speed', ks2mps(wind_speed), ...        % kts
-    'wind_direction', wind_direction, ... % deg
-    'land_location', relative_movement, ..., % m
+    'heading', heading, ...                    % deg
+    'altitude', altitude, ...                  % ft
+    'wind_speed', ks2mps(wind_speed), ...      % kts
+    'wind_direction', wind_direction, ...      % deg
+    'land_location', relative_movement, ...,   % m
     'time_of_fall', data.drop_info.time_land - data.drop_info.time_drop, ... % s
     'relative_traj', relative_traj, ...
     'time_UTC', time_utc ...

@@ -16,6 +16,8 @@ classdef Parachute < Rigid_Body
         mc         % Canopy mass
 
         Cd_0
+        Cd0_flow 
+        Cd_edge  
         variable_ma
         is_deployed    % NEW: deployment flag
         t_deploy
@@ -26,7 +28,7 @@ classdef Parachute < Rigid_Body
         function obj = Parachute(R, mc, l0, k, c, eta, porosity, drag, variable_ma)
             obj = obj@Rigid_Body();
             obj.R = R;
-            obj.A = pi*R^2;
+            obj.A = 2*pi*R^2; % now consists of fabric area instead of flat circular area
             obj.V = 2/3*pi*R^3;
             obj.l0 = l0;
 
@@ -38,6 +40,9 @@ classdef Parachute < Rigid_Body
             obj.mc = mc;
 
             obj.eta = eta;
+
+            obj.Cd0_flow = 2.00;
+            obj.Cd_edge = 0.2832;
 
             if nargin >= 7
                 obj.porosity = porosity;
@@ -65,9 +70,13 @@ classdef Parachute < Rigid_Body
             obj.t_deploy = 0;
         end
 
-        function Cd_out = Cd(obj, ~)
+        function Cd_out = Cd(obj, aoa)
             if obj.is_deployed
-                Cd_out = obj.Cd_0 * obj.eta;
+                % tuneable Drag coefficient values for edge on vs flow facing values
+                c = cos(aoa);
+                s = sin(aoa);
+                Cd_out = obj.eta * (obj.Cd0_flow * (c.^2) + obj.Cd_edge * (s.^2));
+              
             else
                 Cd_out = 0;  % No drag before deployment
             end
