@@ -3,12 +3,12 @@ function plotHARP2(outputs, inputs, flight_traj)
     figure('Position', [50, 50, 1600, 1200]);
     
     % Extract key positions
-    pi_x = inputs.altitude.landing_location(:,1);
-    pi_y = inputs.altitude.landing_location(:,2);
+    pi_x = outputs.harp.position_x; %inputs.altitude.landing_location(:,1);
+    pi_y = outputs.harp.position_y; %inputs.altitude.landing_location(:,2);
     pi_z = 0; % Ground level
     
-    harp_x = outputs.harp.position_x;
-    harp_y = outputs.harp.position_y;
+    harp_x = 0;
+    harp_y = 0;
     harp_z = inputs.altitude.dropIndicatedTrue; % Release altitude
     
     % Calculate intermediate points for trajectory
@@ -96,13 +96,18 @@ function plotHARP2(outputs, inputs, flight_traj)
     ylabel('North (ft)', 'FontSize', 10);
     zlabel('Altitude (ft)', 'FontSize', 10);
     title('3D Trajectory View', 'FontSize', 12, 'FontWeight', 'bold');
+<<<<<<< Updated upstream
     legend('Trajectory', 'PI', 'HARP', 'LAR (Adjusted)', 'LAR (Max)', 'Estimated Trajectory', 'Location', 'best');
+=======
+    legend('Trajectory', 'PI', 'Release Point', 'LAR (Adjusted)', 'LAR (Max)', 'Location', 'best');
+>>>>>>> Stashed changes
     hold off;
     
     %% SUBPLOT 2: Side View (East-Altitude)
     subplot(2, 2, 2);
     hold on;
     grid on;
+    
     
     % Project trajectory onto East-Altitude plane
     if strcmp(inputs.mission.type, 'HALO') && outputs.hvVector.de > 0
@@ -129,7 +134,7 @@ function plotHARP2(outputs, inputs, flight_traj)
     xlabel('East (ft)', 'FontSize', 10);
     ylabel('Altitude (ft)', 'FontSize', 10);
     title('Side View (East-Altitude)', 'FontSize', 12, 'FontWeight', 'bold');
-    legend('Trajectory', 'PI', 'HARP', 'Location', 'best');
+    legend('Trajectory', 'PI', 'Release Point', 'Location', 'best');
     hold off;
     
     %% SUBPLOT 3: Top-Down View (Original 2D map)
@@ -187,10 +192,8 @@ function plotHARP2(outputs, inputs, flight_traj)
     view(45, 30);
     
     % Origin point
-    plot3(0, 0, 0, 'ko', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'k');
+    plot3(harp_x, harp_y, harp_z, 'ko', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'k');
     
-    % Wind vectors at different altitudes (if wind data is available in inputs)
-    % For now, we'll show the main wind effects
     
     % Deployed wind effect vector
     dwe_vector_x = dwe_x - start_x;

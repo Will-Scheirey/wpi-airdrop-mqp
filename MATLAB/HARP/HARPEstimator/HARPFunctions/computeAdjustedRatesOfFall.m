@@ -31,4 +31,4 @@ function arof = computeAdjustedRatesOfFall(inputs, altitudes, ~)
             tempRatio = 288.15 / (arof.deployedAvgTemp + 273.15);
             pressureRatio = arof.deployedMidPressure / altitudes.dropPressure;
             arof.deployedARoF = inputs.parachute.deployedRoF * sqrt(tempRatio * (1 + pressureRatio * 0.1));
-        end
+end

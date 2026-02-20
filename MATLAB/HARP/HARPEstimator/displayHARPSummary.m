@@ -29,23 +29,23 @@ function displayHARPSummary(outputs, inputs)
             
             fprintf('VECTORS:\n');
             if strcmp(inputs.mission.type, 'HALO')
-                fprintf('  HV Drift Effect: %d m\n', round(outputs.hvVector.de));
+                fprintf('  HV Drift Effect: %d ft\n', round(outputs.hvVector.de));
             end
-            fprintf('  Deployed Wind Effect: %d m\n', round(outputs.deployedVector.windEffect));
-            fprintf('  Forward Travel Distance: %d m\n', round(outputs.ftd.distance));
-            fprintf('  Total Wind Effect: %d m\n\n', round(outputs.harp.totalWindEffect));
+            fprintf('  Deployed Wind Effect: %d ft\n', round(outputs.deployedVector.windEffect));
+            fprintf('  Forward Travel Distance: %d ft\n', round(outputs.ftd.distance));
+            fprintf('  Total Wind Effect: %d ft\n\n', round(outputs.harp.totalWindEffect));
             
             fprintf('HARP POSITION:\n');
-            fprintf('  Distance from PI: %d m\n', round(outputs.harp.distance));
+            fprintf('  Distance from PI: %d ft\n', round(outputs.harp.distance));
             fprintf('  Bearing from PI: %03d°\n', round(outputs.harp.bearing));
             fprintf('  Coordinates (m): E %.1f, N %.1f\n\n', ...
                 outputs.harp.position_x, outputs.harp.position_y);
             
             fprintf('LAUNCH ACCEPTABILITY REGION:\n');
-            fprintf('  Maximum Radius (100%% DDD): %d m\n', round(outputs.lar.maxRadius));
-            fprintf('  Adjusted Radius (%d%% DDD): %d m\n', ...
+            fprintf('  Maximum Radius (100%% DDD): %d ft\n', round(outputs.lar.maxRadius));
+            fprintf('  Adjusted Radius (%d%% DDD): %d ft\n', ...
                 round(inputs.safety.percentage*100), round(outputs.lar.adjustedRadius));
-            fprintf('  Usable Green Light Length: %d m\n', round(outputs.lar.usableLength));
+            fprintf('  Usable Green Light Length: %d ft\n', round(outputs.lar.usableLength));
             fprintf('  Safety Factor: %d ft\n\n', inputs.safety.factor);
             
             fprintf('TIMING:\n');
