@@ -139,11 +139,11 @@ function plotHARP2(outputs, inputs, flight_traj)
     
     % Plot PI at origin
     plot(pi_x, pi_y, 'r*', 'MarkerSize', 15, 'LineWidth', 2);
-    text(0, 100, 'PI', 'FontSize', 10, 'FontWeight', 'bold');
+    text(pi_x + 10, pi_y + 10, 'PI', 'FontSize', 10, 'FontWeight', 'bold');
     
     % Plot HARP
     plot(harp_x, harp_y, 'bo', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'b');
-    text(harp_x + 100, harp_y + 100, 'HARP', 'FontSize', 10, 'FontWeight', 'bold');
+    text(harp_x + 10, harp_y + 10, 'HARP', 'FontSize', 10, 'FontWeight', 'bold');
     
     % Plot LAR circles
     %plot(lar_x, lar_y, 'b--', 'LineWidth', 2);
@@ -175,8 +175,7 @@ function plotHARP2(outputs, inputs, flight_traj)
     xlabel('East (ft)', 'FontSize', 10);
     ylabel('North (ft)', 'FontSize', 10);
     title('Top-Down View', 'FontSize', 12, 'FontWeight', 'bold');
-    legend('PI', 'HARP', sprintf('LAR (%.0f%% DDD)', inputs.safety.percentage*100), ...
-        'LAR (100% DDD)', 'Location', 'best');
+    legend('PI', 'HARP', 'Location', 'best');
     hold off;
     
     %% SUBPLOT 4: 3D Wind Vector Diagram
