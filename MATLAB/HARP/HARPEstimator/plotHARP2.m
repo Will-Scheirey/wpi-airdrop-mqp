@@ -71,10 +71,7 @@ function plotHARP2(outputs, inputs, flight_traj)
     % Plot key points
     plot3(pi_x, pi_y, pi_z, 'r*', 'MarkerSize', 15, 'LineWidth', 2);
     plot3(harp_x, harp_y, harp_z, 'bo', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'b');
-    
-    % Plot LAR at ground level
-    plot3(lar_x, lar_y, zeros(size(lar_x)), 'g--', 'LineWidth', 2);
-    plot3(lar_max_x, lar_max_y, zeros(size(lar_max_x)), 'g:', 'LineWidth', 1);
+
     
     % Plot vertical line from HARP to ground
     % plot3([harp_x, harp_x], [harp_y, harp_y], [harp_z, 0], 'k:', 'LineWidth', 1);
@@ -96,11 +93,8 @@ function plotHARP2(outputs, inputs, flight_traj)
     ylabel('North (ft)', 'FontSize', 10);
     zlabel('Altitude (ft)', 'FontSize', 10);
     title('3D Trajectory View', 'FontSize', 12, 'FontWeight', 'bold');
-<<<<<<< Updated upstream
-    legend('Trajectory', 'PI', 'HARP', 'LAR (Adjusted)', 'LAR (Max)', 'Estimated Trajectory', 'Location', 'best');
-=======
-    legend('Trajectory', 'PI', 'Release Point', 'LAR (Adjusted)', 'LAR (Max)', 'Location', 'best');
->>>>>>> Stashed changes
+    legend('Trajectory', 'PI', 'HARP', 'Estimated Trajectory', 'Location', 'best');
+
     hold off;
     
     %% SUBPLOT 2: Side View (East-Altitude)
@@ -152,8 +146,8 @@ function plotHARP2(outputs, inputs, flight_traj)
     text(harp_x + 100, harp_y + 100, 'HARP', 'FontSize', 10, 'FontWeight', 'bold');
     
     % Plot LAR circles
-    plot(lar_x, lar_y, 'b--', 'LineWidth', 2);
-    plot(lar_max_x, lar_max_y, 'b:', 'LineWidth', 1);
+    %plot(lar_x, lar_y, 'b--', 'LineWidth', 2);
+    %plot(lar_max_x, lar_max_y, 'b:', 'LineWidth', 1);
     
     % Plot vectors
     % Deployed wind effect
@@ -176,7 +170,7 @@ function plotHARP2(outputs, inputs, flight_traj)
     text(start_x + ftd_x/2 + 100, start_y + ftd_y/2, 'FTD', 'FontSize', 9);
     
     % Run-in heading line
-    plot([0, run_x], [0, run_y], 'k:', 'LineWidth', 1);
+    %plot([0, run_x], [0, run_y], 'k:', 'LineWidth', 1);
     
     xlabel('East (ft)', 'FontSize', 10);
     ylabel('North (ft)', 'FontSize', 10);
