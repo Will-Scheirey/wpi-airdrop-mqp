@@ -159,7 +159,16 @@ data_out = struct( ...
     'weather', weather, ...
     'system_data', system_data);
 
+planned_landing_lla = system_data.planned_impact_lat_lon;
+takeoff_lla = [flight_measurements.gps_all.GNSS.lat(1), flight_measurements.gps_all.GNSS.lon(1)];
+
+[x,y] = gps_dist(takeoff_lla(1), takeoff_lla(2), planned_landing_lla(1), planned_landing_lla(2));
+
+planned_landing_enu = [x, y];
+drop_pos_enu = data_out.drop_info.gps_drop(1:2);
+
 carp = get_carp_params(data_out);
+carp.planned_relative_landing = planned_landing_enu - drop_pos_enu;
 carp.system_data = system_data;
 
 data_out.carp = carp;
@@ -173,4 +182,20 @@ activation_temp = interp1(weather.alt_agl, weather.temperature, system_data.plan
 data_out.carp.drop_temp = drop_temp;
 data_out.carp.activation_temp = activation_temp;
 
+end
+
+function [x,y] = gps_dist(lat1, lon1, lat2, lon2)
+    % 1. Constants for Earth's Radius (approximate)
+    R = 6371000; % Earth radius in meters
+    
+    % 2. Convert to Radians
+    phi1 = deg2rad(lat1);
+    phi2 = deg2rad(lat2);
+    dlat = deg2rad(lat2 - lat1);
+    dlon = deg2rad(lon2 - lon1);
+    
+    % 3. Calculate East and North distances (Flat Earth Approximation)
+    % Account for latitude changing the distance between longitudes
+    y = dlat * R;
+    x = dlon * R * cos(phi1);
 end
