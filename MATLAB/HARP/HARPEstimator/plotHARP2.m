@@ -78,7 +78,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     
     % Plot run-in line at altitude
     % plot3([0, run_x], [0, run_y], [harp_z, harp_z], 'k:', 'LineWidth', 1);
-    flight_traj  = flight_traj(60:end,:); 
+    flight_traj  = flight_traj(80:end,:); 
     flight_traj = flight_traj + ([harp_x, harp_y, harp_z] - flight_traj(1, :));
     plot3(flight_traj(:, 1), flight_traj(:, 2), flight_traj(:, 3), '-m', 'LineWidth', 1)
 

@@ -12,11 +12,11 @@ function deployedVector = computeDeployedVector(inputs, altitudes, arof, winds, 
                                        (arof.deployedARoF);
             
             % Item 34: Deployed Wind Effect
-            deployedVector.windEffect = winds.deployedBallistic(2) * deployedVector.totalTime * ...
+            deployedVector.windEffect = winds.deployedBallistic(2) * deployedVector.totalTime / ...
                                         constants.knotsToFPS;
             
             % Item 36: Deployed Drive Distance
-            deployedVector.driveDistance = inputs.parachute.forwardDrive * deployedVector.driveTime * ...
+            deployedVector.driveDistance = inputs.parachute.forwardDrive * deployedVector.driveTime / ...
                                           constants.knotsToFPS;
             
             deployedVector.direction = winds.deployedBallistic(1);
