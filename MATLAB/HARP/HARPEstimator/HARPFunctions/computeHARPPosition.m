@@ -7,7 +7,7 @@ function harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs)
             harp.totalWindEffect = hvVector.de + deployedVector.windEffect;
             
             % Deployed wind effect vector (upwind from PI)
-            dweDir = deployedVector.direction + 180;
+            dweDir = deployedVector.direction + 180 - 45;
             if dweDir >= 360
                 dweDir = dweDir - 360;
             end
@@ -16,7 +16,7 @@ function harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs)
             
             % High velocity drift effect vector
             if hvVector.de > 0
-                hvdeDir = hvVector.direction + 180;
+                hvdeDir = hvVector.direction + 180 - 45;
                 if hvdeDir >= 360
                     hvdeDir = hvdeDir - 360;
                 end
@@ -28,7 +28,7 @@ function harp = computeHARPPosition(hvVector, deployedVector, ftd, inputs)
             end
             
             % Forward travel distance
-            ftdDir = inputs.aircraft.magneticCourse + 180;
+            ftdDir = inputs.aircraft.magneticCourse + 180 - 45;
             if ftdDir >= 360
                 ftdDir = ftdDir - 360;
             end

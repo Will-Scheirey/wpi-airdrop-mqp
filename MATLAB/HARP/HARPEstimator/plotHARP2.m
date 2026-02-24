@@ -1,6 +1,5 @@
 function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     % Plot HARP with 4 views: 3D trajectory, side view, top view, and wind vectors
-    figure('Position', [50, 50, 1600, 1200]);
     
     % Extract key positions
     pi_x = outputs.harp.position_x; %inputs.altitude.landing_location(:,1);
@@ -47,7 +46,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     run_y = line_length * cosd(inputs.aircraft.magneticCourse);
     
     %% SUBPLOT 1: 3D Trajectory View
-    subplot(2, 2, 1);
+    figure('Position', [50, 50, 1600, 1200]);
     hold on;
     grid on;
     axis equal;
@@ -79,7 +78,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     % Plot run-in line at altitude
     % plot3([0, run_x], [0, run_y], [harp_z, harp_z], 'k:', 'LineWidth', 1);
 
-    flight_traj  = flight_traj(60:end,:); 
+    flight_traj  = flight_traj(80:end,:); 
 
     planned_landing = planned_landing + ([harp_x, harp_y] - flight_traj(1, 1:2));
 
@@ -104,7 +103,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     hold off;
     
     %% SUBPLOT 2: Side View (East-Altitude)
-    subplot(2, 2, 2);
+    figure('Position', [50, 50, 1600, 1200]);
     hold on;
     grid on;
     
@@ -140,7 +139,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     hold off;
     
     %% SUBPLOT 3: Top-Down View (Original 2D map)
-    subplot(2, 2, 3);
+    figure('Position', [50, 50, 1600, 1200]);
     hold on;
     grid on;
     axis equal;
@@ -187,7 +186,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     hold off;
     
     %% SUBPLOT 4: 3D Wind Vector Diagram
-    subplot(2, 2, 4);
+    figure('Position', [50, 50, 1600, 1200]);
     hold on;
     grid on;
     view(45, 30);
