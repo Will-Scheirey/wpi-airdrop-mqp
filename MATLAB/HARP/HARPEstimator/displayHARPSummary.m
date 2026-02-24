@@ -41,13 +41,6 @@ function displayHARPSummary(outputs, inputs)
             fprintf('  Coordinates (m): E %.1f, N %.1f\n\n', ...
                 outputs.harp.position_x, outputs.harp.position_y);
             
-            fprintf('LAUNCH ACCEPTABILITY REGION:\n');
-            fprintf('  Maximum Radius (100%% DDD): %d ft\n', round(outputs.lar.maxRadius));
-            fprintf('  Adjusted Radius (%d%% DDD): %d ft\n', ...
-                round(inputs.safety.percentage*100), round(outputs.lar.adjustedRadius));
-            fprintf('  Usable Green Light Length: %d ft\n', round(outputs.lar.usableLength));
-            fprintf('  Safety Factor: %d ft\n\n', inputs.safety.factor);
-            
             fprintf('TIMING:\n');
             fprintf('  Groundspeed: %d kts\n', round(outputs.timing.groundspeed));
             fprintf('  Stopwatch Time: %.1f sec\n', outputs.timing.stopwatchTime);
