@@ -1,4 +1,4 @@
-function parachute = Create_Parachute(num_parachutes, t_deploy, r)
+function parachute = Create_Parachute(~, t_deploy, r)
     if nargin < 2
         t_deploy = 0;  % Default: immediate deployment
     end

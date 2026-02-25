@@ -52,33 +52,6 @@ else
     terminal_descent_rate = 0;
 end
 
-% CARP predictions (convert yards to meters)
-carp.ftd_m = carp.ftd * 0.9144;
-carp.drift_eff_m = carp.drift_eff * 0.9144;
-carp.total_displacement_m = sqrt(carp.ftd_m^2 + carp.drift_eff_m^2);
-
-% Horizontal velocity analysis
-horiz_vel_enu = sqrt(V_enu(:,1).^2 + V_enu(:,2).^2);
-mean_horiz_vel = mean(horiz_vel_enu);
-
-% Calculate expected vs actual horizontal travel
-
-% CARP predictions (convert yards to meters)
-carp.ftd_m = carp.ftd * 0.9144;
-carp.drift_eff_m = carp.drift_eff * 0.9144;
-carp.total_displacement_m = sqrt(carp.ftd_m^2 + carp.drift_eff_m^2);
-
-
-% Calculate errors
-results.carp = carp;
-results.propagator = prop;
-
-results.time_error = prop.landing_time - carp.total_tof;
-results.displacement_error = prop.total_horizontal_displacement - carp.total_displacement_m;
-results.displacement_error_pct = 100 * results.displacement_error / carp.total_displacement_m;
-results.descent_rate_error = terminal_descent_rate - (carp.adj_rof * 0.3048);
-results.descent_rate_error_pct = 100 * results.descent_rate_error / (carp.adj_rof * 0.3048);
-
 
 if isfield(model_obj, 'payload')
     fprintf('Payload Drag:\n');
@@ -94,7 +67,6 @@ if isfield(model_obj, 'payload')
 
     fprintf('  Total weight:     %.2f N (%.2f lb)\n', total_weight, total_weight/4.448);
     fprintf('  Terminal V (actual): %.2f m/s (%.2f ft/s)\n', terminal_descent_rate, terminal_descent_rate/0.3048);
-    fprintf('  Terminal V (CARP):   %.2f m/s (%.2f ft/s)\n', carp.adj_rof*0.3048, carp.adj_rof);
 
     % Required drag force
     fprintf('  Required drag force: %.2f N\n', total_weight);

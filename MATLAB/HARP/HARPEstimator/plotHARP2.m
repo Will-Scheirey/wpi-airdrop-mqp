@@ -42,18 +42,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     ftdDir = -inputs.aircraft.magneticCourse + 180;
     ftd_x = outputs.ftd.distance * sind(ftdDir);
     ftd_y = outputs.ftd.distance * cosd(ftdDir);
-    
-    % LAR circles
-    theta = linspace(0, 2*pi, 100);
-    lar_x = outputs.lar.adjustedRadius * cos(theta) + harp_x;
-    lar_y = outputs.lar.adjustedRadius * sin(theta) + harp_y;
-    lar_max_x = outputs.lar.maxRadius * cos(theta) + harp_x;
-    lar_max_y = outputs.lar.maxRadius * sin(theta) + harp_y;
-    
-    % Run-in line
-    line_length = max(outputs.harp.distance * 1.5, outputs.lar.maxRadius * 2);
-    run_x = line_length * sind(inputs.aircraft.magneticCourse);
-    run_y = line_length * cosd(inputs.aircraft.magneticCourse);
+  
     
     %% SUBPLOT 1: 3D Trajectory View
     figure('Position', [50, 50, 1600, 1200]);
@@ -169,28 +158,16 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
 
     % Actual landing (end of flight_traj)
     plot(flight_traj(end, 1), flight_traj(end, 2), 'ms', 'MarkerSize', 12, 'LineWidth', 2, 'DisplayName', 'Actual Landing');
+   
+    plot([harp_x, mid_x, dwe_x, pi_x], ...
+     [harp_y, mid_y, dwe_y, pi_y], ...
+     'b-', 'LineWidth', 2)
 
-    % Deployed wind effect vector
-    quiver(0, 0, dwe_x, dwe_y, 0, 'g', 'LineWidth', 2, 'MaxHeadSize', 0.5, 'DisplayName', 'DWE');
-    text(dwe_x/2, dwe_y/2 + 100, 'DWE', 'FontSize', 9, 'Color', 'g');
-    
-    % High velocity drift (if HALO)
-    if strcmp(inputs.mission.type, 'HALO') && outputs.hvVector.de > 0
-        quiver(dwe_x, dwe_y, -hvde_x, hvde_y, 0, 'm', 'LineWidth', 2, 'MaxHeadSize', 0.5, 'DisplayName', 'HVDE');
-        text(dwe_x - hvde_x/2, dwe_y + hvde_y/2 + 100, 'HVDE', 'FontSize', 9, 'Color', 'm');
-    end
-    
-    % Forward travel distance
-    quiver(dwe_x - hvde_x, dwe_y + hvde_y, -ftd_x, ftd_y + dwe_y + hvde_y, 0, 'k', 'LineWidth', 2, 'MaxHeadSize', 0.5, 'DisplayName', 'FTD');
-    text(start_x + ftd_x/2 + 100, start_y + ftd_y/2, 'FTD', 'FontSize', 9);
-    
     xlabel('East (ft)', 'FontSize', 10);
     ylabel('North (ft)', 'FontSize', 10);
     title('Top-Down View', 'FontSize', 12, 'FontWeight', 'bold');
     legend('Location', 'best');
-    sgtitle(sprintf('%s HARP Solution - %s | Altitude: %.0f ft | Distance: %.0f ft', ...
-        inputs.mission.type, inputs.parachute.type, harp_z, outputs.harp.distance), ...
-        'FontSize', 12, 'FontWeight', 'bold');
+   
     hold off;
     
     %% SUBPLOT 4: 3D Wind Vector Diagram
@@ -228,12 +205,12 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     quiver3(0, 0, -harp_z*0.7, ftd_x*ftd_scale, ftd_y*ftd_scale, 0, ...
         'k', 'LineWidth', 2.5, 'MaxHeadSize', 0.8);
     text(ftd_x*ftd_scale/2, ftd_y*ftd_scale/2, -harp_z*0.7, ...
-        'Aircraft', 'FontSize', 10, 'Color', 'k', 'FontWeight', 'bold');
+        'FTD Vector', 'FontSize', 10, 'Color', 'k', 'FontWeight', 'bold');
     
     % Resultant vector to HARP
-    quiver3(0, 0, 0, harp_x*0.5, harp_y*0.5, -harp_z, ...
+    quiver3(0, 0, 0, pi_x*0.5, pi_y*0.5, -harp_z, ...
         'r', 'LineWidth', 3, 'MaxHeadSize', 0.8);
-    text(harp_x*0.25, harp_y*0.25, -harp_z/2, ...
+    text(pi_x*0.25, pi_y*0.25, -harp_z/2, ...
         'Total', 'FontSize', 10, 'Color', 'r', 'FontWeight', 'bold');
     
     % Add wind direction indicators if available
@@ -257,9 +234,5 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing)
     
     legend('Origin', 'DWE', 'Location', 'best');
     hold off;
-    
-    %% Overall title
-    sgtitle(sprintf('%s HARP Solution - %s | Altitude: %.0f m | Distance: %.0f m', ...
-        inputs.mission.type, inputs.parachute.type, harp_z, outputs.harp.distance), ...
-        'FontSize', 14, 'FontWeight', 'bold');
+   
 end
