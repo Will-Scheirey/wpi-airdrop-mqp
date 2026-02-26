@@ -4,7 +4,7 @@ addpath(genpath("weather"));
 addpath(genpath("haars_data"));
 
 parent_dir = "haars_data";
-drop_dir = "DN150_Lt1_n13_08052025_side";
+drop_dir = "DN151_Lt1_n14_08052025_side";
 full_dir = fullfile(parent_dir, drop_dir);
 
 data_out = get_flight_estimates(full_dir);
