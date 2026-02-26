@@ -17,21 +17,20 @@ function results = HARP_Dynamic_Model(data_out)
         data_out.l (1,1) double = 83
         data_out.h (1,1) double = 43
         data_out.m (1,1) double = 500 %mass of payload in lbs
+        data_out.inputs = []
+        data_out.data_out = []
         data_out.carp_data = []
     end
     %% STEP 2: Create Parachute System
-    parachute_system1 = Create_Parachute(...
-        data_out.num_parachutes, 5, 2);
-    parachute_system1.t_cut = 38;
+    parachute_system1 = Create_Parachute(5, 2);
 
-    parachute_system2 = Create_Parachute(...
-    data_out.num_parachutes, 41, single_radius);
+    parachute_system2 = Create_Parachute(41);
 
     %% STEP 3: Create Payload System
     payload = Create_Payload(data_out.w, data_out.l, data_out.h,data_out.m);
     
     %% STEP 4: Convert CARP Results to Propagator Initial Conditions
-    x0 = HARP_To_Propagator(data_out);
+    x0 = HARP_To_Propagator(carp_data);
 
     % x0(4:6) = x0(4:6) * 2;
 
@@ -50,8 +49,6 @@ function results = HARP_Dynamic_Model(data_out)
         'weather', the_weather, ...
         'model', @Two_Stage_Model);
 
-    %% STEP 5: Extract Final State 
-    results = Results(t, y, model_obj, data_out.num_parachutes);
 end
 
 
