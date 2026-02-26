@@ -1,0 +1,25 @@
+Post processing order for each data file
+- Start with "TRACK" file
+	- Copy file and save under new name to avoid compromising original raw data
+	- Check column headers/labels. They can be shifted one column to the right. Make sure headers and units are lined up with the correct data.
+	- Remove "$DATA" row (usually row 7 in the spreadsheet). Rows above the header row (usually row 5) can be removed.
+	- Remove unneeded data from track file (lat, lon, hAcc, vAcc, sAcc) 
+	- Create additional time column with first data row as 0 seconds. Check GPS time to confirm data collect rate. Should be 5 Hz. Populate column 0.2 second interval
+	- Plot altitude to identify drop event. Take data from 1 minute before drop through 1 minute after
+- Move to "SENSOR" file
+	- Add filter. Filter for "BARO"
+	- Copy BARO, temperature and time columns to new tab
+	- Add column for time in the new "BARO" tab with first data row at 0 seconds. Populate column based on collection rate indicated by dataset time. Ideally all key parameters are collected at 5 Hz, however don't assume that is the case. 
+		- If data is collected at more than 5 Hz, average data to create an average for every 0.2 seconds or filter to pick off data for that interval
+	- Reduce data set to drop event based on the times identified in the TRACK file 
+	- Calculate air density for each data row using ideal gas law formula [air density = (static pressure/(R/Temp))]. R is the specific gas constant for dry air, 287.05 (J/(kg*K).
+		(This calculation assumes humidity affect is negligible. This is a good assumption except for exceptional cases of high temperature (>35C) and high humidity (>40%).)
+	- Sanity check calculated air density against what is expected for standard day at given altitudes, sampling a few points through the drop profile 
+	- Copy air density data at 5 hz interval to "TRACK" file to support the Drag Area (CdS) calculation
+- Finish dataset post processing in TRACK file
+	- All required data for the event should now be in the track file. Make sure to not delete or overwrite raw data. Create a copy of the dataset for post processing is recommended.
+	- Create new column for CdS calculation. Use drag equation to find CdS for each data point.
+	- Create new column for horizontal velocity. Determine absolute horizontal velocity from the two horizontal velocity components for each data point - Vhorz=sqrt(Vnorth^2+Veast^2)
+	- Plot horizontal and vertical velocity versus time
+	- Identify exit time/altitude, first stage stabilization time/altitude, start of second stage deployment time/alt, end of second stage deployment time/alt, time/alt of at ground impact for each velocity plot
+	- Reference ballistics processing AIAA white paper for additional post processing instructions

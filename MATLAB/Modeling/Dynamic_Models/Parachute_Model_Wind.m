@@ -159,6 +159,55 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
 
             if any(isnan(f_p)), f_p = [0;0;0]; end
             if any(isnan(f_c)), f_c = [0;0;0]; end
+
+            % Store AoA and drag for logging
+            obj.aoa_p_curr = aoa_p;
+            obj.aoa_c_curr = aoa_c;
+            
+            obj.drag_force_p = f_p;
+            obj.drag_force_c = f_c;
+            
+            % ==============================
+            % --- Parachute Lift         ---
+            % ==============================
+            %   L = tan(aoa)*D
+            % Lift direction chosen as the component opposite gravity
+            % that is perpendicular to the relative wind.
+            
+            f_l_p = [0; 0; 0];
+            f_l_c = [0; 0; 0];
+            
+            v_mag_c = norm(v_rel_c_b);
+            if v_mag_c > 1e-6
+                v_hat_c = v_rel_c_b / v_mag_c;
+            
+                g_b_c = obj.C_EB_c * obj.g_vec_e;
+                g_up_b_c = -g_b_c / norm(g_b_c);
+            
+                lift_dir_c = g_up_b_c - dot(g_up_b_c, v_hat_c) * v_hat_c;
+            
+                if norm(lift_dir_c) < 1e-6
+                    lift_dir_c = cross(v_hat_c, [0; 1; 0]);
+                    if norm(lift_dir_c) < 1e-6
+                        lift_dir_c = cross(v_hat_c, [1; 0; 0]);
+                    end
+                end
+            
+                lift_dir_c = lift_dir_c / norm(lift_dir_c);
+            
+                L_mag_c = norm(f_c) * tan(aoa_c);
+                f_l_c = L_mag_c * lift_dir_c;
+            
+                if any(isnan(f_l_c))
+                    f_l_c = [0; 0; 0];
+                end
+            end
+            
+            obj.lift_force_p = f_l_p;
+            obj.lift_force_c = f_l_c;
+            
+            f_p = f_p + f_l_p;
+            f_c = f_c + f_l_c;
         end
 
         function [f_p, f_c] = calc_riser_force(obj)
