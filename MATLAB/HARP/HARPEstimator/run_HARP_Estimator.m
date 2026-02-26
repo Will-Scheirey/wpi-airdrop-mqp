@@ -19,4 +19,3 @@ inputs = convertDataOutToInputs(data_out);
 % Display summary
 displayHARPSummary(outputs, inputs);
 plotHARP2(outputs, inputs, m2ft(data_out.carp.relative_traj), m2ft(data_out.carp.planned_relative_landing));
-
