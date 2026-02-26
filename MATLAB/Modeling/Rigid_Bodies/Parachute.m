@@ -16,14 +16,19 @@ classdef Parachute < Rigid_Body
         mc         % Canopy mass
 
         Cd_0
+        Cd0_flow 
+        Cd_edge  
         variable_ma
+        is_deployed    % NEW: deployment flag
+        t_deploy
+        t_cut
     end
 
     methods
         function obj = Parachute(R, mc, l0, k, c, eta, porosity, drag, variable_ma)
             obj = obj@Rigid_Body();
             obj.R = R;
-            obj.A = pi*R^2;
+            obj.A = 2*pi*R^2; % now consists of fabric area instead of flat circular area
             obj.V = 2/3*pi*R^3;
             obj.l0 = l0;
 
@@ -35,6 +40,9 @@ classdef Parachute < Rigid_Body
             obj.mc = mc;
 
             obj.eta = eta;
+
+            obj.Cd0_flow = 2.00;
+            obj.Cd_edge = 0.2832;
 
             if nargin >= 7
                 obj.porosity = porosity;
@@ -57,11 +65,30 @@ classdef Parachute < Rigid_Body
             else
                 obj.variable_ma = false;
             end
-
+            % Default to deployed immediately
+            obj.is_deployed = false;
+            obj.t_deploy = 0;
         end
 
-        function Cd_out = Cd(obj, ~); Cd_out = obj.Cd_0 * obj.eta; end
-        function S_out = S(obj, ~); S_out = obj.A; end
+        function Cd_out = Cd(obj, aoa)
+            if obj.is_deployed
+                % tuneable Drag coefficient values for edge on vs flow facing values
+                c = cos(aoa);
+                s = sin(aoa);
+                Cd_out = obj.eta * (obj.Cd0_flow * (c.^2) + obj.Cd_edge * (s.^2));
+              
+            else
+                Cd_out = 0;  % No drag before deployment
+            end
+        end
+
+        function S_out = S(obj, ~)
+            if obj.is_deployed
+                S_out = obj.A;
+            else
+                S_out = 0;  % No area before deployment
+            end
+        end
 
         function ma_out = added_mass(obj, rho)
             p = obj.porosity;
@@ -77,7 +104,7 @@ classdef Parachute < Rigid_Body
 
             m_out = obj.mc + obj.added_mass(rho);
         end
-        
+
         function I_out = I(obj, rho)
             if ~obj.variable_ma
                 rho = 1.225;
@@ -87,17 +114,17 @@ classdef Parachute < Rigid_Body
             I_XX = 83/320*m*obj.R^2; % Moment of inertia of a hemisphere [kg m^2]
             I_YY = I_XX;             % Moment of inertia of a hemisphere [kg m^2]
             I_ZZ = 2/5*m*obj.R^2;    % Moment of inertia of a hemisphere [kg m^2]
-            
+
             I_XY = 0;         % Moment of inertia of a hemisphere [kg m^2]
             I_XZ = 0;         % Moment of inertia of a hemisphere [kg m^2]
             I_YZ = 0;         % Moment of inertia of a hemisphere [kg m^2]
-            
+
             % Inertia Tensor
             I_out = [
-             I_XX, -I_XY, -I_XZ;
-            -I_XY,  I_YY, -I_YZ;
-            -I_XZ, -I_YZ,  I_ZZ;
-            ];
+                I_XX, -I_XY, -I_XZ;
+                -I_XY,  I_YY, -I_YZ;
+                -I_XZ, -I_YZ,  I_ZZ;
+                ];
         end
 
     end

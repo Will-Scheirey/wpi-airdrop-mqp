@@ -1,6 +1,6 @@
 function data_out = get_flight_estimates(full_dir)
 
-smooth_window = 20;
+smooth_window = 3;
 alt_mean_window = 100;
 
 [dt, ...
@@ -15,85 +15,7 @@ alt_mean_window = 100;
 drop_time = drop_info.time_drop;
 land_time = drop_info.time_land;
 
-%% Noise Parameters
-Rp = 10;
-R_pos = eye(3) * Rp^2;
-
-% sensor_var.mag = sensor_var.mag * 1e1;
-% sensor_var.baro = sensor_var.baro * 1e1;
-% sensor_var.gyro = sensor_var.gyro * 1e1;
-% sensor_var.accel = sensor_var.accel * 1e1;
-% % sensor_var.mag = sensor_var.mag * 1e1;
-
-R_mag = blkdiag(sensor_var.mag(1), sensor_var.mag(2), sensor_var.mag(3)).^2;
-
-R_baro = (sensor_var.baro * 1e1)^2;
-
-Rv = 2;
-R_vel = eye(3) * Rv^2;
-
-R = blkdiag( ...
-    R_pos, ...
-    R_mag, ...
-    R_baro, ...
-    R_vel ...
-    );
-
-% accel noise covariance
-sigma_a = sqrt(sensor_var.accel(:)) * 5e2;
-Sa = diag(sigma_a.^2);
-
-Q_PV = [ (dt^4/4)*Sa, (dt^3/2)*Sa;
-         (dt^3/2)*Sa, (dt^2)*Sa ];
-
-sigma_w = sqrt(norm(sensor_var.gyro));
-Q_e = eye(4) * (dt*sigma_w)^2;
-
-Qwb = 1e-5;
-Q_wb = eye(3) * Qwb^2;
-
-Qab = 1e-5;
-Q_ab = eye(3) * Qab^2;
-
-Qpb = 1e-5;
-Q_pb = eye(3) * Qpb^2;
-
-sigma_bm = 1e-2;
-Q_mb = eye(3) * (sigma_bm^2);
-
-sigma_bb = 1e-2;
-Q_bb = sigma_bb^2;
-
-sigma_vv = 1e-3;
-Q_vv = sigma_vv^2 * eye(3);
-
-Q = blkdiag(...
-    Q_PV, ... % P
-    ... % Q_V,... % V
-    Q_e, ... % e
-    Q_wb, ... % w
-    Q_ab, ... % ab
-    Q_pb, ...
-    Q_mb, ...
-    Q_bb, ...
-    Q_vv ...
-    );
-
-P0 = blkdiag( ...
-    1e-2 * eye(3), ...
-    1e-2 * eye(3), ...
-    1e-2 * eye(4), ...
-    1e-2 * eye(3), ...
-    1e-2 * eye(3), ...
-    1e-2* eye(3), ...
-    1e-2 * eye(3), ...
-    1e-2, ...
-    1e-2 * eye(3) ...
-    );
-
-Q = (Q + Q.')/2;                     % enforce symmetry
-q_floor = 1e-12;                     % pick a floor in variance units
-Q = Q + q_floor * eye(size(Q));      % jitter to make invertible
+[R, Q, P0] = get_noise_params(sensor_var, dt);
 
 %% Run the Kalman Filter
 kf = Airdrop_EKF(R, Q, 0, P0, dt);
@@ -108,25 +30,57 @@ kf.initialize(true, flight_measurements.accel.data(1, :)', ...
 
 kf.run_filter(measurements, inputs, tspan, acc_gps, drop_time, 1, true);
 
-%{
 %% Run the Smoother
 
-sm = Forward_Backward_Smoother(R, Q, 0, P0, dt, payload.I());  % match your kf ctor
-sm.is_initialized = true;
+%{
+sm = Forward_Backward_Smoother(R, Q, 0, P0, dt);  % match your kf ctor
+
+sm.initialize(true, flight_measurements.accel.data(end, :)', ...
+    flight_measurements.gyro.data(end, :)', ...
+    flight_measurements.mag.data(end, :)', ...
+    flight_measurements.gps.data(end, :)', ...
+    flight_measurements.baro.data(end, :)');
+
+sm.initialize(true, flight_measurements.accel.data(1, :)', ...
+    flight_measurements.gyro.data(1, :)', ...
+    flight_measurements.mag.data(1, :)', ...
+    flight_measurements.gps.data(1, :)', ...
+    flight_measurements.baro.data(1, :)');
+
 sm.set_forward_results(kf.x_hist, kf.P_hist, kf.F_hist, kf.Q_hist);
-sm.smooth(measurements, inputs, tspan, acc_gps, true);
+
+
+% tspan_s = tspan(find(tspan > drop_time, 1):find(tspan > land_time, 1));
+tspan_s = tspan(1:find(tspan > drop_time, 1));
+
+sm.smooth(measurements, inputs, tspan_s, acc_gps, true);
 
 %% Fuse Data
 [x_s, P_s] = sm.fuse();
 %}
 %% Exract Values
+%{
+covariances_s = P_s;
 
+x_est_s = x_s(:, 2:end)';
+p_est_s = x_est_s(:, sm.x_inds.P_E);
+v_est_s = x_est_s(:, sm.x_inds.V_E);
+e_est_s = x_est_s(:, sm.x_inds.e);
+w_b_est_s = x_est_s(:, sm.x_inds.b_g);
+a_b_est_s = x_est_s(:, sm.x_inds.b_a);
+p_b_est_s = x_est_s(:, sm.x_inds.b_p);
+m_b_est_s = x_est_s(:, sm.x_inds.b_m);
+b_b_est_s = x_est_s(:, sm.x_inds.b_b);
+
+t_plot_s = tspan_s(1:end-1);
+%}
 covariances = kf.P_hist;
 
 x_est = kf.x_hist(:, 2:end)';
 p_est = x_est(:, kf.x_inds.P_E);
 v_est = x_est(:, kf.x_inds.V_E);
 e_est = x_est(:, kf.x_inds.e);
+eul_est = quat2eul(e_est);
 w_b_est = x_est(:, kf.x_inds.b_g);
 a_b_est = x_est(:, kf.x_inds.b_a);
 p_b_est = x_est(:, kf.x_inds.b_p);
@@ -137,38 +91,115 @@ t_plot = tspan(1:end-1);
 t_plot_drop = [drop_time, land_time];
 % Speed, heading angle, altitude, windspeed and direction
 
+drop_idx_start = find(t_plot > drop_time, 1);
+drop_idx_stop = find(t_plot > land_time, 1);
+
+drop_t_plot = t_plot(drop_idx_start:drop_idx_stop) - t_plot(drop_idx_start);
+
 time_utc = all_measurements.gps_all.GNSS.datetime_utc(end);
 
-[~, weather] =load_weather(time_utc);
+[~, weather] = load_weather(time_utc);
+weather.alt_agl(1) = 0;
+
 
 %% Get CARP Inputs
+
+system_data = get_drop_system_data(full_dir);
 
 estimates = struct( ...
     'all', x_est, ...
     'pos', p_est, ...
     'vel', v_est, ...
     'quat', e_est, ...
+    'eul', eul_est, ...
     'gyro_bias', w_b_est, ...
     'accel_bias', a_b_est, ...
     'pos_bias', p_b_est, ...
     'mag_bias', m_b_est, ...
     'baro_bias', b_b_est);
+%{
+estimates_smoothed = struct( ...
+    'all', x_est_s, ...
+    'pos', p_est_s, ...
+    'vel', v_est_s, ...
+    'quat', e_est_s, ...
+    'gyro_bias', w_b_est_s, ...
+    'accel_bias', a_b_est_s, ...
+    'pos_bias', p_b_est_s, ...
+    'mag_bias', m_b_est_s, ...
+    'baro_bias', b_b_est_s);
 
+drop_estimates_smoothed = struct( ...
+    'all', x_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'pos', p_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'vel', v_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'quat', e_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'gyro_bias', w_b_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'accel_bias', a_b_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'pos_bias', p_b_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'mag_bias', m_b_est_s(drop_idx_start:drop_idx_stop, :), ...
+    'baro_bias', b_b_est_s(drop_idx_start:drop_idx_stop, :));
+%}
 data_out = struct( ...
+    'dt', dt, ...
     't_plot', t_plot, ...
     't_plot_drop', t_plot_drop, ...
+    'drop_t_plot', drop_t_plot, ...
+    ... % 't_plot_s', t_plot_s, ...
+    ... % 'tspan_s', tspan_s, ...
     'tspan', tspan, ...
     'estimates', estimates, ...
+    ... %'estimates_smoothed', estimates_smoothed, ...
+    'inputs', inputs, ...
+    ... %'drop_estimates_smoothed', drop_estimates_smoothed, ...
     'cov', covariances, ...
+    ... %'cov_smoothed', covariances_s, ...
     'kf', kf, ...
     'measurements', flight_measurements, ...
     'stationary_measurements', data_stationary, ...
     'drop_info', drop_info, ...
     'time_utc', time_utc, ...
-    'weather', weather);
+    'weather', weather, ...
+    'system_data', system_data);
+
+planned_landing_lla = system_data.planned_impact_lat_lon;
+takeoff_lla = [flight_measurements.gps_all.GNSS.lat(1), flight_measurements.gps_all.GNSS.lon(1)];
+
+[x,y] = gps_dist(takeoff_lla(1), takeoff_lla(2), planned_landing_lla(1), planned_landing_lla(2));
+
+planned_landing_enu = [x, y];
+drop_pos_enu = data_out.drop_info.gps_drop(1:2);
 
 carp = get_carp_params(data_out);
+carp.planned_relative_landing = planned_landing_enu - drop_pos_enu;
+carp.system_data = system_data;
 
 data_out.carp = carp;
 
+winds = [weather.alt_agl * 1e3, mod(weather.direction, 360), ks2mps(weather.win_speed)];
+
+data_out.winds.profile = winds;
+
+drop_temp = interp1(weather.alt_agl, weather.temperature, carp.altitude / 1000);
+activation_temp = interp1(weather.alt_agl, weather.temperature, system_data.planned_activation / 1000);
+
+data_out.carp.drop_temp = drop_temp;
+data_out.carp.activation_temp = activation_temp;
+
+end
+
+function [x,y] = gps_dist(lat1, lon1, lat2, lon2)
+    % 1. Constants for Earth's Radius (approximate)
+    R = 6371000; % Earth radius in meters
+    
+    % 2. Convert to Radians
+    phi1 = deg2rad(lat1);
+    phi2 = deg2rad(lat2);
+    dlat = deg2rad(lat2 - lat1);
+    dlon = deg2rad(lon2 - lon1);
+    
+    % 3. Calculate East and North distances (Flat Earth Approximation)
+    % Account for latitude changing the distance between longitudes
+    y = dlat * R;
+    x = dlon * R * cos(phi1);
 end

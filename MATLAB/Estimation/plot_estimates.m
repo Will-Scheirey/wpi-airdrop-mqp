@@ -1,21 +1,19 @@
-function fig_idx = plot_estimates(data_in, fig_idx)
+function fig_idx = plot_estimates(data_in, t_plot, tspan, estimate_name, fig_idx)
 
-if nargin < 2
+if nargin < 5
     fig_idx = 1;
 end
 
-t_plot = data_in.t_plot;
 t_plot_drop = data_in.t_plot_drop;
-tspan = data_in.tspan;
 
-p_est = data_in.estimates.pos;
-v_est = data_in.estimates.vel;
-e_est = data_in.estimates.quat;
-w_b_est = data_in.estimates.gyro_bias;
-a_b_est = data_in.estimates.accel_bias;
-p_b_est = data_in.estimates.pos_bias;
-m_b_est = data_in.estimates.mag_bias;
-b_b_est = data_in.estimates.baro_bias;
+p_est = data_in.(estimate_name).pos;
+v_est = data_in.(estimate_name).vel;
+e_est = data_in.(estimate_name).quat;
+w_b_est = data_in.(estimate_name).gyro_bias;
+a_b_est = data_in.(estimate_name).accel_bias;
+p_b_est = data_in.(estimate_name).pos_bias;
+m_b_est = data_in.(estimate_name).mag_bias;
+b_b_est = data_in.(estimate_name).baro_bias;
 
 data_gps = data_in.measurements.gps;
 acc_gps = data_in.measurements.acc_gps;
@@ -139,6 +137,14 @@ legend("a_1", "a_2", "a_3")
 xlim([t_plot(1)+1, t_plot(end)])
 % xlim(t_plot_drop)
 title("Estimated Acceleration Components")
+
+fig_idx = new_fig(fig_idx);
+clf
+plot(tspan, kf.accel_calc_all, 'LineWidth', 2); hold on
+legend("a_1", "a_2", "a_3")
+xlim(t_plot_drop)
+% xlim(t_plot_drop)
+title("Estimated Drop Acceleration Components")
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -271,31 +277,25 @@ title("Trajectory")
 
 fig_idx = new_fig(fig_idx);
 clf
-plot3(p_est(:,1), p_est(:,2), p_est(:,3), '.-', 'MarkerSize', 10, 'DisplayName', 'Estimate', 'LineWidth', 0.5); hold on;
-plot3(p_est(1,1), p_est(1,2), p_est(1,3), '.r', 'MarkerSize', 30, 'DisplayName', 'Start', 'LineWidth', 1); hold on;
-plot3(p_est(end,1), p_est(end,2), p_est(end,3), '.g', 'MarkerSize', 30, 'DisplayName', 'End', 'LineWidth', 1); hold on;
-legend
-axis equal
-xlabel("X (m)")
-ylabel("Y (m)")
-zlabel("Z (m)")
-title("Trajectory")
-
-fig_idx = new_fig(fig_idx);
-clf
 
 drop_idx = t_plot > drop_time;
 x_pos = p_est(drop_idx, 1) - p_est(find(drop_idx, 1), 1);
 y_pos = p_est(drop_idx, 2) - p_est(find(drop_idx, 1), 2);
 z_pos = p_est(drop_idx, 3);
 
+activation_alt = ft2m(data_in.system_data.logged_activation) + (380 - 128);
+activation_idx = find(z_pos < activation_alt, 1);
+
+t_plot_drop_ = t_plot(drop_idx) - t_plot(find(drop_idx, 1));
+
 yyaxis left
-plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), x_pos, 'LineWidth', 1.5, 'DisplayName', 'X'); hold on;
-plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), y_pos, 'LineWidth', 1.5, 'DisplayName', 'Y'); hold on;
+plot(t_plot_drop_, x_pos, '.-b', 'DisplayName', 'X', 'MarkerSize', 6); hold on;
+plot(t_plot_drop_, y_pos,  '.-g','DisplayName', 'Y', 'MarkerSize', 6); hold on;
 ylabel("X, Y Position (m)")
 
 yyaxis right
-plot(t_plot(drop_idx) - t_plot(find(drop_idx, 1)), z_pos, 'LineWidth', 1.5, 'DisplayName', 'z'); hold on;
+plot(t_plot_drop_, z_pos, 'LineWidth', 1.5, 'DisplayName', 'z'); hold on;
+plot(t_plot_drop_(activation_idx), z_pos(activation_idx), 'rx', 'MarkerSize', 10, 'DisplayName', 'Activation');
 ylabel("Altitude (m)")
 
 xlabel("Time (s)")
