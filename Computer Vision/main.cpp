@@ -15,22 +15,16 @@ static bool have_last = false;
 static bool have_prev = false;
 static cv::Point2d last_valid(0.0, 0.0), prev_valid(0.0, 0.0);
 
-cv::Point2d centroid(0.0,0.0);
-float rms_lat = 0.0;
-float rms_lon = 0.0;
-int num_points = 0;
-
 void push_coord(std::vector<cv::Point2d>&, const cv::Point2d&);
 void push_frame(std::vector<cv::Mat>&, const cv::Mat&);
 
 int main (void) {
     std::cout << std::fixed << std::setprecision(5);
 
-    cv::Mat img_sat = cv::imread("/Users/paigerust/Desktop/fg_cv_test_1/sat_view.png", -1);
+    cv::Mat img_sat = cv::imread("/Users/paigerust/Desktop/MQP/fg_cv_test_1/sat_view.png", -1);
     cv::cvtColor(img_sat, img_sat, cv::COLOR_BGRA2BGR);
-    // cv::Mat img_fg = cv::imread ("/Users/paigerust/Desktop/fg_cv_test_1/payload_view_5.png", -1);
 
-    cv::VideoCapture vid_fg("/Users/paigerust/Desktop/fg_cv_test_1/fg_cv_vid_1.mov");
+    cv::VideoCapture vid_fg("/Users/paigerust/Desktop/MQP/fg_cv_test_1/fg_cv_vid_1.mov");
 
     int frame_count = static_cast<int>(vid_fg.get(cv::CAP_PROP_FRAME_COUNT));
     double fps = vid_fg.get(cv::CAP_PROP_FPS);
@@ -40,8 +34,14 @@ int main (void) {
     std::cout << "Frame count: " << frame_count << "\n";
     std::cout << "FPS: " << fps << "\n";
 
-    cv::VideoWriter vid_out("/Users/paigerust/Desktop/fg_cv_test_1/fg_cv_out_1.mov", cv::VideoWriter::fourcc('a', 'v', 'c', '1'), fps, cv::Size(frame_width, frame_height));
+    cv::VideoWriter vid_out("/Users/paigerust/Desktop/MQP/fg_cv_test_1/fg_cv_out_1.mov", cv::VideoWriter::fourcc('a', 'v', 'c', '1'), fps, cv::Size(frame_width, frame_height));
     cv::Mat frame_fg;
+
+    std::ofstream coord_out;
+    coord_out.open("logs/coordinate_log.csv");
+    coord_out << std::fixed << std::setprecision(5);
+
+    coord_out << "timestamp" << "," << "latitude" << "," << "longitude" << std::endl;
 
     if (!vid_fg.isOpened()) {
         std::cerr << "Error: Could not open video file.\n";
@@ -102,6 +102,7 @@ int main (void) {
                 compute = !H.empty();
             } else {
                 std::cerr << "Not enough matches (" << goodMatches.size() << ") to compute homography.\n";
+
             }
         }
 
@@ -116,6 +117,7 @@ int main (void) {
 
             push_frame(window_frames, cropped);
             push_coord(window_coords, coord);
+            coord_out << video_timestamp << "," << coord.x << "," << coord.y << std::endl;
 
             prev_valid = last_valid;
             have_prev = have_last;
@@ -144,26 +146,17 @@ int main (void) {
 
                 window_index = (window_index + 1) % window;
             }
+            coord_out << video_timestamp << "," << "NaN" << "," << "NaN" << std::endl;
         }
 
         cv::Point2d averaged_coordinate = average_coords(window_coords);
         all_coords.push_back(averaged_coordinate);
         std::cout << "=========================================================\n";
-        std::cout << "Video Timestamp:\t" << video_timestamp << "\n";
         std::cout << "Estimated Latitude:\t" << averaged_coordinate.x << "\n";
         std::cout << "Estimated Longitude:\t" << averaged_coordinate.y << "\n";
-
-        cv::Mat out = img_sat.clone();
-        add_marker(out, averaged_coordinate);
-        vid_out.write(out); 
     }
 
-    flight_statistics();
-    cv::Point2d rms_m = degrees_to_m();
-    std::cout << "=========================================================\n";
-    std::cout << "Centroid:\t" << centroid << "\n";
-    std::cout << "Latitudinal RMS (deg):\t" << rms_lat << "\t| Latitudinal RMS (m)\t" << rms_m.x << "\n";
-    std::cout << "Longitudinal RMS (deg):\t" << rms_lon << "\t| Longitudinal RMS (m)\t" << rms_m.y << "\n";
+    flight_statistics(img_sat, vid_out);
 
     vid_fg.release();
     vid_out.release();

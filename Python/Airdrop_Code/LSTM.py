@@ -1,6 +1,6 @@
 from tensorflow.python.keras.metrics import Metric
 from sklearn.metrics import mean_squared_error
-from keras import backend as K  # (kept in case you use it elsewhere)
+from keras import backend as K
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
 import tensorflow as tf
@@ -11,6 +11,8 @@ import itertools
 import time
 import sys
 import os
+from pathlib import Path
+import re
 
 LOOKBACK = 60
 STRIDE = 1
@@ -32,105 +34,93 @@ base_loc = "/Users/paigerust/wpi-airdrop-mqp/Python/Datasets"
 data_loc = base_loc + "/MATLAB Data/Constant Flight"
 
 if use_all_cols:
-    payload_cols  = ['roll', 'pitch', 'acc_x', 'acc_y', 'acc_z']
+    payload_cols  = ['wx_dps', 'wy_dps', 'ax_ms2', 'ay_ms2', 'az_ms2']
 else:
-    payload_cols  = ['roll', 'pitch']
+    payload_cols  = ['wx_dps', 'wy_dps']
 
 plt.rcParams["font.family"] = "Helvetica"
 plt.rcParams['font.size']   = 12
 
 def main():
+    matlab_out = base_loc + "/HAARS Data/full"
+    matlab_out_d = base_loc + "/HAARS Data/derivative"
 
-
-    flights = [
-        # (sensor_path, wind_path, title, wspd, wdir)  # wspd/wdir optional metadata
-        (data_loc + "/sensor_data_2_0.csv",  data_loc + "/wind_data_2_0.csv",  "2mps_0deg", 2, 0),
-        (data_loc + "/sensor_data_2_90.csv",  data_loc + "/wind_data_2_90.csv",  "2mps_90deg", 2, 90),
-        (data_loc + "/sensor_data_4_90.csv",  data_loc + "/wind_data_4_90.csv",  "4mps_90deg", 4, 90),
-        (data_loc + "/sensor_data_4_180.csv",  data_loc + "/wind_data_4_180.csv",  "4mps_180deg", 4, 180),
-        (data_loc + "/sensor_data_6_180.csv",  data_loc + "/wind_data_6_180.csv",  "6mps_180deg", 6, 180),
-        (data_loc + "/sensor_data_6_270.csv",  data_loc + "/wind_data_6_270.csv",  "6mps_270deg", 6, 270),
-        (data_loc + "/sensor_data_8_270.csv",  data_loc + "/wind_data_8_270.csv",  "8mps_270deg", 8, 270),
-        (data_loc + "/sensor_data_8_0.csv",  data_loc + "/wind_data_8_0.csv",  "8mps_0deg", 8, 0),
-        (data_loc + "/sensor_data_10_0.csv",  data_loc + "/wind_data_10_0.csv",  "10mps_0deg", 10, 0),
-        (data_loc + "/sensor_data_10_90.csv",  data_loc + "/wind_data_10_90.csv",  "10mps_90deg", 10, 90),
-        (data_loc + "/sensor_data_12_90.csv",  data_loc + "/wind_data_12_90.csv",  "12mps_90deg", 12, 90),
-        (data_loc + "/sensor_data_12_180.csv",  data_loc + "/wind_data_12_180.csv",  "12mps_180deg", 12, 180),
-        (data_loc + "/sensor_data_14_180.csv",  data_loc + "/wind_data_14_180.csv",  "14mps_180deg", 14, 180),
-        (data_loc + "/sensor_data_14_270.csv",  data_loc + "/wind_data_14_270.csv",  "14mps_270deg", 14, 270),
-    ]
+    flights = build_flights(matlab_out, matlab_out_d)
 
     flight_data = []
-    for sensor_path, wind_path, title, wspd, wdir in flights:
-        X, y_wspd, y_wdir, _ = load_flight(sensor_path, wind_path, title)
-
+    for f in flights:
+        X, y_wspd, y_wdir, _ = load_flight(f["sensor_path"], f["wind_path"], f["title"])
         flight_data.append({
-            "title": title,
+            "title": f["title"],
             "X": X,
             "y_wspd": y_wspd,
             "y_wdir": y_wdir,
-            "wspd": wspd,
-            "wdir": wdir
         })
 
-    print(title, X.shape, y_wspd.shape, y_wdir.shape)
+    print(f"Loaded {len(flight_data)} flights")
 
     for test_group in range(len(flight_data)):
         test_data = flight_data[test_group]
 
         train_data = [flight_data[i] for i in range(len(flight_data)) if i != test_group]
 
-    Title = f"TEST={test_data['title']} (train on 13 flights)"
+        Title = f"TEST={test_data['title']} (train on 13 flights)"
 
-    X_train_list = [data["X"] for data in train_data]
-    X_all_list = [data["X"] for data in train_data] + [test_data["X"]]
+        X_train_list = [data["X"] for data in train_data]
+        X_all_list = [data["X"] for data in train_data] + [test_data["X"]]
 
-    X_all_norm, mu, sigma = normalize_data(X_train_list, X_all_list)
+        X_all_norm, mu, sigma = normalize_data(X_train_list, X_all_list)
 
-    for i, data in enumerate(train_data):
-        data["X_norm"] = X_all_norm[i]
-        test_data["X_norm"] = X_all_norm[-1]
+        X_w_all, y_w_all = [], []
+        for i, data in enumerate(train_data):
+            data["X_norm"] = X_all_norm[i]
+            test_data["X_norm"] = X_all_norm[-1]
 
-    X_w, y_w = make_windows(data["X_norm"], data["y_wspd"], lookback=LOOKBACK, stride=STRIDE)
+            X_w, y_w = make_windows(data["X_norm"], data["y_wspd"], lookback=LOOKBACK, stride=STRIDE)
+            X_w_all.append(X_w)
+            y_w_all.append(y_w)
 
-    (X_train, y_train), (X_val, y_val) = train_val_split(X_w, y_w, fraction=TRAIN_VAL_SPLIT)
+        X_w = np.concatenate(X_w_all, axis=0)
+        y_w = np.concatenate(y_w_all, axis=0)
 
-    y_train = np.asarray(y_train).reshape(-1)
-    y_val   = np.asarray(y_val).reshape(-1)
+        (X_train, y_train), (X_val, y_val) = train_val_split(X_w, y_w, fraction=TRAIN_VAL_SPLIT)
 
-    X_test, y_test = make_windows(test_data["X_norm"], test_data["y_wspd"], lookback=LOOKBACK, stride=STRIDE)
+        y_train = np.asarray(y_train)
+        y_val   = np.asarray(y_val)
 
-    model = build_LSTM(numFeatures=X_train.shape[-1])
-    train(model, X_train, y_train, X_val, y_val, Title)
+        X_test, y_test = make_windows(test_data["X_norm"], test_data["y_wspd"], lookback=LOOKBACK, stride=STRIDE)
 
-    metrics = plot_predictions(model, X_test, y_train, y_test, Title, training_increment=1.0, save_fig=0)
+        model = build_LSTM(numFeatures=X_train.shape[-1])
+        train(model, X_train, y_train, X_val, y_val, Title)
 
-    pred_test = model.predict(X_test, verbose=0).squeeze()
+        # metrics = plot_predictions(model, X_test, y_train, y_test, Title, training_increment=1.0, save_fig=0)
 
-    fs = 20.0
-    dt = 1.0 / fs
-    t_test = (np.arange(len(y_test)) + LOOKBACK) * dt  # seconds
-    t_test_min = t_test / 60.0                         # minutes
+        pred_test = model.predict(X_test, verbose=0).squeeze()
 
-    plt.figure(figsize=(10, 3))
+        fs = 20.0
+        dt = 1.0 / fs
+        t_test = (np.arange(len(y_test)) + LOOKBACK) * dt  # seconds
+        t_test_min = t_test / 60.0                         # minutes
 
-    plt.plot(t_test_min, y_test,
-            label="True wind speed",
-            linewidth=1.5)
+        plt.figure(figsize=(10, 3))
 
-    plt.plot(t_test_min, pred_test,
-            label="Predicted wind speed",
-            linewidth=1.5,
-            alpha=0.9)
+        plt.plot(t_test_min, y_test,
+                label="True wind speed",
+                linewidth=1.5)
 
-    plt.xlabel("Time (minutes)")
-    plt.ylabel("Wind speed (m/s)")
-    plt.title(f"Test flight: {Title}")
-    plt.legend()
-    plt.grid(True, linestyle="--", alpha=0.5)
+        plt.plot(t_test_min, pred_test,
+                label="Predicted wind speed",
+                linewidth=1.5,
+                alpha=0.9)
 
-    plt.tight_layout()
-    plt.show()
+        plt.xlabel("Time (minutes)")
+        plt.ylabel("Wind speed (m/s)")
+        plt.title(f"Test flight: {Title}")
+        plt.legend()
+        plt.grid(True, linestyle="--", alpha=0.5)
+
+        plt.tight_layout()
+        plt.show()
 
     # for m in range(len(payload_cols)):
     #     drone_attitude[:, m] = scale(drone_attitude[:, m])
@@ -431,10 +421,56 @@ def plot_mult_moving_avg(t1, t2, ground_truth, labels, y_label, y_lims, title, s
 
     plt.close()
 
+def build_flights(output_folder, output_folder_d):
+    out = Path(output_folder)
+    out_d = Path(output_folder_d)
+
+    # Index by base_name
+    imu = {}
+    wind = {}
+    dimu = {}
+    dwind = {}
+
+    # helper: extract base from "imu_<base>.csv"
+    def base_from(prefix, path: Path):
+        m = re.match(rf"{re.escape(prefix)}_(.*)\.csv$", path.name)
+        return m.group(1) if m else None
+
+    for p in out.glob("imu_*.csv"):
+        b = base_from("imu", p)
+        if b: imu[b] = p
+
+    for p in out.glob("wind_*.csv"):
+        b = base_from("wind", p)
+        if b: wind[b] = p
+
+    for p in out_d.glob("d_imu_*.csv"):
+        b = base_from("d_imu", p)
+        if b: dimu[b] = p
+
+    for p in out_d.glob("d_wind_*.csv"):
+        b = base_from("d_wind", p)
+        if b: dwind[b] = p
+
+    bases = sorted(set(imu) & set(wind))  # only require imu+wind; add &set(dimu)&set(dwind) if you require derivatives too
+
+    flights = []
+    for b in bases:
+        flights.append({
+            "title": b,
+            "sensor_path": str(imu[b]),
+            "wind_path": str(wind[b]),
+            "d_sensor_path": str(dimu.get(b, "")),
+            "d_wind_path": str(dwind.get(b, "")),
+        })
+
+    return flights
+
+
 def load_flight(sensor_csv, wind_csv, title):
     X = np.array(pd.read_csv(sensor_csv)[payload_cols])
-    y_wspd = np.array(pd.read_csv(wind_csv)['wind_mag'])
-    y_wdir = np.array(pd.read_csv(wind_csv)['wind_dir'])
+    y_wspd = np.array(pd.read_csv(wind_csv)['wind_speed_mps'])
+    y_wdir = np.array(pd.read_csv(wind_csv)['wind_dir_deg'])
 
     n = min(len(X), len(y_wspd), len(y_wdir))
     return X[:n], y_wspd[:n], y_wdir[:n], title
@@ -459,7 +495,7 @@ def make_windows(X, y, lookback=LOOKBACK, stride=STRIDE):
 
     for t in range(lookback, T, stride):
         X_w.append(X[t - lookback:t])
-        y_w.append(y[t])
+        y_w.append(y[t - lookback:t])
 
     return np.asarray(X_w), np.asarray(y_w).reshape(-1)
 
@@ -475,11 +511,13 @@ def train_val_split(X, y, fraction=TRAIN_VAL_SPLIT):
 
 def build_LSTM(numFeatures):
     inp = tf.keras.Input(shape=(LOOKBACK, numFeatures))  # (timesteps, features)
-    x = tf.keras.layers.LSTM(420, return_sequences=True)(inp)
-    x = tf.keras.layers.LSTM(180, return_sequences=True)(x)
-    x = tf.keras.layers.LSTM(90, return_sequences=True, dropout=0.3)(x)
-    x = tf.keras.layers.LSTM(48, activation='tanh')(x)
-    out = tf.keras.layers.Dense(1)(x)
+    x = tf.keras.layers.Conv1D(filters=32, kernel_size=5, padding="same", activation="relu")(inp)
+    x = tf.keras.layers.LSTM(64, return_sequences=True)(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    x = tf.keras.layers.LSTM(32, return_sequences=True)(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    x = tf.keras.layers.Dense(32, activation="relu")(x)
+    out = tf.keras.layers.Dense(2)(x)
 
     model = tf.keras.Model(inp, out)
     optimizer = tf.keras.optimizers.RMSprop(learning_rate=4e-5)
