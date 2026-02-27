@@ -1,13 +1,13 @@
-function x0 = HARP_To_Propagator(data_out)
+function x0 = HARP_To_Propagator(carp_data)
     % Convert CARP outputs to ENU initial conditions for propagator (East
     % North Up)
     
     % Initial altitude (convert ft to m)
-    alt_m = data_out.carp.altitude * 0.3048; %payload falls to the ground hence the true_altitude - terrain_elevation
+    alt_m = carp_data.altitude * 0.3048; %payload falls to the ground hence the true_altitude - terrain_elevation
     
     % Initial horizontal velocity (convert knots to m/s)
-    gs_ms = data_out.carp.groundspeed * 0.514444;  % knots to m/s
-    heading_rad = -deg2rad(data_out.carp.heading);
+    gs_ms = carp_data.groundspeed * 0.514444;  % knots to m/s
+    heading_rad = -deg2rad(carp_data.heading);
     
     % ENU velocity components (aircraft velocity at release)
     V_east = gs_ms * sin(heading_rad);

@@ -30,7 +30,7 @@ function results = HARP_Dynamic_Model(data_out)
     payload = Create_Payload(data_out.w, data_out.l, data_out.h,data_out.m);
     
     %% STEP 4: Convert CARP Results to Propagator Initial Conditions
-    x0 = HARP_To_Propagator(carp_data);
+    x0 = HARP_To_Propagator(data_out.carp_data);
 
     % x0(4:6) = x0(4:6) * 2;
 
@@ -48,6 +48,8 @@ function results = HARP_Dynamic_Model(data_out)
         'payload', payload, ...
         'weather', the_weather, ...
         'model', @Two_Stage_Model);
+
+results = [t, y, model_obj];
 
 end
 
