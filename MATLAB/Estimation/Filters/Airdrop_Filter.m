@@ -130,7 +130,8 @@ classdef Airdrop_Filter < Abstract_Filter
             end
         end
 
-        function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas)
+        function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas, q_meas, V_e)
+            nargin
             obj.update_bias = true;
             pos_inds = obj.x_inds.P_E;
 
@@ -151,7 +152,9 @@ classdef Airdrop_Filter < Abstract_Filter
             accel_meas_corr = obj.g_norm * accel_meas / norm(accel_meas);
 
             % Estimate the orientation from accel and mag measurments
-            q_meas = obj.quat_from_acc_mag(accel_meas_corr, mag_meas);
+            if nargin < 8
+                q_meas = obj.quat_from_acc_mag(accel_meas_corr, mag_meas);
+            end
 
             % C_i_b = ecef2body_rotm(q_meas);   % IMPORTANT: check your function name returns which direction
             % You used C_BE in your quat_from_acc_mag and called it C_BE.
@@ -165,7 +168,8 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.m_ref_i = C_bi * m_b0;         % inertial reference mag
 
             % Initialize velocity and angular velocity to zero
-            obj.x_curr(obj.x_inds.V_E) = zeros(3,1);
+            if nargin < 9, V_e = zeros(3,1); end
+            obj.x_curr(obj.x_inds.V_E) = V_e;
             % obj.x_curr(obj.x_inds.w_b) = zeros(3,1);
 
             % Initialize gyro bias to the current gyro readings

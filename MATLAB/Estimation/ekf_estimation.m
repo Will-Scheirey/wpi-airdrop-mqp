@@ -1,7 +1,7 @@
-clearvars -except t y model x_actual; clc; close all
+clearvars -except t y model x_actual tspan; clc; close all
 
-num_sec = 20;
-meas_freq = 10; % Number of measurements per second
+num_sec = 10;
+meas_freq = 100; % Number of measurements per second
 num_steps = num_sec * meas_freq + 1;
 
 % Only re-run the simulation if we need to
@@ -26,8 +26,8 @@ sensor = Sensor_FlySight(meas_freq);
 p_std_dev = sensor.gps_std_dev;
 a_std_dev = sensor.accel_std_dev;
 w_std_dev = sensor.gyro_std_dev;
-e_std_dev = sensor.mag_std_dev;
-w_bias_std_dev = 5;
+mag_std_dev = sensor.mag_std_dev;
+w_bias_std_dev = 0;
 
 a_corr = correct_meas_accel(a_actual, v_actual, w_actual, e_actual, alpha_actual);
 
@@ -42,75 +42,70 @@ w_meas(:, 2) = w_meas(:, 2) + w_bias(2);
 w_meas(:, 3) = w_meas(:, 3) + w_bias(3);
 
 p_meas = sensor_noise_white(p_actual, p_std_dev);
+lla_worc = [42.2741, -71.8080, 100];
+pos_lla = enu2lla(p_meas, lla_worc, "flat");
 
-e_meas = sensor_noise_white(e_actual, e_std_dev);
+mag_XYZ  = zeros(num_steps, 3);
+mag_actual = zeros(num_steps, 3);
+v_e_actual = zeros(num_steps, 3);
+for n = 1:num_steps
+    XYZ = wrldmagm(pos_lla(n, 3), pos_lla(n, 1), pos_lla(n, 2), 2025);
+    XYZ = XYZ / norm(XYZ);
 
-measurements = [p_meas, e_meas, w_meas]';
+    mag_XYZ(n, :) = XYZ;
+    C_EB = ecef2body_rotm(e_actual(n, :)); % Body -> inertial
 
-state_idx = 14;
+    mag_actual(n, :) = (C_EB' * XYZ);
+    v_e_actual(n, :) = (C_EB * v_actual(n, :)');
+end
 
-% Wind noise addition
-mag = 6 * ones(2001, 1);
-direction = 270 * ones(2001, 1);
-wind = [mag direction];
+m_meas = sensor_noise_white(mag_actual, mag_std_dev);
 
-wind_meas = sensor_noise_white(wind, 1);
+v_meas = sensor_noise_white(v_e_actual, p_std_dev);
+
+data_accel = table(tspan', a_meas, repmat(-1, num_steps, 1), 'VariableNames', {'time', 'data', 'meas_idx'});
+data_gyro  = table(tspan', w_meas, repmat(-1, num_steps, 1), 'VariableNames', {'time', 'data', 'meas_idx'});
+
+data_gps   = table(tspan', p_meas, repmat(1, num_steps, 1), 'VariableNames', {'time', 'data', 'meas_idx'});
+data_mag   = table(tspan', m_meas, repmat(2, num_steps, 1), 'VariableNames', {'time', 'data', 'meas_idx'});
+data_vel   = table(tspan', v_meas, repmat(4, num_steps, 1), 'VariableNames', {'time', 'data', 'meas_idx'});
+
+measurements = {data_gps, data_mag, data_vel};
+
+inputs = table(tspan', data_accel.data, data_gyro.data, ...
+    'VariableNames', {'time', 'accel', 'gyro'});
 
 %% Set up the Kalman Filter
 num_steps = numel(t);
 
-x0 = [
-    y(1, 1:3)';
-
-    ecef2body_rotm(y(1, 7:10)')' * y(1, 4:6)'
-
-    y(7:13)';
-    zeros(3,1);
-    ];
-
-R = blkdiag( ...
-    (p_std_dev^2) * eye(3), ...
-    (e_std_dev^2) * eye(4), ...
-    (w_std_dev^2) * eye(3)  ...
-    );
-
-Q_P = [
-    1e-5, 0,  0;
-    0,    1e-5, 0;
-    0,    0,    1e-5;
-];
-
-cross_term = 1e-6;
-diag_term = 1e-4;
-
-Q_V = [
-    diag_term,           cross_term,  cross_term;
-    cross_term,    diag_term,        cross_term
-    cross_term,    cross_term,  diag_term
-];
-
-Q = blkdiag(...
-    Q_P,... % P
-    Q_V,... % V
-    1e-2 * eye(4), ... % e
-    1e-1 * eye(3), ... % w
-    1e-20 * eye(3) ...
-    );
-
-P0 = blkdiag( ...
-    1e1 * eye(3), ...
-    1e2 * eye(3), ...
-    1e-3 * eye(4), ...
-    1e-3 * eye(3), ...
-    w_bias_std_dev^2 * eye(3) ...
-    );
-
 %% Run the Kalman Filter
 % The Kalman Filter
 dt = t(2) - t(1);
-kf = EKF_V_E(R, Q, x0, 0, P0, dt, model.payload.I());
 
-kf.run_filter(measurements, a_meas', num_steps);
+sensor_var = struct( ...
+    'accel', repmat(a_std_dev, 1, 3), ...
+    'gyro',  repmat(w_std_dev, 1, 3), ...
+    'gps',   repmat(p_std_dev, 1, 3), ...
+    'mag',   repmat(mag_std_dev, 1, 3), ...
+    'baro',  p_std_dev);
+
+[R, Q, P0] = get_noise_params(sensor_var, dt);
+
+kf = Airdrop_EKF(R, Q, 0, P0, dt);
+
+kf.initialize(true, ...
+    [9.81, 0, 0]', ...
+    [0, 0, 0]', ...
+    data_mag.data(1, :)', ...
+    data_gps.data(1, :)', ...
+    data_gps.data(1, 3)', ...
+    e_actual(1, :), ... 
+    v_e_actual(1, :) ...
+    )
+
+acc_gps = repmat(p_std_dev, num_steps, 2);
+
+kf.run_filter(measurements, inputs, t, acc_gps, 0, 1, true);
 
 x_est = kf.x_hist(:, 2:end)';
 covariances = kf.P_hist;
@@ -124,39 +119,25 @@ v_truth_b = v_actual(1:end-1, :);
 e_truth = e_actual(1:end-1, :);
 w_truth = w_actual(1:end-1, :);
 
-
 for i = 1:height(v_truth_b)
-    v_truth(i, :) = ecef2body_rotm(e_truth(i, :))' * v_truth_b(i, :)';
+    v_truth(i, :) = ecef2body_rotm(e_truth(i, :)) * v_truth_b(i, :)';
 end
-
-% v_truth = v_actual(1:end-1, :);
 
 x_truth = [p_truth, v_truth, e_truth, w_truth];
 
-p_est = x_est(:, 1:3);
-v_est = x_est(:, 4:6);
-e_est = x_est(:, 7:10);
-w_est = x_est(:, 11:13);
+p_est = x_est(:,  kf.x_inds.P_E);
+v_est = x_est(:,  kf.x_inds.V_E);
+e_est = x_est(:,  kf.x_inds.e);
 
 p_err = p_est - p_truth;
 v_err = v_est - v_truth;
 e_err = e_est - e_truth;
-w_err = w_est - w_truth;
 
-w_bias_err = w_bias' - x_est(:, 14:16);
+w_bias_err = w_bias' - x_est(:, kf.x_inds.b_g);
 
-x_err = [p_err, v_err, e_err, w_err, w_bias_err];
+x_err = [p_err, v_err, e_err, w_bias_err];
 
 t_plot = t(1:end-1);
-
-LSTM_export_sensor = [y(:, 11:13), alpha_actual];
-LSTM_export_sensor_file = "LSTM_sensor_data.csv";
-
-LSTM_export_wind = wind_meas;
-LSTM_export_wind_file = "LSTM_wind_data.csv";
-
-writematrix(LSTM_export_sensor, LSTM_export_sensor_file);
-writematrix(LSTM_export_wind, LSTM_export_wind_file);
 
 %% Plot Values
 figure(1)
@@ -185,28 +166,26 @@ title("Quaternion Error vs. Time")
 
 figure(4)
 clf
-plot(t_plot, w_err, 'LineWidth', 2)
-legend("w_0^B", "w_1^B", "w_2^B")
-xlabel("Time (s)")
-ylabel("Error (rad/s)")
-title("Body Angular Velocity Error vs. Time")
+plot(t_plot, x_est(:, kf.x_inds.b_m), 'LineWidth', 2)
+title("Mag Bias Estimate")
 
 figure(5)
 clf
-plot_cov(x_err(:, state_idx), squeeze(covariances(state_idx, state_idx, 1:end-1)), t_plot)
+plot(tspan, mag_actual, 'LineWidth', 2)
+title("Mag Measurement")
 
 figure(6)
 clf
 
 subplot(3, 1, 1)
-plot(t_plot, x_est(:, 14) - w_bias(1), 'DisplayName', 'Estimate Error', 'LineWidth', 1.5); hold on
+plot(t_plot, w_bias_err(:, 1), 'DisplayName', 'Estimate Error', 'LineWidth', 1.5); hold on
 legend
 xlabel("Time (s)")
 ylabel("Bias Error (rad/s)")
 sgtitle("Gyro Axis 0")
 
 subplot(3, 1, 2)
-plot(t_plot, x_est(:, 15) - w_bias(2), 'DisplayName', 'Estimate Error', 'LineWidth', 1.5); hold on
+plot(t_plot, w_bias_err(:, 2), 'DisplayName', 'Estimate Error', 'LineWidth', 1.5); hold on
 
 legend
 xlabel("Time (s)")
@@ -214,7 +193,7 @@ ylabel("Bias Error (rad/s)")
 sgtitle("Gyro Axis 1")
 
 subplot(3, 1, 3)
-plot(t_plot, x_est(:, 16) - w_bias(3), 'DisplayName', 'Estimate Error', 'LineWidth', 1.5); hold on
+plot(t_plot, w_bias_err(:, 3), 'DisplayName', 'Estimate Error', 'LineWidth', 1.5); hold on
 legend
 xlabel("Time (s)")
 ylabel("Bias Error (rad/s)")
@@ -225,6 +204,18 @@ sgtitle("Gyro Bias Estimate Errors")
 figure(7)
 clf
 plot(t_plot, v_est);
+
+figure(8)
+clf
+plot(t_plot, e_truth);
+title("Actual Quaternion Parts")
+
+figure(9)
+clf
+plot(t_plot, e_est);
+title("Estimated Quaternion Parts")
+
+
 
 function plot_cov(err, cov, t)
     plot(t, err, '-b', 'LineWidth', 1.5, 'DisplayName', 'Error'); hold on
