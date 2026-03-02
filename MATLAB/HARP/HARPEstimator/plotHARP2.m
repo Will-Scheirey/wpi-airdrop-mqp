@@ -1,4 +1,4 @@
-function plotHARP2(outputs, inputs, flight_traj, planned_landing)
+function plotHARP2(outputs, inputs, flight_traj, planned_landing, dynamic_model)
     % Plot HARP with 4 views: 3D trajectory, side view, top view, and wind vectors
     
     % Extract key positions
