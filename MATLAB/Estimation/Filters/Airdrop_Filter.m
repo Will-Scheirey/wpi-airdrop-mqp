@@ -328,13 +328,13 @@ classdef Airdrop_Filter < Abstract_Filter
                 if verbose && mod(ii, 1) == 0
                     fprintf("%d / %d (t=%.6f)\n", ii, num_steps, t0);
                 end
-                
+
                 if t0 > drop_time
                     % obj.Q(obj.x_inds.b_m, obj.x_inds.b_m) = eye(3) * 1e-8;
                     % obj.Q(obj.x_inds.b_a, obj.x_inds.b_a) = eye(3) * 1e-4;
                     % obj.Q(obj.x_inds.b_g, obj.x_inds.b_g) = eye(3) * 1e-4;
                 end
-                
+
                 obj.x_hist(:, i) = obj.x_curr;
 
                 % Helper lambdas to keep code readable
@@ -490,7 +490,7 @@ classdef Airdrop_Filter < Abstract_Filter
             a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
 
             % rotation used for dV/db_a block (same as yours)
-            C_bi = ecef2body_rotm(e);     % body -> inertial
+            C_EB = ecef2body_rotm(e);     % body -> inertial
 
             A(P, V) = eye(3);
 
@@ -518,7 +518,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 2*a0*e1 + 2*a1*e2 + 2*a2*e3 ...
                 ];
 
-            A(V, BA) = -C_bi;
+            A(V, BA) = -C_EB;
 
             % =========================================================================
             % Quaternion kinematics Jacobian rows (dx6dx..dx9dx)
@@ -618,9 +618,8 @@ classdef Airdrop_Filter < Abstract_Filter
             q = obj.get_e();
 
             % --- NEW: magnetometer prediction ---
-            C_bi  = ecef2body_rotm(q);   % (given: this is b2i)
-            C_ib  = C_bi.';              % i2b
-            m_pred = C_ib * obj.m_ref_i + b_m; % predicted mag in body
+            C_BE  = ecef2body_rotm(q)';   % (given: this is b2i)
+            m_pred = C_BE * obj.m_ref_i + b_m; % predicted mag in body
 
             vel = obj.get_V_E();
             vel_pred = vel + b_v;
@@ -644,11 +643,13 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function H = H_mag(obj)
             H = zeros(3, obj.num_states);
-            q  = obj.get_e();
-            Jq = obj.dmag_dq_numeric(q);          % 3x4
+
+            q  = obj.get_e();                    % [e0 e1 e2 e3]' scalar-first
+            mE = obj.m_ref_i(:);                 % 3x1 inertial/ECEF reference field
+
+            Jq = obj.dmag_dq_analytic(q, mE);    % 3x4 analytic
+
             H(:, obj.x_inds.e)   = Jq;
-
-
             H(:, obj.x_inds.b_m) = eye(3);
         end
 
@@ -835,36 +836,61 @@ classdef Airdrop_Filter < Abstract_Filter
             end
         end
 
-        function Jq = dC_times_m_dq_wxyz_i2b(~, q, m)
-            % Analytic Jacobian of y = C_ib(q) * m wrt q = [w x y z]'.
-            % Assumes C_ib is the "standard" i2b DCM for quaternion [w x y z].
-            % Returns Jq (3x4): [dy/dw, dy/dx, dy/dy, dy/dz]
+        function J = dmag_dq_analytic(obj, q, mE)
+            %DMAG_DQ_ANALYTIC Analytic d( C_BE(q)*mE ) / d q  for scalar-first q.
+            %   q  = [e0 e1 e2 e3]'  (scalar-first)
+            %   mE = reference field in E/inertial (3x1)
+            %   Returns J = d m_b / d q (3x4)
 
-            q = q(:); m = m(:);
-            q = q / norm(q);
+            q  = q(:);
+            mE = mE(:);
 
-            w = q(1); x = q(2); y = q(3); z = q(4);
+            e0 = q(1); e1 = q(2); e2 = q(3); e3 = q(4);
+            mx = mE(1); my = mE(2); mz = mE(3);
 
-            % These are partials of the STANDARD i2b DCM C_ib(q)
-            dC_dw = [  0,  2*z, -2*y;
-                -2*z,  0,  2*x;
-                2*y, -2*x,  0 ];
+            % If C_EB(q) is the usual quaternion DCM (body->E),
+            % then C_BE = C_EB' (E->body).
+            %
+            % Using:
+            % C_EB =
+            % [1-2(e2^2+e3^2)   2(e1e2-e0e3)   2(e1e3+e0e2)
+            %  2(e1e2+e0e3)     1-2(e1^2+e3^2) 2(e2e3-e0e1)
+            %  2(e1e3-e0e2)     2(e2e3+e0e1)   1-2(e1^2+e2^2)]
+            %
+            % then C_BE = C_EB'.
 
-            dC_dx = [  0,   2*y,  2*z;
-                2*y, -4*x,  2*w;
-                2*z, -2*w, -4*x ];
+            % Derivatives of m_b = C_BE * mE = C_EB' * mE
+            % J(:,k) = d/d e_k of (C_EB')*mE = (dC_EB/de_k)' * mE
 
-            dC_dy = [ -4*y,  2*x, -2*w;
-                2*x,   0,   2*z;
-                2*w,  2*z, -4*y ];
+            % ---- dC_EB/de0 ----
+            dC0 = [ 0,      -2*e3,   2*e2;
+                2*e3,    0,     -2*e1;
+                -2*e2,    2*e1,   0 ];
 
-            dC_dz = [ -4*z,  2*w,  2*x;
-                -2*w, -4*z,  2*y;
-                2*x,  2*y,   0 ];
+            % ---- dC_EB/de1 ----
+            dC1 = [ 0,       2*e2,    2*e3;
+                2*e2,   -4*e1,   -2*e0;
+                2*e3,    2*e0,   -4*e1 ];
 
-            % y = C*m  => dy/dq = (dC/dq)*m
-            Jq = [dC_dw*m, dC_dx*m, dC_dy*m, dC_dz*m];
+            % ---- dC_EB/de2 ----
+            dC2 = [ -4*e2,   2*e1,    2*e0;
+                2*e1,   0,       2*e3;
+                -2*e0,   2*e3,   -4*e2 ];
+
+            % ---- dC_EB/de3 ----
+            dC3 = [ -4*e3,  -2*e0,    2*e1;
+                2*e0,  -4*e3,    2*e2;
+                2*e1,   2*e2,    0 ];
+
+            % Apply transpose because m_b uses C_BE = C_EB'
+            J0 = dC0.' * mE;
+            J1 = dC1.' * mE;
+            J2 = dC2.' * mE;
+            J3 = dC3.' * mE;
+
+            J = [J0, J1, J2, J3];
         end
+
     end
 
 end

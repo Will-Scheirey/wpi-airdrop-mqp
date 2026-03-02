@@ -1,4 +1,4 @@
-clearvars -except t y model x_actual tspan; clc; close all
+clearvars -except t y model x_actual tspan; clear; clc;
 
 num_sec = 10;
 meas_freq = 100; % Number of measurements per second
@@ -15,7 +15,7 @@ end
 if run_sim
     disp("Running sim")
     tspan = linspace(0, num_sec, num_steps);
-    [t, y, model] = propagate_model('tspan', tspan, 'riser', true, 'model', @Parachute_Model_Simple);
+    [t, y, model] = propagate_model('tspan', tspan, 'riser', false, 'model', @Parachute_Model_Simple, 'use_drag', false);
     x_actual = y(1:end-1, :);
 end
 
@@ -89,12 +89,12 @@ sensor_var = struct( ...
     'mag',   repmat(mag_std_dev, 1, 3), ...
     'baro',  p_std_dev);
 
-[R, Q, P0] = get_noise_params(sensor_var, dt);
+[R, Q, P0] = get_noise_params_sim(sensor_var, dt);
 
 kf = Airdrop_EKF(R, Q, 0, P0, dt);
 
 kf.initialize(true, ...
-    [9.81, 0, 0]', ...
+    a_actual(1, :)', ...
     [0, 0, 0]', ...
     data_mag.data(1, :)', ...
     data_gps.data(1, :)', ...
@@ -171,7 +171,7 @@ title("Mag Bias Estimate")
 
 figure(5)
 clf
-plot(tspan, mag_actual, 'LineWidth', 2)
+plot(tspan, data_mag.data, 'LineWidth', 2)
 title("Mag Measurement")
 
 figure(6)
@@ -215,6 +215,94 @@ clf
 plot(t_plot, e_est);
 title("Estimated Quaternion Parts")
 
+figure(10)
+clf
+plot(tspan, data_accel.data)
+title("Acceleration Measurement")
+
+figure(11)
+clf
+plot(t_plot, x_est(:, kf.x_inds.b_a))
+title("Acceleration Bias Estimate")
+
+figure(12)
+clf
+plot(tspan, data_gyro.data);
+title("Gyro Measurement")
+
+figure(13)
+clf
+plot(t_plot, x_est(:, kf.x_inds.b_g))
+title("Gyro Bias Estimate")
+
+figure(14)
+clf
+subplot(3,1,1)
+plot(tspan, data_gps.data(:, 1), '.-r', 'MarkerSize', 10); hold on
+plot(t_plot, x_est(:, kf.x_inds.P_E(1)), '-b', 'LineWidth', 1);
+legend("Measurement", "Estimate")
+title("X Pos")
+xlim([0, 2])
+
+subplot(3,1,2)
+plot(tspan, data_gps.data(:, 2), '.-r', 'MarkerSize', 10); hold on
+plot(t_plot, x_est(:, kf.x_inds.P_E(2)), '-b', 'LineWidth', 1);
+legend("Measurement", "Estimate")
+title("Y Pos")
+xlim([0, 2])
+
+subplot(3,1,3)
+plot(tspan, data_gps.data(:, 3), '.-r', 'MarkerSize', 10); hold on
+plot(t_plot, x_est(:, kf.x_inds.P_E(3)), '-b', 'LineWidth', 1);
+legend("Measurement", "Estimate")
+title("Z Pos")
+xlim([0, 2])
+
+figure(15)
+clf
+plot(t_plot, x_est(:, kf.x_inds.b_p), 'LineWidth', 1.5)
+title("Position Bias Estimate")
+
+figure(16)
+clf
+subplot(3,1,1)
+plot(tspan, data_vel.data(:, 1), '.-r', 'MarkerSize', 10); hold on
+plot(t_plot, x_est(:, kf.x_inds.V_E(1)), '-b', 'LineWidth', 1);
+legend("Measurement", "Estimate")
+title("X Vel")
+xlim([0, 2])
+
+subplot(3,1,2)
+plot(tspan, data_vel.data(:, 2), '.-r', 'MarkerSize', 10); hold on
+plot(t_plot, x_est(:, kf.x_inds.V_E(2)), '-b', 'LineWidth', 1);
+legend("Measurement", "Estimate")
+title("Y Vel")
+xlim([0, 2])
+
+subplot(3,1,3)
+plot(tspan, data_vel.data(:, 3), '.-r', 'MarkerSize', 10); hold on
+plot(t_plot, x_est(:, kf.x_inds.V_E(3)), '-b', 'LineWidth', 1);
+legend("Measurement", "Estimate")
+title("Z Vel")
+xlim([0, 2])
+
+figure(17)
+plot(t_plot, x_est(:, kf.x_inds.b_v), 'LineWidth', 1.5)
+title("Velocity Bias Estimate")
+
+idx = kf.x_inds.P_E(1);
+
+figure(18)
+clf
+plot_cov(p_err(:, 1), squeeze(covariances(idx, idx, 2:end)), t_plot);
+legend
+
+meas_range = kf.measurement_ranges{kf.meas_defs.pos.idx}(1);
+
+figure(19)
+clf
+plot_cov(squeeze(kf.inno_hist(meas_range, 2:end)), squeeze(covariances(idx, idx, 2:end)), t_plot);
+legend
 
 
 function plot_cov(err, cov, t)
