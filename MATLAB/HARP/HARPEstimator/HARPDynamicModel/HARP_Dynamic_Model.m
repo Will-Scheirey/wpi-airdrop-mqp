@@ -22,9 +22,9 @@ function results = HARP_Dynamic_Model(data_out)
         data_out.carp_data = []
     end
     %% STEP 2: Create Parachute System
-    parachute_system1 = Create_Parachute(2.5, 2); 
+    parachute_system1 = Create_Parachute(2.5, 0.1);
 
-    parachute_system2 = Create_Parachute(22.5, 100);
+    parachute_system2 = Create_Parachute(22.5, 45);
 
     %% STEP 3: Create Payload System
     payload = Create_Payload(data_out.w, data_out.l, data_out.h,data_out.m);

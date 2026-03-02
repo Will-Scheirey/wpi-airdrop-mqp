@@ -41,7 +41,7 @@ classdef Parachute < Rigid_Body
 
             obj.eta = eta;
 
-            obj.Cd0_flow = 2.00;
+            obj.Cd0_flow = 1.42;
             obj.Cd_edge = 0.2832;
 
             if nargin >= 7
@@ -75,7 +75,7 @@ classdef Parachute < Rigid_Body
                 % tuneable Drag coefficient values for edge on vs flow facing values
                 c = cos(aoa);
                 s = sin(aoa);
-                Cd_out = obj.eta * (obj.Cd0_flow * (c.^2) + obj.Cd_edge * (s.^2));
+                Cd_out = obj.eta * (obj.Cd0_flow * (s.^2) + obj.Cd_edge * (c.^2));
               
             else
                 Cd_out = 0;  % No drag before deployment
