@@ -49,7 +49,7 @@ function results = HARP_Dynamic_Model(data_out)
         'weather', the_weather, ...
         'model', @Two_Stage_Model);
 
-results = [t, y, model_obj];
+ results = Harp_Dynamic_Model_Results(t, y, model_obj);
 
 end
 
