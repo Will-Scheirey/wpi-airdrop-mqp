@@ -84,6 +84,9 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing, dynamic_model)
     flight_traj = flight_traj + ([harp_x, harp_y, harp_z] - flight_traj(1, :));
     plot3(flight_traj(:, 1), flight_traj(:, 2), flight_traj(:, 3), '-m', 'LineWidth', 1)
 
+    %Dynamic Model Trajectory
+    plot3(m2ft(dynamic_model.trajectory(:, 1)),m2ft(dynamic_model.trajectory(:, 2)),m2ft(dynamic_model.trajectory(:, 3)));
+
     plot_wind_traj(inputs.winds.profile(:, 1), inputs.winds.profile(:, 2)+180, inputs.winds.profile(:, 3), flight_traj, 50, 1/2);
 
     plot3(planned_landing(1), planned_landing(2), 0, 'rx', 'MarkerSize', 20, 'DisplayName', 'Planned Landing');

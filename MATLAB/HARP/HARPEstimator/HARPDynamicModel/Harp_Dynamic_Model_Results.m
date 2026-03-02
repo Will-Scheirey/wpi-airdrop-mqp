@@ -1,4 +1,4 @@
-function results = Harp_Dynamic_Model_Results(t, y)
+function prop = Harp_Dynamic_Model_Results(t, y)
 
 % Payload position is in columns 1-3 (ENU)
 payload_altitude = y(:,3);

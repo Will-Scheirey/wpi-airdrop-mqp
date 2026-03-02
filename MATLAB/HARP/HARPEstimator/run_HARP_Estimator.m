@@ -19,5 +19,5 @@ inputs = convertDataOutToInputs(data_out);
 dynamic_model = HARP_Dynamic_Model('inputs', inputs, 'data_out', data_out, 'carp_data', carp_data);
 
 % Display summary
-displayHARPSummary(outputs, inputs, dynamic_model);
+displayHARPSummary(outputs, inputs);
 plotHARP2(outputs, inputs, m2ft(data_out.carp.relative_traj), m2ft(data_out.carp.planned_relative_landing), dynamic_model);
