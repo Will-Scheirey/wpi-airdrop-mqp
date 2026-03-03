@@ -95,28 +95,28 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'x0')
         x0 = NameValueArgs.x0;
     else
-        v0 = 300;
+        v0 = 0;
         % --- Payload ---
-        P0   = [v0; 0; 3000];              % ENU position      [m]
-        V_p0 = [300; 0; 0];                % ENU velocity      [m   s^-1]
+        P0   = [0; 0; 3000];              % ENU position      [m]
+        V_p0 = [v0; 0; 0];                % ENU velocity      [m   s^-1]
         e_p0 = eul2quat([0, 0, 0])'; % Orientation
         w_p0 = [0; 0; 0];                % Body angular rates [rad s^-1]
         
         % --- Parachute ---
         P0_c = P0 + [0; 0; parachute.l0];           % ENU Position      [m]
-        V_c0 = [v0; 0; 0] * 0;                % ENU velocity      [m   s^-1]
+        V_c0 = [v0; 0; 0];                % ENU velocity      [m   s^-1]
         e_c0 = eul2quat([0, 0, 0])';  % Orientation
         w_c0 = [0; 0; 0];               % Body angular rates [rad s^-1]
         
         x0   = [
             P0;
-            ecef2body_rotm(e_p0) * V_p0;
+            body2enu_rotm(e_p0) * V_p0;
         
             e_p0;
             w_p0;
         
             P0_c
-            ecef2body_rotm(e_c0) * V_c0;
+            body2enu_rotm(e_c0) * V_c0;
         
             e_c0;
             w_c0;

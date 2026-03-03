@@ -210,11 +210,11 @@ function plot_energy(t, y, payload, parachute)
 
     for idx = 1:height(y)
         e_p = y(idx, 7:10);
-        rotm_p = ecef2body_rotm(e_p);
+        rotm_p = body2enu_rotm(e_p);
         P_a_p = y(idx,1:3)' + rotm_p' * payload.P_attach_B;
 
         e_c = y(idx, 20:23);
-        rotm_c = ecef2body_rotm(e_c);
+        rotm_c = body2enu_rotm(e_c);
         P_a_c = y(idx,14:16)' + rotm_c' * parachute.P_attach_B;
 
         dist =  norm(P_a_p - P_a_c);

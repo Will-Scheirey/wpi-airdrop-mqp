@@ -90,7 +90,7 @@ for idx = 1:length(all_results{1}.propagator.t_plot)
 
     vel = all_results{1}.propagator.y_sim(idx, 4:6)';
     quat = all_results{1}.propagator.y_sim(idx, 7:10);
-    rotm_p = ecef2body_rotm(quat);
+    rotm_p = body2enu_rotm(quat);
 
     vel_inertial(idx, :) = rotm_p * vel;
 end

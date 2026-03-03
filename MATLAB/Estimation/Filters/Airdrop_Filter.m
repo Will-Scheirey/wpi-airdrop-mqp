@@ -118,20 +118,18 @@ classdef Airdrop_Filter < Abstract_Filter
                 "pos", struct("idx",1,"dim",3), ...
                 "mag", struct("idx",2,"dim",3), ...
                 "alt", struct("idx",3,"dim",1), ...
-                "vel", struct("idx",4,"dim",3) ...
-                );
+                "vel", struct("idx",4,"dim",3) );
 
             r = 1;
-            for k = 1:numel(fieldnames(obj.meas_defs))
-                fn = fieldnames(obj.meas_defs);
-                s = obj.meas_defs.(fn{k});
+            order = ["pos","mag","alt","vel"];
+            for k = 1:numel(order)
+                s = obj.meas_defs.(order(k));
                 obj.measurement_ranges{s.idx} = r:(r+s.dim-1);
                 r = r + s.dim;
             end
         end
 
         function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas, q_meas, V_e)
-            nargin
             obj.update_bias = true;
             pos_inds = obj.x_inds.P_E;
 
@@ -156,12 +154,12 @@ classdef Airdrop_Filter < Abstract_Filter
                 q_meas = obj.quat_from_acc_mag(accel_meas_corr, mag_meas);
             end
 
-            % C_i_b = ecef2body_rotm(q_meas);   % IMPORTANT: check your function name returns which direction
+            % C_i_b = body2enu_rotm(q_meas);   % IMPORTANT: check your function name returns which direction
             % You used C_BE in your quat_from_acc_mag and called it C_BE.
-            % In your calc_accel you do: C_EB = ecef2body_rotm(e)' ; then a_e = C_EB*(a-b) + g
-            % That implies ecef2body_rotm(e) returns C_BE (body <- earth). Good.
+            % In your calc_accel you do: C_EB = body2enu_rotm(e)' ; then a_e = C_EB*(a-b) + g
+            % That implies body2enu_rotm(e) returns C_BE (body <- earth). Good.
 
-            C_bi = ecef2body_rotm(q_meas);     % body -> inertial (b2i)
+            C_bi = body2enu_rotm(q_meas);     % body -> inertial (b2i)
             m_b0 = mag_meas / norm(mag_meas);  % measured mag in body
 
             % m_b = C_ib * m_i  =>  m_i = C_bi * m_b
@@ -177,7 +175,7 @@ classdef Airdrop_Filter < Abstract_Filter
             % Initialize orientation
             obj.x_curr(obj.x_inds.e) = q_meas;
             % Initialize accel bias to the measurement minus corrected
-            obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
+            % obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
             obj.x_curr(obj.x_inds.b_m) = zeros(3,1);
             obj.x_curr(obj.x_inds.b_b) = 0;
 
@@ -230,7 +228,7 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function speed_out = speed(obj)
-            speed_out = norm(obj.get_V_E);
+            speed_out = norm(obj.get_V_E());
         end
 
         function run_filter(obj, y_all, u_all, timesteps, acc_gps_all, drop_time, direction, verbose, order)
@@ -490,7 +488,7 @@ classdef Airdrop_Filter < Abstract_Filter
             a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
 
             % rotation used for dV/db_a block (same as yours)
-            C_EB = ecef2body_rotm(e);     % body -> inertial
+            C_EB = body2enu_rotm(e);     % body -> inertial
 
             A(P, V) = eye(3);
 
@@ -554,8 +552,8 @@ classdef Airdrop_Filter < Abstract_Filter
             % w_b = obj.get_w_b();     % 3x1
 
             % ---- Input handling ----
-            a_meas_b = u.accel';
-            w_meas_b = u.gyro';
+            a_meas_b = u.accel(:);
+            w_meas_b = u.gyro(:);
 
             b_g = obj.get_b_g();
 
@@ -618,7 +616,7 @@ classdef Airdrop_Filter < Abstract_Filter
             q = obj.get_e();
 
             % --- NEW: magnetometer prediction ---
-            C_BE  = ecef2body_rotm(q)';   % (given: this is b2i)
+            C_BE  = body2enu_rotm(q)';   % (given: this is b2i)
             m_pred = C_BE * obj.m_ref_i + b_m; % predicted mag in body
 
             vel = obj.get_V_E();
@@ -672,7 +670,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function a_e = calc_accel(obj, a)
             e = obj.get_e();
-            C_bi = ecef2body_rotm(e);          % body -> inertial
+            C_bi = body2enu_rotm(e);          % body -> inertial
 
             b_a = obj.get_b_a();
 
@@ -800,39 +798,6 @@ classdef Airdrop_Filter < Abstract_Filter
                 end
 
                 ptr_out = p; % next unread index when scanning backward
-            end
-        end
-
-        function Jq = dmag_dq_numeric(obj, q)
-            % Numeric Jacobian wrt q = [w x y z]' for:
-            %   m_pred(q) = C_ib(q) * m_ref_i = ecef2body_rotm(q)' * m_ref_i
-            % where ecef2body_rotm(q) returns C_bi (body->inertial, b2i).
-
-            eps = 1e-6;
-
-            q = q(:);
-            q = q / norm(q);
-
-            % baseline
-            C_bi = ecef2body_rotm(q);      % b2i
-            m0   = C_bi.' * obj.m_ref_i;   % i2b * m_ref_i
-
-            Jq = zeros(3,4);
-
-            for k = 1:4
-                dq = zeros(4,1);
-                dq(k) = eps;
-
-                qp = q + dq;  qp = qp / norm(qp);
-                qm = q - dq;  qm = qm / norm(qm);
-
-                C_bi_p = ecef2body_rotm(qp);
-                C_bi_m = ecef2body_rotm(qm);
-
-                mp = C_bi_p.' * obj.m_ref_i;
-                mm = C_bi_m.' * obj.m_ref_i;
-
-                Jq(:,k) = (mp - mm) / (2*eps);
             end
         end
 

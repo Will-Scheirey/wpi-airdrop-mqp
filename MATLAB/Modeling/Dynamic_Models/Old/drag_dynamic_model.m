@@ -45,7 +45,7 @@ I = [
 % --- Rotations ---
 % =================
 
-C_BE = ecef2body_rotm(e); % ROTM to Body from ECEF
+C_BE = body2enu_rotm(e); % ROTM to Body from ECEF
 C_EB = C_BE';             % ROTM to ECEF from Body
 
 g_vec_b = C_BE * g_vec_e; % Gravity vector in Body Frame

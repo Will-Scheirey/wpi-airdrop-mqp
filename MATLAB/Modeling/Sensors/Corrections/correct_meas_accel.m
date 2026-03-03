@@ -6,7 +6,7 @@ function accel_out = correct_meas_accel(a_list, v_list, w_list, e_list, alpha_li
     g_e = [0;0;-9.81];
 
     for i = 1:n
-        C_BE = ecef2body_rotm(e_list(i,:)');
+        C_BE = body2enu_rotm(e_list(i,:)');
         g_b  = C_BE * g_e;
 
         v_dot_b = a_list(i,:)';

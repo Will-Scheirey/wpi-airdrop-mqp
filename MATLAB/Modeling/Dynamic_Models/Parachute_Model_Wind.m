@@ -119,8 +119,8 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             % --- Rotations ---
             % =================
 
-            obj.C_EB_p   = ecef2body_rotm(obj.e_p)';                 % ROTM from ECEF to Body
-            obj.C_EB_c   = ecef2body_rotm(obj.e_c)';                 % ROTM from ECEF to Body
+            obj.C_EB_p   = body2enu_rotm(obj.e_p)';                 % ROTM from ECEF to Body
+            obj.C_EB_c   = body2enu_rotm(obj.e_c)';                 % ROTM from ECEF to Body
         end
 
         function calc_mass(obj)
