@@ -41,7 +41,7 @@ classdef Parachute < Rigid_Body
 
             obj.eta = eta;
 
-            obj.Cd0_flow = 1.42;
+            obj.Cd0_flow = 0.78;
             obj.Cd_edge = 0.2832;
 
             if nargin >= 7
@@ -68,6 +68,7 @@ classdef Parachute < Rigid_Body
             % Default to deployed immediately
             obj.is_deployed = false;
             obj.t_deploy = 0;
+            obj.t_cut = inf;
         end
 
         function Cd_out = Cd(obj, aoa)

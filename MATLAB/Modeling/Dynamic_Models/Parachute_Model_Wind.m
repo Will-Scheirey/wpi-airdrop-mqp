@@ -195,7 +195,15 @@ classdef Parachute_Model_Wind < Parachute_Model_Simple
             
                 lift_dir_c = lift_dir_c / norm(lift_dir_c);
             
-                L_mag_c = norm(f_c) * tan(aoa_c);
+                Vh = norm(v_rel_c_e(1:2));     % horizontal speed
+                Vv = abs(v_rel_c_e(3));        % vertical speed magnitude
+                L_over_D = Vh / max(Vv, 1e-3); % avoid divide-by-zero
+                
+                % Clamp to keep parachute realistic/stable (round canopies are small L/D)
+                L_over_D = min(L_over_D, 0.3);
+                
+                L_mag_c = norm(f_c) * L_over_D;
+                
                 f_l_c = L_mag_c * lift_dir_c;
             
                 if any(isnan(f_l_c))

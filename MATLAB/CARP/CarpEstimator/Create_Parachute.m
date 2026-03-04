@@ -7,8 +7,11 @@ function parachute = Create_Parachute(r, t_deploy)
     single_mass = 57*2;            % kg (125 lb per chute)
     riser_length = 18.28;        % m (60 ft published)
     riser_k = 1000;             % N/m per riser
-    riser_c = 10000;               % N·s/m system damping
-    
+    %riser_c = 10000;               % N·s/m system damping
+    %test change to see if this is whats causing the program to have an
+    %extrodinaryly long run time
+    riser_c = 10000;
+
     % REALISTIC PARACHUTE PARAMETERS
     % using vertical-only drag, these can be physically realistic
     canopy_efficiency = 0.90;    % 90% efficient (realistic for cargo chute)
@@ -28,6 +31,7 @@ function parachute = Create_Parachute(r, t_deploy)
     
     % Set deployment time
     parachute.t_deploy = t_deploy;
+    parachute.t_cut = inf; % trying to ensure that the first chute opens at 0.1 seconds
     parachute.is_deployed = (t_deploy == 0);  % Deploy immediately if t_deploy is 0
     
 end

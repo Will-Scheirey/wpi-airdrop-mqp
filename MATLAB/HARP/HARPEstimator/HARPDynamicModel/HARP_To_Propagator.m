@@ -40,11 +40,11 @@ function x0 = HARP_To_Propagator(carp_data)
     % Assemble state vector (26 states)
     x0 = [
         P0;                % 1-3:   Payload position (ENU)
-        body2enu_rotm(e_p0) * V_p0_for_state;    % 4-6:   Payload velocity (ENU frame)
+        body2enu_rotm(e_p0)' * V_p0_for_state;    % 4-6:   Payload velocity (ENU frame)
         e_p0;              % 7-10:  Payload quaternion
         w_p0;              % 11-13: Payload angular velocity
         P0_c;              % 14-16: Parachute position (ENU)
-        body2enu_rotm(e_c0) * V_c0_for_state;    % 17-19: Parachute velocity (ENU frame)
+        body2enu_rotm(e_c0)' * V_c0_for_state;    % 17-19: Parachute velocity (ENU frame)
         e_c0;              % 20-23: Parachute quaternion
         w_c0;              % 24-26: Parachute angular velocity
     ];
