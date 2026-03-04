@@ -72,7 +72,7 @@ classdef Airdrop_Filter < Abstract_Filter
 
             obj.dt = dt;
 
-            obj.g_vec_e = [0; 0; -obj.g_norm];
+            obj.g_vec_e = [0; 0; obj.g_norm];
 
             obj.last_u = struct('accel', [0, 0, 0], 'gyro', [0, 0, 0]);
             obj.last_down = [0; 0; 1];
@@ -141,6 +141,7 @@ classdef Airdrop_Filter < Abstract_Filter
             % Initialize altitude to the baro measurement
             obj.x_curr(pos_inds(3))   = baro_meas;
 
+
             % Initialize altitude bias to GPS altitude minus baro altitude
             obj.x_curr(obj.x_inds.b_p(3)) = gps_meas(3) - baro_meas;
 
@@ -151,13 +152,8 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % Estimate the orientation from accel and mag measurments
             if nargin < 8
-                q_meas = obj.quat_from_acc_mag(accel_meas_corr, mag_meas);
+                q_meas = quat_from_acc_mag(accel_meas_corr, mag_meas);
             end
-
-            % C_i_b = body2enu_rotm(q_meas);   % IMPORTANT: check your function name returns which direction
-            % You used C_BE in your quat_from_acc_mag and called it C_BE.
-            % In your calc_accel you do: C_EB = body2enu_rotm(e)' ; then a_e = C_EB*(a-b) + g
-            % That implies body2enu_rotm(e) returns C_BE (body <- earth). Good.
 
             C_bi = body2enu_rotm(q_meas);     % body -> inertial (b2i)
             m_b0 = mag_meas / norm(mag_meas);  % measured mag in body
@@ -182,6 +178,28 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.x_curr = obj.x_curr(:);
 
             obj.is_initialized = true;
+
+            function q_meas = quat_from_acc_mag(a_b, m_b)
+                d_b = -a_b / norm(a_b);
+                obj.last_down = d_b;
+
+                obj.down_vec_all(obj.hist_idx, :) = d_b;
+
+                u_b = -d_b;
+
+                m_b = m_b / norm(m_b);
+
+                e_b = cross(m_b, d_b);
+                e_b = e_b / norm(e_b);
+
+                n_b = cross(u_b, e_b);
+                n_b = n_b / norm(n_b);
+
+                C_BE = [ e_b, n_b, u_b ];
+
+                C_bi  = C_BE.';                 % b2i
+                q_meas = rotm_to_quat(C_bi);
+            end
         end
 
         % --- GETTERS ---
@@ -403,9 +421,9 @@ classdef Airdrop_Filter < Abstract_Filter
                         if isempty(meas)
                             continue;
                         end
-
                         meas_idx = meas.meas_idx;
 
+                        %{
                         if meas_idx == 1
                             % Assumes acc_gps_all is aligned with this stream's row index.
                             accH = acc_gps_all(r, 1);
@@ -418,6 +436,8 @@ classdef Airdrop_Filter < Abstract_Filter
                         else
                             [innovation, ~, S] = obj.update(meas.data', meas_idx);
                         end
+                        %}
+                        [innovation, ~, S] = obj.update(meas.data', meas_idx);
 
                         obj.inno_hist(obj.measurement_ranges{meas_idx}, obj.hist_idx) = innovation;
                         S_list{kk} = S;
@@ -432,15 +452,12 @@ classdef Airdrop_Filter < Abstract_Filter
 
         function [innovation, K, S] = update(obj, y, meas_idx, R_gps)
             y_pred = obj.h(meas_idx);
-            H = obj.h_jacobian_states(meas_idx);
+            my_H = obj.h_jacobian_states(meas_idx);
 
             range = obj.measurement_ranges{meas_idx};
             R_meas = obj.R(range, range);
-            if nargin == 4
-                R_meas = R_gps;
-            end
 
-            [innovation, K, S] = obj.update_impl(y, y_pred, H, R_meas);
+            [innovation, K, S] = obj.update_impl(y, y_pred, my_H, R_meas);
             obj.normalize_quat();
         end
         function predict(obj, u)
@@ -455,281 +472,148 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function A = f_jacobian_states(obj, u)
-            %F_JACOBIAN_STATES  Continuous-time state Jacobian (df/dx)
-            % Rewritten to be maintainable, but it uses the EXACT SAME equations
-            % as your existing dx0dx..dx21dx construction.
-            %
-            % Works for both your old 22-state layout and your newer layouts (e.g. if you
-            % added b_m). Any extra states beyond the original ones get zero dynamics here.
-
-            % --- size / indices ---
-            nx = numel(obj.x_curr);
-            A  = zeros(nx, nx);
-
-            % Required groups (must exist in your init_x_inds)
-            P  = obj.x_inds.P_E(:);   % 3
-            V  = obj.x_inds.V_E(:);   % 3
-            E  = obj.x_inds.e(:);     % 4  (e0 e1 e2 e3)
-            BG = obj.x_inds.b_g(:);   % 3
-            BA = obj.x_inds.b_a(:);   % 3
-
-            e  = obj.get_e();      e0 = e(1); e1 = e(2); e2 = e(3); e3 = e(4);
-
-            b_g = obj.get_b_g();
-            b_a = obj.get_b_a();
-
-            w_meas = u.gyro(:);
-            a_meas = u.accel(:);
-
-            w = w_meas - b_g;
-            w0=w(1); w1=w(2); w2=w(3);
-
-            a_b = a_meas - b_a;
-            a0 = a_b(1); a1 = a_b(2); a2 = a_b(3);
-
-            % rotation used for dV/db_a block (same as yours)
-            C_EB = body2enu_rotm(e);     % body -> inertial
-
-            A(P, V) = eye(3);
-
-            % Row for d(V0)/dx
-            A(V(1), E)  = [ ...
-                2*a0*e0 - 2*a1*e3 + 2*a2*e2, ...
-                2*a0*e1 + 2*a1*e2 + 2*a2*e3, ...
-                2*a1*e1 - 2*a0*e2 + 2*a2*e0, ...
-                2*a2*e1 - 2*a0*e3 - 2*a1*e0 ...
+            a = u.accel(:);     a0  = a(1);  a1  = a(2);  a2  = a(3);
+            w = u.gyro(:);      w0  = w(1);  w1  = w(2);  w2  = w(3);
+            e = obj.get_e();    e0  = e(1);  e1  = e(2);  e2  = e(3);  e3 = e(4); 
+            ba = obj.get_b_a(); ba0 = ba(1); ba1 = ba(2); ba2 = ba(3);
+            bw = obj.get_b_g(); bw0 = bw(1); bw1 = bw(2); bw2 = bw(3);
+            
+            A = [
+                0, 0, 0, 1, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 1, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 1,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 2*e0*(a0 - ba0) - 2*e3*(a1 - ba1) + 2*e2*(a2 - ba2), 2*e1*(a0 - ba0) + 2*e2*(a1 - ba1) + 2*e3*(a2 - ba2), 2*e1*(a1 - ba1) - 2*e2*(a0 - ba0) + 2*e0*(a2 - ba2), 2*e1*(a2 - ba2) - 2*e3*(a0 - ba0) - 2*e0*(a1 - ba1),     0,     0,     0, - e0^2 - e1^2 + e2^2 + e3^2,           2*e0*e3 - 2*e1*e2,         - 2*e0*e2 - 2*e1*e3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 2*e0*(a1 - ba1) + 2*e3*(a0 - ba0) - 2*e1*(a2 - ba2), 2*e2*(a0 - ba0) - 2*e1*(a1 - ba1) - 2*e0*(a2 - ba2), 2*e1*(a0 - ba0) + 2*e2*(a1 - ba1) + 2*e3*(a2 - ba2), 2*e0*(a0 - ba0) - 2*e3*(a1 - ba1) + 2*e2*(a2 - ba2),     0,     0,     0,         - 2*e0*e3 - 2*e1*e2, - e0^2 + e1^2 - e2^2 + e3^2,           2*e0*e1 - 2*e2*e3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0, 2*e1*(a1 - ba1) - 2*e2*(a0 - ba0) + 2*e0*(a2 - ba2), 2*e0*(a1 - ba1) + 2*e3*(a0 - ba0) - 2*e1*(a2 - ba2), 2*e3*(a1 - ba1) - 2*e0*(a0 - ba0) - 2*e2*(a2 - ba2), 2*e1*(a0 - ba0) + 2*e2*(a1 - ba1) + 2*e3*(a2 - ba2),     0,     0,     0,           2*e0*e2 - 2*e1*e3,         - 2*e0*e1 - 2*e2*e3, - e0^2 + e1^2 + e2^2 - e3^2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                        bw0/2 - w0/2,                                        bw1/2 - w1/2,                                        bw2/2 - w2/2,  e1/2,  e2/2,  e3/2,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                        w0/2 - bw0/2,                                                   0,                                        w2/2 - bw2/2,                                        bw1/2 - w1/2, -e0/2,  e3/2, -e2/2,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                        w1/2 - bw1/2,                                        bw2/2 - w2/2,                                                   0,                                        w0/2 - bw0/2, -e3/2, -e0/2,  e1/2,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                        w2/2 - bw2/2,                                        w1/2 - bw1/2,                                        bw0/2 - w0/2,                                                   0,  e2/2, -e1/2, -e0/2,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                0, 0, 0, 0, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 ];
-
-            % Row for d(V1)/dx
-            A(V(2), E)  = [ ...
-                2*a1*e0 + 2*a0*e3 - 2*a2*e1, ...
-                2*a0*e2 - 2*a1*e1 - 2*a2*e0, ...
-                2*a0*e1 + 2*a1*e2 + 2*a2*e3, ...
-                2*a0*e0 - 2*a1*e3 + 2*a2*e2 ...
-                ];
-
-            % Row for d(V2)/dx
-            A(V(3), E)  = [ ...
-                2*a1*e1 - 2*a0*e2 + 2*a2*e0, ...
-                2*a1*e0 + 2*a0*e3 - 2*a2*e1, ...
-                2*a1*e3 - 2*a0*e0 - 2*a2*e2, ...
-                2*a0*e1 + 2*a1*e2 + 2*a2*e3 ...
-                ];
-
-            A(V, BA) = -C_EB;
-
-            % =========================================================================
-            % Quaternion kinematics Jacobian rows (dx6dx..dx9dx)
-            % de/dt = -1/2 * Omega(w) * e
-            % Your existing partials are preserved exactly as written.
-            % =========================================================================
-
-            % Row for de0/dx  (your dx6dx)
-            A(E(1), E) = [0,      -0.5*w0, -0.5*w1, -0.5*w2];
-            A(E(2), E) = [0.5*w0,  0,       0.5*w2, -0.5*w1];
-            A(E(3), E) = [0.5*w1, -0.5*w2,  0,       0.5*w0];
-            A(E(4), E) = [0.5*w2,  0.5*w1, -0.5*w0,  0];
-
-            ev = [e1; e2; e3];
-
-            S_ev = [   0, -e3,  e2;
-                e3,   0, -e1;
-                -e2,  e1,   0 ];
-
-            dqdot_dw = [ -0.5*ev.';          % 1x3
-                0.5*(e0*eye(3) + S_ev) ];  % 3x3
-
-            A(E, BG) = -dqdot_dw;
         end
 
         function dxdt = f(obj, u)
-            % State derivative using the SAME equations as your current code,
-            % but assembled by named blocks for maintainability.
+            v = obj.get_V_E();  v0  = v(1);  v1  = v(2);  v2  = v(3);
+            a = u.accel(:);     a0  = a(1);  a1  = a(2);  a2  = a(3);
+            w = u.gyro(:);      w0  = w(1);  w1  = w(2);  w2  = w(3);
+            e = obj.get_e();    e0  = e(1);  e1  = e(2);  e2  = e(3);  e3 = e(4); 
+            ba = obj.get_b_a(); ba0 = ba(1); ba1 = ba(2); ba2 = ba(3);
+            bw = obj.get_b_g(); bw0 = bw(1); bw1 = bw(2); bw2 = bw(3);
+            g = obj.g_vec_e;  g0  = g(1);  g1  = g(2);  g2  = g(3);
 
-            % ---- Unpack state via getters (already index-safe) ----
-            V_e = obj.get_V_E();     % 3x1
-            e   = obj.get_e();       % 4x1
-            % w_b = obj.get_w_b();     % 3x1
-
-            % ---- Input handling ----
-            a_meas_b = u.accel(:);
-            w_meas_b = u.gyro(:);
-
-            b_g = obj.get_b_g();
-
-            % ---- Allocate output ----
-            nx   = numel(obj.x_curr);
-            dxdt = zeros(nx, 1);
-
-            % ---- Kinematics / dynamics (same math) ----
-            dP_dt = V_e;
-            dV_dt = obj.calc_accel(a_meas_b);                         % C_bi*(a - b_a) + g_vec_e
-
-            % Use gyro as input:
-            w_corr = (w_meas_b - b_g);
-            de_dt  = -0.5 * quat_kinematic_matrix(w_corr) * e;
-
-            % ---- Bias models (same as your current: random walk / constant) ----
-            db_g_dt = zeros(3,1);
-            db_a_dt = zeros(3,1);
-            db_p_dt = zeros(3,1);
-
-            % ---- Write into dxdt using indices (no hard-coded positions) ----
-            dxdt(obj.x_inds.P_E) = dP_dt;
-            dxdt(obj.x_inds.V_E) = dV_dt;
-            dxdt(obj.x_inds.e)   = de_dt;
-
-            dxdt(obj.x_inds.b_g) = db_g_dt;
-            dxdt(obj.x_inds.b_a) = db_a_dt;
-            dxdt(obj.x_inds.b_p) = db_p_dt;
+            dxdt = [
+            v0;
+            v1;
+            v2;
+            (a0 - ba0)*(e0^2 + e1^2 - e2^2 - e3^2) - g0 - (a1 - ba1)*(2*e0*e3 - 2*e1*e2) + (a2 - ba2)*(2*e0*e2 + 2*e1*e3);
+            (a1 - ba1)*(e0^2 - e1^2 + e2^2 - e3^2) - g1 + (a0 - ba0)*(2*e0*e3 + 2*e1*e2) - (a2 - ba2)*(2*e0*e1 - 2*e2*e3);
+            (a2 - ba2)*(e0^2 - e1^2 - e2^2 + e3^2) - g2 - (a0 - ba0)*(2*e0*e2 - 2*e1*e3) + (a1 - ba1)*(2*e0*e1 + 2*e2*e3);
+            (e1*(bw0 - w0))/2 + (e2*(bw1 - w1))/2 + (e3*(bw2 - w2))/2;
+            (e3*(bw1 - w1))/2 - (e0*(bw0 - w0))/2 - (e2*(bw2 - w2))/2;
+            (e1*(bw2 - w2))/2 - (e3*(bw0 - w0))/2 - (e0*(bw1 - w1))/2;
+            (e2*(bw0 - w0))/2 - (e1*(bw1 - w1))/2 - (e0*(bw2 - w2))/2;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            0;
+            ];
 
             % ---- Logging (keep exactly what you had) ----
-            obj.accel_calc_all(obj.hist_idx, :) = dV_dt.';
+            % obj.accel_calc_all(obj.hist_idx, :) = dV_dt.';
         end
 
         function H = h_jacobian_states(obj, meas_idx)
             switch meas_idx
-                case 1, H = obj.H_pos();
-                case 2, H = obj.H_mag();
-                case 3, H = obj.H_alt();
-                case 4, H = obj.H_vel();
+                case 1, range = 1:3;
+                case 2, range = 4:6;
+                case 3, range = 7;
+                case 4, range = 8:10;
                 otherwise, error("bad meas_idx");
             end
+
+            v = obj.get_V_E();  v0  = v(1);  v1  = v(2);  v2  = v(3);
+            e = obj.get_e();    e0  = e(1);  e1  = e(2);  e2  = e(3);  e3 = e(4); 
+            ba = obj.get_b_a(); ba0 = ba(1); ba1 = ba(2); ba2 = ba(3);
+            bw = obj.get_b_g(); bw0 = bw(1); bw1 = bw(2); bw2 = bw(3);
+            g = obj.g_vec_e;  g0  = g(1);  g1  = g(2);  g2  = g(3);
+            m0 = obj.m_ref_i; m00 = m0(1); m01 = m0(2); m02 = m0(3);
+
+            H = [
+            1, 0, 0, 0, 0, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0;
+            0, 1, 0, 0, 0, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0;
+            0, 0, 1, 0, 0, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0;
+            0, 0, 0, 0, 0, 0, 2*e0*m00 - 2*e2*m02 + 2*e3*m01, 2*e1*m00 + 2*e2*m01 + 2*e3*m02, 2*e1*m01 - 2*e0*m02 - 2*e2*m00, 2*e0*m01 + 2*e1*m02 - 2*e3*m00, 0, 0, 0, 0, 0, 0,  0,  0,  0, -1,  0,  0,  0,  0,  0,  0;
+            0, 0, 0, 0, 0, 0, 2*e0*m01 + 2*e1*m02 - 2*e3*m00, 2*e0*m02 - 2*e1*m01 + 2*e2*m00, 2*e1*m00 + 2*e2*m01 + 2*e3*m02, 2*e2*m02 - 2*e0*m00 - 2*e3*m01, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, -1,  0,  0,  0,  0,  0;
+            0, 0, 0, 0, 0, 0, 2*e0*m02 - 2*e1*m01 + 2*e2*m00, 2*e3*m00 - 2*e1*m02 - 2*e0*m01, 2*e0*m00 - 2*e2*m02 + 2*e3*m01, 2*e1*m00 + 2*e2*m01 + 2*e3*m02, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0, -1,  0,  0,  0,  0;
+            0, 0, 1, 0, 0, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0, -1,  0,  0,  0;
+            0, 0, 0, 1, 0, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0, -1,  0,  0;
+            0, 0, 0, 0, 1, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0, -1,  0;
+            0, 0, 0, 0, 0, 1,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1;
+            ];
+
+            H = H(range, :);
         end
 
         function y = h(obj, meas_idx)
-            P_E = obj.get_P_E();
-            b_p = obj.get_b_p();
-            b_b = obj.get_b_b();
-            b_v = obj.get_b_v();
-
-            p_pred = P_E + b_p;
-
-            % w_b = obj.get_w_b();
-            b_g = obj.get_b_g();
-            b_m = obj.get_b_m();
-
-            % w_pred = w_b + b_g;
-
-            alt_pred = obj.altitude() + b_b;
-
-            q = obj.get_e();
-
-            % --- NEW: magnetometer prediction ---
-            C_BE  = body2enu_rotm(q)';   % (given: this is b2i)
-            m_pred = C_BE * obj.m_ref_i + b_m; % predicted mag in body
-
-            vel = obj.get_V_E();
-            vel_pred = vel + b_v;
+            p = obj.get_P_E();  p0  = p(1);  p1  = p(2);  p2  = p(3);
+            v = obj.get_V_E();  v0  = v(1);  v1  = v(2);  v2  = v(3);
+            e = obj.get_e();    e0  = e(1);  e1  = e(2);  e2  = e(3);  e3 = e(4); 
+            bp = obj.get_b_p(); bp0 = bp(1); bp1 = bp(2); bp2 = bp(3);
+            bv = obj.get_b_v(); bv0 = bv(1); bv1 = bv(2); bv2 = bv(3);
+            bm = obj.get_b_m(); bm0 = bm(1); bm1 = bm(2); bm2 = bm(3);
+            bb = obj.get_b_b();
+            ba = obj.get_b_a(); ba0 = ba(1); ba1 = ba(2); ba2 = ba(3);
+            bw = obj.get_b_g(); bw0 = bw(1); bw1 = bw(2); bw2 = bw(3);
+            g = obj.g_vec_e;  g0  = g(1);  g1  = g(2);  g2  = g(3);
+            m0 = obj.m_ref_i; m00 = m0(1); m01 = m0(2); m02 = m0(3);
 
             y_all = [
-                p_pred;
-                m_pred;
-                alt_pred;
-                vel_pred;
-                ];
-
+            p0 - bp0;
+            p1 - bp1;
+            p2 - bp2;
+            m01*(2*e0*e3 + 2*e1*e2) - bm0 - m02*(2*e0*e2 - 2*e1*e3) + m00*(e0^2 + e1^2 - e2^2 - e3^2);
+            m02*(2*e0*e1 + 2*e2*e3) - m00*(2*e0*e3 - 2*e1*e2) - bm1 + m01*(e0^2 - e1^2 + e2^2 - e3^2);
+            m00*(2*e0*e2 + 2*e1*e3) - bm2 - m01*(2*e0*e1 - 2*e2*e3) + m02*(e0^2 - e1^2 - e2^2 + e3^2);
+            p2 - bb;
+            v0 - bv0;
+            v1 - bv1;
+            v2 - bv2;
+            ];
+            
             y = y_all(obj.measurement_ranges{meas_idx});
-        end
-
-        % --- JACOBIANS ---
-        function H = H_pos(obj)
-            H = zeros(3, obj.num_states);
-            H(:, obj.x_inds.P_E) = eye(3);
-            H(:, obj.x_inds.b_p) = eye(3);
-        end
-
-        function H = H_mag(obj)
-            H = zeros(3, obj.num_states);
-
-            q  = obj.get_e();                    % [e0 e1 e2 e3]' scalar-first
-            mE = obj.m_ref_i(:);                 % 3x1 inertial/ECEF reference field
-
-            Jq = obj.dmag_dq_analytic(q, mE);    % 3x4 analytic
-
-            H(:, obj.x_inds.e)   = Jq;
-            H(:, obj.x_inds.b_m) = eye(3);
-        end
-
-        function H = H_alt(obj)
-            H = zeros(1, obj.num_states);
-            H(:, obj.x_inds.P_E(3)) = 1;
-            H(:, obj.x_inds.b_b) = 1;
-        end
-
-        function H = H_vel(obj)
-            H = zeros(3, obj.num_states);
-            H(:, obj.x_inds.V_E) = eye(3);
-            H(:, obj.x_inds.b_v) = eye(3);
         end
 
         % --- UTILS ---
         function normalize_quat(obj)
             obj.x_curr(obj.x_inds.e) = obj.get_e() / norm(obj.get_e());
-        end
-
-        function a_e = calc_accel(obj, a)
-            e = obj.get_e();
-            C_bi = body2enu_rotm(e);          % body -> inertial
-
-            b_a = obj.get_b_a();
-
-            a_e  = C_bi * (a - b_a) + obj.g_vec_e;
-        end
-
-        function q_meas = quat_from_acc_mag(obj, a_b, m_b)
-            d_b = -a_b / norm(a_b);
-            obj.last_down = d_b;
-
-            obj.down_vec_all(obj.hist_idx, :) = d_b;
-
-            u_b = -d_b;
-
-            m_b = m_b / norm(m_b);
-
-            e_b = cross(m_b, d_b);
-            e_b = e_b / norm(e_b);
-
-            n_b = cross(u_b, e_b);
-            n_b = n_b / norm(n_b);
-
-            C_BE = [ e_b, n_b, u_b ];
-
-            C_bi  = C_BE.';                 % b2i
-            q_meas = obj.rotm_to_quat(C_bi);
-        end
-
-        function q = rotm_to_quat(~, R)
-            tr = trace(R);
-            if tr > 0
-                S  = sqrt(tr + 1.0) * 2.0;
-                q0 = 0.25 * S;
-                q1 = (R(3,2) - R(2,3)) / S;
-                q2 = (R(1,3) - R(3,1)) / S;
-                q3 = (R(2,1) - R(1,2)) / S;
-            else
-                if (R(1,1) > R(2,2)) && (R(1,1) > R(3,3))
-                    S  = sqrt(1.0 + R(1,1) - R(2,2) - R(3,3)) * 2.0;
-                    q0 = (R(3,2) - R(2,3)) / S;
-                    q1 = 0.25 * S;
-                    q2 = (R(1,2) + R(2,1)) / S;
-                    q3 = (R(1,3) + R(3,1)) / S;
-                elseif R(2,2) > R(3,3)
-                    S  = sqrt(1.0 - R(1,1) + R(2,2) - R(3,3)) * 2.0;
-                    q0 = (R(1,3) - R(3,1)) / S;
-                    q1 = (R(1,2) + R(2,1)) / S;
-                    q2 = 0.25 * S;
-                    q3 = (R(2,3) + R(3,2)) / S;
-                else
-                    S  = sqrt(1.0 - R(1,1) - R(2,2) + R(3,3)) * 2.0;
-                    q0 = (R(2,1) - R(1,2)) / S;
-                    q1 = (R(1,3) + R(3,1)) / S;
-                    q2 = (R(2,3) + R(3,2)) / S;
-                    q3 = 0.25 * S;
-                end
-            end
-            q = [q0; q1; q2; q3];
-            q = q / norm(q);
         end
 
         function [ptr_out, rows] = take_rows_in_window_dir(~, time_vec, ptr_in, tmin, tmax, dir)
@@ -800,62 +684,6 @@ classdef Airdrop_Filter < Abstract_Filter
                 ptr_out = p; % next unread index when scanning backward
             end
         end
-
-        function J = dmag_dq_analytic(obj, q, mE)
-            %DMAG_DQ_ANALYTIC Analytic d( C_BE(q)*mE ) / d q  for scalar-first q.
-            %   q  = [e0 e1 e2 e3]'  (scalar-first)
-            %   mE = reference field in E/inertial (3x1)
-            %   Returns J = d m_b / d q (3x4)
-
-            q  = q(:);
-            mE = mE(:);
-
-            e0 = q(1); e1 = q(2); e2 = q(3); e3 = q(4);
-            mx = mE(1); my = mE(2); mz = mE(3);
-
-            % If C_EB(q) is the usual quaternion DCM (body->E),
-            % then C_BE = C_EB' (E->body).
-            %
-            % Using:
-            % C_EB =
-            % [1-2(e2^2+e3^2)   2(e1e2-e0e3)   2(e1e3+e0e2)
-            %  2(e1e2+e0e3)     1-2(e1^2+e3^2) 2(e2e3-e0e1)
-            %  2(e1e3-e0e2)     2(e2e3+e0e1)   1-2(e1^2+e2^2)]
-            %
-            % then C_BE = C_EB'.
-
-            % Derivatives of m_b = C_BE * mE = C_EB' * mE
-            % J(:,k) = d/d e_k of (C_EB')*mE = (dC_EB/de_k)' * mE
-
-            % ---- dC_EB/de0 ----
-            dC0 = [ 0,      -2*e3,   2*e2;
-                2*e3,    0,     -2*e1;
-                -2*e2,    2*e1,   0 ];
-
-            % ---- dC_EB/de1 ----
-            dC1 = [ 0,       2*e2,    2*e3;
-                2*e2,   -4*e1,   -2*e0;
-                2*e3,    2*e0,   -4*e1 ];
-
-            % ---- dC_EB/de2 ----
-            dC2 = [ -4*e2,   2*e1,    2*e0;
-                2*e1,   0,       2*e3;
-                -2*e0,   2*e3,   -4*e2 ];
-
-            % ---- dC_EB/de3 ----
-            dC3 = [ -4*e3,  -2*e0,    2*e1;
-                2*e0,  -4*e3,    2*e2;
-                2*e1,   2*e2,    0 ];
-
-            % Apply transpose because m_b uses C_BE = C_EB'
-            J0 = dC0.' * mE;
-            J1 = dC1.' * mE;
-            J2 = dC2.' * mE;
-            J3 = dC3.' * mE;
-
-            J = [J0, J1, J2, J3];
-        end
-
     end
 
 end

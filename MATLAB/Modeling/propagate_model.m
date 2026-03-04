@@ -95,7 +95,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'x0')
         x0 = NameValueArgs.x0;
     else
-        v0 = 0;
+        v0 = 300;
         % --- Payload ---
         P0   = [0; 0; 3000];              % ENU position      [m]
         V_p0 = [v0; 0; 0];                % ENU velocity      [m   s^-1]

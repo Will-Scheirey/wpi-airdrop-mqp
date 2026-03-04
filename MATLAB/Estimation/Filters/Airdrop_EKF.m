@@ -26,7 +26,7 @@ classdef Airdrop_EKF < Airdrop_Filter
         function predict_impl(obj, u)
             A   = obj.f_jacobian_states(u);
             Phi = eye(size(A)) + obj.dt * A;
-            % Phi = expm(obj.dt * A);
+            % Phi = expm(A * obj.dt);
 
             Qd = obj.Q;
 

@@ -25,10 +25,17 @@ function [R, Q, P0] = get_noise_params_sim(var, dt)
     % Process noise (Q)
     % --------------------------
     % P/V driven by continuous white acceleration noise:
-    Sa = diag(var.accel(:));       % 3x3 accel variance
-
+    Sa = diag(var.accel(:));
+    
+    % model mismatch floor
+    sigma_a_floor = 1;
+    Sa = Sa + (sigma_a_floor^2)*eye(3);
+    
     Q_PV = [ (dt^4/4)*Sa, (dt^3/2)*Sa;
              (dt^3/2)*Sa, (dt^2)*Sa ];
+
+    Q_PV(1:3, 1:3) = Q_PV(4:6, 4:6) * 1e3;
+    Q_PV(4:6, 4:6) = Q_PV(4:6, 4:6) * 1e3;
 
     % Quaternion noise: keep it simple and small.
     % Use an effective gyro variance (average axis variance).
@@ -70,6 +77,6 @@ function [R, Q, P0] = get_noise_params_sim(var, dt)
         1e-6 * eye(3), ...   % b_p
         1e-6 * eye(3), ...   % b_m
         1e-6,         ...    % b_b
-        1e-2 * eye(3) ...    % b_v
+        1e-6 * eye(3) ...    % b_v
     );
 end

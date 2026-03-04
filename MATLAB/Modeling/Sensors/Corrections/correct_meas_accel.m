@@ -19,6 +19,7 @@ function accel_out = correct_meas_accel(a_list, v_list, w_list, e_list, alpha_li
             - g_b ...
             + cross(alpha_b, r_s_b) ...
             + cross(w_b, cross(w_b, r_s_b));
+        % a_b = v_dot_b - g_b;
         accel_out(i,:) = a_b';
     end
 end

@@ -2,7 +2,7 @@
 clear; clc
 
 num_sec = 50;
-meas_freq = 100; % Number of measurements per second
+meas_freq = 50; % Number of measurements per second
 num_steps = num_sec * meas_freq + 1;
 
 % Only re-run the simulation if we need to
@@ -16,7 +16,7 @@ end
 if run_sim
     disp("Running sim")
     tspan = linspace(0, num_sec, num_steps);
-    [t, y, model] = propagate_model('tspan', tspan, 'riser', false, 'model', @Parachute_Model_Simple, 'use_drag', true);
+    [t, y, model] = propagate_model('tspan', tspan, 'riser', true, 'model', @Parachute_Model_Simple, 'use_drag', true);
     x_actual = y(1:end-1, :);
 end
 
@@ -28,7 +28,7 @@ num_steps = length(tspan);
 %% Create Sensor Measurements
 sensor = Sensor_FlySight(meas_freq);
 p_std_dev = sensor.gps_std_dev;
-v_std_dev = 1e-1;
+v_std_dev = 3;
 baro_std_dev = sensor.baro_std_dev;
 a_std_dev = sensor.accel_std_dev;
 w_std_dev = sensor.gyro_std_dev;
@@ -54,14 +54,14 @@ pos_lla = enu2lla(p_meas, lla_worc, "flat");
 mag_XYZ  = zeros(num_steps, 3);
 mag_actual = zeros(num_steps, 3);
 v_e_actual = zeros(num_steps, 3);
-for n = 1:num_steps
-    XYZ = wrldmagm(pos_lla(n, 3), pos_lla(n, 1), pos_lla(n, 2), 2025);
-    XYZ = XYZ / norm(XYZ);
 
-    mag_XYZ(n, :) = XYZ;
+m_enu = [1; 0; 0];  % arbitrary, just consistent
+for n = 1:num_steps
+
+    mag_XYZ(n, :) = m_enu;
     C_EB = body2enu_rotm(e_actual(n, :)); % Body -> inertial
 
-    mag_actual(n, :) = (C_EB' * XYZ);
+    mag_actual(n, :) = (C_EB' * m_enu);
     v_e_actual(n, :) = (C_EB * v_actual(n, :)');
 end
 
@@ -76,7 +76,7 @@ data_gps   = table(tspan', p_meas, repmat(1, num_steps, 1), 'VariableNames', {'t
 data_mag   = table(tspan', m_meas, repmat(2, num_steps, 1), 'VariableNames', {'time', 'data', 'meas_idx'});
 data_vel   = table(tspan', v_meas, repmat(4, num_steps, 1), 'VariableNames', {'time', 'data', 'meas_idx'});
 
-measurements = {data_gps, data_mag, data_vel};
+measurements = {data_gps, data_mag};
 
 inputs = table(tspan', data_accel.data, data_gyro.data, ...
     'VariableNames', {'time', 'accel', 'gyro'});
@@ -86,11 +86,10 @@ num_steps = numel(t);
 
 %% Run the Kalman Filter
 
-figure(1e6)
-plot(tspan, p_meas - p_actual)
-
+kf_dt_div = 3;
 % The Kalman Filter
 dt = t(2) - t(1);
+dt_kf = dt / kf_dt_div;
 
 sensor_var = struct( ...
     'accel', repmat(a_std_dev.^2, 1, 3), ...
@@ -101,12 +100,12 @@ sensor_var = struct( ...
     'baro',  baro_std_dev.^2 ...
 );
 
-[R, Q, P0] = get_noise_params_sim(sensor_var, dt);
+[R, Q, P0] = get_noise_params_sim(sensor_var, dt_kf);
 
-kf = Airdrop_EKF(R, Q, 0, P0, dt);
+kf = Airdrop_EKF(R, Q, 0, P0, dt_kf);
 
 kf.initialize(true, ...
-    a_actual(1, :)', ...
+     a_actual(1,:), ...
     [0, 0, 0]', ...
     data_mag.data(1, :)', ...
     data_gps.data(1, :)', ...
@@ -117,9 +116,12 @@ kf.initialize(true, ...
 
 acc_gps = repmat(p_std_dev, num_steps, 2);
 
-kf.run_filter(measurements, inputs, t, acc_gps, 100, 1, true);
+t_kf = 0:dt_kf:t(end);
 
-x_est = kf.x_hist(:, 2:end)';
+kf.run_filter(measurements, inputs, t_kf, acc_gps, 100, 1, true);
+
+x_est_temp = kf.x_hist(:, 1:kf_dt_div:end);
+x_est = x_est_temp';
 covariances = kf.P_hist;
 
 %% Exract Values
@@ -127,6 +129,7 @@ covariances = kf.P_hist;
 p_truth = p_actual(1:end-1, :);
 
 v_truth_b = v_actual(1:end-1, :);
+% v_truth = v_e_actual(1:end-1, :);
 
 e_truth = e_actual(1:end-1, :);
 w_truth = w_actual(1:end-1, :);
@@ -303,7 +306,7 @@ idx = kf.x_inds.P_E(3);
 
 fig_idx = new_fig(fig_idx);
 clf
-p = plot_cov(p_err(:, 3), squeeze(covariances(idx, idx, 2:end)), t_plot);
+p = plot_cov(p_err(:, 3), squeeze(covariances(idx, idx, 1:kf_dt_div:end)), t_plot);
 p.Marker = ".";
 p.MarkerSize = 10;
 p.LineWidth = 1;
@@ -313,12 +316,13 @@ title("Position X Error and Covariance")
 
 fig_idx = new_fig(fig_idx);
 clf
-p = plot_cov(p_err(:, 3), squeeze(kf.inno_hist(3, 2:end)), t_plot);
+inno = squeeze(kf.inno_hist(3, :));
+p = plot_cov(inno, squeeze(covariances(idx, idx, :)), t_kf);
 p.Marker = ".";
 p.MarkerSize = 10;
 p.LineWidth = 1;
 legend
-
+title("Position X Innovation and Covariance")
 
 function p = plot_cov(err, cov, t)
     p = plot(t, err, '-b', 'LineWidth', 1.5, 'DisplayName', 'Error'); hold on
