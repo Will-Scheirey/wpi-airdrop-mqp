@@ -86,9 +86,10 @@ plot(sqrt(covariances), '--b', 'DisplayName', 'Covariance', 'LineWidth', 1);
 plot(-sqrt(covariances), '--b', 'HandleVisibility', 'off', 'LineWidth', 1);
 
 legend;
-title("Error and Covariance vs. Time")
-xlabel("Time (s)")
+title("Position Error and Covariance vs. Time")
+xlabel("Timestep")
 ylabel("Error (m)")
+ylim([-1,1])
 
 % plot(x_estimates(1, 2:end)); hold on
 % plot(values(1, 1:end-1));

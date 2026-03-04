@@ -41,11 +41,11 @@ f = [dp_dt;
     dv_dt;
     de_dt;
     zeros(16, 1);
-    ];
+    ]
 
 
 
-F = jacobian(f, x);
+F = jacobian(f, x)
 
 h = [
     p - bp;
