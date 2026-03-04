@@ -43,7 +43,7 @@ rho     = 1.225;      % Density of air                   [kg m^-3]
 % --- Rotations ---
 % =================
 
-C_BE  = ecef2body_rotm(e);                    % ROTM to Body from ECEF
+C_BE  = body2enu_rotm(e);                    % ROTM to Body from ECEF
 
 alpha = atan(abs(w / u));                     % Angle of attack
 beta  = asin(abs(v/V));                       % Side slip angle

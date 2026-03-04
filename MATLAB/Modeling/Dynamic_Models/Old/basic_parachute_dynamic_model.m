@@ -41,8 +41,8 @@ rho     = StandardAtmosphereModel.Density(h); % Density of air  [kg m^-3]
 % --- Rotations ---
 % =================
 
-C_EB   = ecef2body_rotm(e_p);                    % ROTM from ECEF to Body
-C_EB_c = ecef2body_rotm(e_c);                    % ROTM from ECEF to Body
+C_EB   = body2enu_rotm(e_p);                    % ROTM from ECEF to Body
+C_EB_c = body2enu_rotm(e_c);                    % ROTM from ECEF to Body
 
 alpha = atan(abs(w / u));                     % Angle of attack
 beta  = asin(abs(v/V_p_norm));                       % Side slip angle

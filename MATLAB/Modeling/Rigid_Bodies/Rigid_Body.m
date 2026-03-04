@@ -28,8 +28,19 @@ classdef Rigid_Body
         
         % --- Basic Aerodynamic Properties ---
         function S_out = S(obj, aoa); S_out = 0; end
+        % might have to change Cd_out to reflect the changes made in the CL
+        % out portion
         function Cd_out = Cd(obj, aoa); Cd_out = 0; end
-        function Cl_out = Cl(obj, aoa); Cl_out = 0; end
+        %function Cl_out = Cl(obj, aoa); Cl_out = 0; end
+        function Cl_out = Cl(obj, aoa)
+          %   L/D = tan(aoa) = Cl/Cd  ->  Cl = Cd * tan(aoa)
+          if obj.is_deployed
+              Cd_curr = obj.Cd(aoa);
+              Cl_out = Cd_curr .* tan(aoa);
+          else
+              Cl_out = 0;  % No lift before deployment
+          end
+        end
         function ClS_out = ClS(obj, aoa); ClS_out = obj.S(aoa)*obj.Cl(aoa); end
         function CdS_out = CdS(obj, aoa); CdS_out = obj.S(aoa)*obj.Cd(aoa); end
 

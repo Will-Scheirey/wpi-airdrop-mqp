@@ -1,8 +1,12 @@
 function [R, Q, P0] = get_noise_params(sensor_var, dt)
 
 %% Noise Parameters
-Rp = 10;
-R_pos = eye(3) * Rp^2;
+Rp = 5;
+R_pos = [
+    Rp, 0, 0;
+    0, Rp, 0;
+    0, 0, Rp*5;
+].^2;
 
 % sensor_var.mag = sensor_var.mag * 1e1;
 % sensor_var.baro = sensor_var.baro * 1e1;
@@ -12,7 +16,7 @@ R_pos = eye(3) * Rp^2;
 
 R_mag = blkdiag(sensor_var.mag(1), sensor_var.mag(2), sensor_var.mag(3)).^2;
 
-R_baro = (sensor_var.baro * 1e2)^2;
+R_baro = (sensor_var.baro * 1e3)^2;
 
 Rv = 2;
 R_vel = eye(3) * Rv^2;

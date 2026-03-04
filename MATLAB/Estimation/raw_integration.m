@@ -48,7 +48,7 @@ for i = 2:num_steps
     e(:,i) = e(:,i-1) + e_dot*dt;
     e(:,i) = e(:, i) / norm(e(:, i));
 
-    C_EB = ecef2body_rotm(e(:, i));
+    C_EB = body2enu_rotm(e(:, i));
 
     v_dot   = a' + C_EB * g_vec_e;
     p_dot   = C_EB' * v(:, i-1);
