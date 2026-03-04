@@ -32,8 +32,6 @@ function results = HARP_Dynamic_Model(data_out)
     %% STEP 4: Convert CARP Results to Propagator Initial Conditions
     x0 = HARP_To_Propagator(data_out.carp_data);
 
-    % x0(4:6) = x0(4:6) * 2;
-
     [~, the_weather] = load_weather(data_out.carp_data.time_UTC);
     the_weather.win_speed = ks2mps(the_weather.win_speed);
     the_weather.alt_agl = ft2m(1000 * the_weather.alt_agl);

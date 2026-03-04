@@ -102,7 +102,7 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing, dynamic_model)
     ylabel('North (ft)', 'FontSize', 10);
     zlabel('Altitude (ft)', 'FontSize', 10);
     title('3D Trajectory View', 'FontSize', 12, 'FontWeight', 'bold');
-    legend('Trajectory', 'PI', 'HARP', 'Estimated Trajectory', 'Location', 'best');
+    legend('Trajectory', 'PI', 'HARP', 'Estimated Trajectory','Dynamic Model Trajectory','Wind Vectors', 'Planned Landing','Location', 'best');
 
     hold off;
     
@@ -166,78 +166,13 @@ function plotHARP2(outputs, inputs, flight_traj, planned_landing, dynamic_model)
    
     plot([harp_x, mid_x, dwe_x, pi_x], ...
      [harp_y, mid_y, dwe_y, pi_y], ...
-     'b-', 'LineWidth', 2)
+     'b-', 'LineWidth', 2, 'DisplayName', 'HARP Trajectory')
 
     xlabel('East (ft)', 'FontSize', 10);
     ylabel('North (ft)', 'FontSize', 10);
     title('Top-Down View', 'FontSize', 12, 'FontWeight', 'bold');
     legend('Location', 'best');
    
-    hold off;
-    
-    %% SUBPLOT 4: 3D Wind Vector Diagram
-    figure('Position', [50, 50, 1600, 1200]);
-    hold on;
-    grid on;
-    view(45, 30);
-    
-    % Origin point
-    plot3(harp_x, harp_y, harp_z, 'ko', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'k');
-    
-    
-    % Deployed wind effect vector
-    dwe_vector_x = dwe_x - start_x;
-    dwe_vector_y = dwe_y - start_y;
-    % Scale for visualization
-    scale = 1;
-    quiver3(0, 0, 0, dwe_vector_x*scale, dwe_vector_y*scale, -harp_z*0.3, ...
-        'g', 'LineWidth', 2.5, 'MaxHeadSize', 0.8);
-    text(dwe_vector_x*scale/2, dwe_vector_y*scale/2, -harp_z*0.15, ...
-        'DWE', 'FontSize', 10, 'Color', 'g', 'FontWeight', 'bold');
-    
-    % High velocity drift vector (if HALO)
-    if strcmp(inputs.mission.type, 'HALO') && outputs.hvVector.de > 0
-        hvde_vector_x = hvde_x;
-        hvde_vector_y = hvde_y;
-        quiver3(0, 0, -harp_z*0.3, hvde_vector_x*scale, hvde_vector_y*scale, -harp_z*0.4, ...
-            'm', 'LineWidth', 2.5, 'MaxHeadSize', 0.8);
-        text(hvde_vector_x*scale/2, hvde_vector_y*scale/2, -harp_z*0.5, ...
-            'HVDE', 'FontSize', 10, 'Color', 'm', 'FontWeight', 'bold');
-    end
-    
-    % Aircraft velocity vector
-    ftd_scale = 0.3; % Scale down for visualization
-    quiver3(0, 0, -harp_z*0.7, ftd_x*ftd_scale, ftd_y*ftd_scale, 0, ...
-        'k', 'LineWidth', 2.5, 'MaxHeadSize', 0.8);
-    text(ftd_x*ftd_scale/2, ftd_y*ftd_scale/2, -harp_z*0.7, ...
-        'FTD Vector', 'FontSize', 10, 'Color', 'k', 'FontWeight', 'bold');
-    
-    % Resultant vector to HARP
-    quiver3(0, 0, 0, pi_x*0.5, pi_y*0.5, -harp_z, ...
-        'r', 'LineWidth', 3, 'MaxHeadSize', 0.8);
-    text(pi_x*0.25, pi_y*0.25, -harp_z/2, ...
-        'Total', 'FontSize', 10, 'Color', 'r', 'FontWeight', 'bold');
-    
-    % Add wind direction indicators if available
-    if isfield(inputs, 'winds')
-        % This section can be expanded if wind profile data is available
-        title_str = '3D Wind Vectors';
-    else
-        title_str = '3D Effect Vectors';
-    end
-    
-    xlabel('East (ft)', 'FontSize', 10);
-    ylabel('North (ft)', 'FontSize', 10);
-    zlabel('Altitude (ft)', 'FontSize', 10);
-    title(title_str, 'FontSize', 12, 'FontWeight', 'bold');
-    
-    % Set axis limits for better visualization
-    max_val = max([abs(dwe_x), abs(dwe_y), harp_z]) * 0.6;
-    xlim([-max_val, max_val]);
-    ylim([-max_val, max_val]);
-    zlim([-harp_z, harp_z*0.1]);
-    
-    legend('Origin', 'DWE', 'Location', 'best');
     hold off;
    
 end
