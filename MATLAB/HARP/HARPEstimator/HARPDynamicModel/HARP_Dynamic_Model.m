@@ -34,6 +34,20 @@ function results = HARP_Dynamic_Model(data_out)
 
     % x0(4:6) = x0(4:6) * 2;
 
+    % --- Force initial geometry to make riser taut for chute1 ---
+    P_p0 = x0(1:3);
+    e_p0 = x0(7:10);
+    e_c0 = x0(20:23);
+    
+    C_EB_p0 = body2enu_rotm(e_p0);
+    C_EB_c0 = body2enu_rotm(e_c0);
+    
+    r_attach_p_e = C_EB_p0' * payload.P_attach_B;
+    r_attach_c_e = C_EB_c0' * parachute_system1.P_attach_B;
+    
+    % Place canopy COM so attachment points are separated by l0 in +Z
+    x0(14:16) = P_p0 + r_attach_p_e - r_attach_c_e + [0;0;parachute_system1.l0];
+
     [~, the_weather] = load_weather(data_out.carp_data.time_UTC);
     the_weather.win_speed = ks2mps(the_weather.win_speed);
     the_weather.alt_agl = ft2m(1000 * the_weather.alt_agl);

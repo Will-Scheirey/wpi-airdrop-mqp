@@ -24,16 +24,19 @@ classdef Dynamic_Model < matlab.System
         end
 
         function [t, y] = run_model(obj, x0, tspan, rel_tol, abs_tol)
+            
             obj.x0 = x0;
 
             if nargin < 4
-                rel_tol = 1e-12;
+                rel_tol = 1e-6;
             end
             if nargin < 5
-                abs_tol = 1e-12;
+                abs_tol = 1e-8;
             end
 
-            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol, 'Events', @myEvent); % Set solver tolerance
+            fprintf('run_model RelTol=%g AbsTol=%g\n', rel_tol, abs_tol);
+
+            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol, 'Events', @myEvent,'Stats','on','MaxStep',0.2); % Set solver tolerance
 
             [t, y] = ode15s(@obj.ode_fcn, tspan, x0, options);
 
@@ -43,7 +46,8 @@ classdef Dynamic_Model < matlab.System
             function [value, isterminal, direction] = myEvent(t, y)
                 value = y(3) > 0;
                 isterminal = 1;     % Stop the integration
-                direction = 0;      % Any direction
+                %direction = 0;      % Any direction
+                direction = -1;     % descending through 0
             end
         end
 

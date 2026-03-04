@@ -213,7 +213,13 @@ classdef Parachute_Model_Simple < Dynamic_Model
                 lift_dir_c = lift_dir_c / norm(lift_dir_c);
             
                 % Lift magnitude based on drag magnitude
-                L_mag_c = norm(f_c) * tan(aoa_c);
+                v_rel_c_e = obj.C_EB_c' * obj.V_c;
+                Vh = norm(v_rel_c_e(1:2));
+                Vv = abs(v_rel_c_e(3));
+                L_over_D = Vh / max(Vv, 1e-3);
+                L_over_D = min(L_over_D, 0.3);
+                L_mag_c = norm(f_c) * L_over_D;
+
                 f_l_c = L_mag_c * lift_dir_c;
             
                 if any(isnan(f_l_c))
