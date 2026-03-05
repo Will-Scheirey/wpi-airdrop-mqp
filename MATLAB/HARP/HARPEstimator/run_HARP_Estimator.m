@@ -20,4 +20,4 @@ dynamic_model = HARP_Dynamic_Model('inputs', inputs, 'data_out', data_out, 'carp
 
 % Display summary
 displayHARPSummary(outputs, inputs);
-plotHARP2(outputs, inputs, m2ft(data_out.carp.relative_traj), m2ft(data_out.carp.planned_relative_landing), dynamic_model);
+plotHARP2(outputs, inputs, data_out.carp.relative_traj, data_out.carp.planned_relative_landing, dynamic_model);
