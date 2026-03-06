@@ -11,16 +11,24 @@ is_dir = [all_entries.isdir];
 all_dirs = all_entries(is_dir);
 all_dirs = all_dirs(~ismember({all_dirs.name}, {'.', '..'}));  % <-- fixes issue #2
 
-results = struct();
 
-for i = 1:length(all_dirs)
+results_all = cell(length(all_dirs), 1);
+
+parfor i = 1:length(all_dirs)
     drop_dir = all_dirs(i).name;
     full_dir = fullfile(parent_dir, drop_dir);
 
     fprintf('\n--- Processing (%d/%d): %s ---\n', i, length(all_dirs), drop_dir);
 
+    results = struct();
     try
-        data_out     = get_flight_estimates(full_dir, true);          % <-- inside loop
+        sensor_size = dir(fullfile(full_dir, "SENSOR.csv")).bytes;
+
+        if sensor_size > 100e6
+            error("Filesize too big!")
+        end
+
+        data_out     = get_flight_estimates(full_dir);          % <-- inside loop
         carp_data    = data_out.carp;
         inputs       = convertDataOutToInputs(data_out);
         [outputs, inputs] = computeHARP(inputs);
@@ -28,22 +36,25 @@ for i = 1:length(all_dirs)
                                            'carp_data', carp_data);
 
         field_name = matlab.lang.makeValidName(drop_dir);
-        results.(field_name).drop_dir      = drop_dir;
-        results.(field_name).data_out      = data_out;
-        results.(field_name).carp_data     = carp_data;
-        results.(field_name).inputs        = inputs;
-        results.(field_name).outputs       = outputs;
-        results.(field_name).dynamic_model = dynamic_model;
-        results.(field_name).status        = 'success';
+        results.drop_dir      = drop_dir;
+        results.data_out      = data_out;
+        results.carp_data     = carp_data;
+        results.inputs        = inputs;
+        results.outputs       = outputs;
+        results.dynamic_model = dynamic_model;
+        results.status        = 'success';
 
     catch ME
         fprintf('ERROR on %s: %s\n', drop_dir, ME.message);
         field_name = matlab.lang.makeValidName(drop_dir);
-        results.(field_name).drop_dir = drop_dir;
-        results.(field_name).status   = 'failed';
-        results.(field_name).error    = ME.message;
+        results.drop_dir = drop_dir;
+        results.status   = 'failed';
+        results.error    = ME.message;
     end
+    results_all{i} = results;
+    fprintf('\n--- Processing (%d/%d): %s ---\n', i, length(all_dirs), drop_dir);
+    fprintf("\tSTATUS: %s\n", results.status);
 end
 
 save_path = fullfile(parent_dir, 'all_drops_results.mat');
-save(save_path, 'results', '-v7.3');
+save(save_path, 'results_all', '-v7.3');

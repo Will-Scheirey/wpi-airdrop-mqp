@@ -55,7 +55,7 @@ function inputs = convertDataOutToInputs(data_out)
                 inputs.altitude.dzTerrain = data_out.dz.terrain_elevation;
             else
                 inputs.altitude.dzTerrain = inputs.altitude.piElevation;
-                warning('DZ terrain elevation not specified, using PI elevation');
+                % warning('DZ terrain elevation not specified, using PI elevation');
             end
             
             % D-value
@@ -63,7 +63,7 @@ function inputs = convertDataOutToInputs(data_out)
                 inputs.altitude.dValue = data_out.weather.d_value;
             else
                 inputs.altitude.dValue = 0;
-                warning('D-value not specified, using 0');
+                % warning('D-value not specified, using 0');
             end
             
             % Actuation altitude (HALO only)
@@ -136,19 +136,19 @@ function inputs = convertDataOutToInputs(data_out)
                     inputs.safety.factor = data_out.safety.factor;
                 else
                     inputs.safety.factor = 2000;
-                    warning('Safety factor not specified, using default 2000 ft');
+                    % warning('Safety factor not specified, using default 2000 ft');
                 end
                 
                 if isfield(data_out.safety, 'percentage')
                     inputs.safety.percentage = data_out.safety.percentage;
                 else
                     inputs.safety.percentage = 0.80;
-                    warning('Safety percentage not specified, using default 80%%');
+                    % warning('Safety percentage not specified, using default 80%%');
                 end
             else
                 inputs.safety.factor = 2000;
                 inputs.safety.percentage = 0.80;
-                warning('Safety parameters not specified, using defaults');
+                % warning('Safety parameters not specified, using defaults');
             end
             
             %% DZ INFORMATION

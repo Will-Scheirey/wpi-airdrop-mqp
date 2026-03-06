@@ -29,7 +29,7 @@ function results = HARP_Dynamic_Model(data_out)
     deploy_idx = find((data_out.data_out.drop_estimates.pos(:, 3) - data_out.data_out.drop_estimates.pos(end, 3)) < deploy_alt, 1);
     time_deploy = data_out.data_out.drop_t_plot(deploy_idx);
 
-    fprintf("Deploy Time for 2nd Paracute: %0.2f seconds\n", time_deploy);
+    % fprintf("Deploy Time for 2nd Paracute: %0.2f seconds\n", time_deploy);
 
     parachute_system1 = Create_Parachute(2.5, 0.1);
 

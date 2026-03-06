@@ -34,9 +34,7 @@ classdef Dynamic_Model < matlab.System
                 abs_tol = 1e-8;
             end
 
-            fprintf('run_model RelTol=%g AbsTol=%g\n', rel_tol, abs_tol);
-
-            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol, 'Events', @myEvent,'Stats','on','MaxStep',0.2); % Set solver tolerance
+            options = odeset('RelTol', rel_tol, 'AbsTol', abs_tol, 'Events', @myEvent,'MaxStep',0.2); % Set solver tolerance
 
             [t, y] = ode15s(@obj.ode_fcn, tspan, x0, options);
 
