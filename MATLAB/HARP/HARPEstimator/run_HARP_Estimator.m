@@ -7,7 +7,7 @@ parent_dir = "haars_data";
 drop_dir = "DN151_Lt1_n14_08052025_side";
 full_dir = fullfile(parent_dir, drop_dir);
 
-data_out = get_flight_estimates(full_dir);
+data_out = get_flight_estimates(full_dir, true);
 
 carp_data = data_out.carp;
 

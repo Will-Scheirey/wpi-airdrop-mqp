@@ -1,4 +1,8 @@
-function data_out = get_flight_estimates(full_dir)
+function data_out = get_flight_estimates(full_dir, verbose)
+
+if nargin < 2
+    verbose = false;
+end
 
 smooth_window = 3;
 alt_mean_window = 100;
@@ -28,7 +32,7 @@ kf.initialize(true, flight_measurements.accel.data(1, :)', ...
     flight_measurements.gps.data(1, :)', ...
     flight_measurements.baro.data(1, :)');
 
-kf.run_filter(measurements, inputs, tspan, acc_gps, drop_time, 1, true);
+kf.run_filter(measurements, inputs, tspan, acc_gps, drop_time, 1, verbose);
 
 %% Run the Smoother
 

@@ -20,7 +20,7 @@ for i = 1:length(all_dirs)
     fprintf('\n--- Processing (%d/%d): %s ---\n', i, length(all_dirs), drop_dir);
 
     try
-        data_out     = get_flight_estimates(full_dir);          % <-- inside loop
+        data_out     = get_flight_estimates(full_dir, true);          % <-- inside loop
         carp_data    = data_out.carp;
         inputs       = convertDataOutToInputs(data_out);
         [outputs, inputs] = computeHARP(inputs);
