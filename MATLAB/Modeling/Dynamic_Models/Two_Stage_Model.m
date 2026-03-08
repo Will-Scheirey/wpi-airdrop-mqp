@@ -26,6 +26,8 @@ classdef Two_Stage_Model < Parachute_Model_Wind
 
                 if ~obj.parachute2.is_deployed
                     fprintf('*** PARACHUTE 2 DEPLOYED at t = %.2f seconds ***\n', t);
+                    x(14:16) = x(1:3);
+                    x(17:19) = x(4:6);
                 end
                 obj.parachute2.is_deployed = true;
                 obj.parachute = obj.parachute2;

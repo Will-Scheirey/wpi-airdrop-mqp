@@ -1,10 +1,13 @@
-function parachute = Create_Parachute(r, t_deploy)
+function parachute = Create_Parachute(r, t_deploy, t_cut)
     if nargin < 2
         t_deploy = 0;  % Default: immediate deployment
     end
+    if nargin < 3
+        t_cut = t_deploy;
+    end
     
     % Single G-12D parameters
-    single_mass = 57*2;            % kg (125 lb per chute)
+    single_mass = 57;            % kg (125 lb per chute)
     riser_length = 18.28;        % m (60 ft published)
     riser_k = 1000;             % N/m per riser
     %riser_c = 10000;               % N·s/m system damping
@@ -30,8 +33,10 @@ function parachute = Create_Parachute(r, t_deploy)
         true);  % variable_ma = true
     
     % Set deployment time
+    parachute.t_cut = t_cut; % trying to ensure that the first chute opens at 0.1 seconds
     parachute.t_deploy = t_deploy;
-    parachute.t_cut = inf; % trying to ensure that the first chute opens at 0.1 seconds
+    % parachute.t_cut = inf; % trying to ensure that the first chute opens at 0.1 seconds
     parachute.is_deployed = (t_deploy == 0);  % Deploy immediately if t_deploy is 0
     
 end
+
