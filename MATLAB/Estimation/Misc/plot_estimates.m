@@ -76,10 +76,10 @@ fig_idx = new_fig(fig_idx);
 clf
 plot(t_plot, v_est, 'LineWidth', 2); hold on
 plot(t_plot, vecnorm(v_est, 2, 2), 'LineWidth', 1.5)
-legend("V_0^E", "V_1^E", "V_2^E", "Velocity Norm")
+legend("V_X", "V_Y", "V_{Altitude}", "Velocity Norm")
 xlabel("Time (s)")
 ylabel("Velocity (m/s)")
-title("ECEF Velocity vs. Time")
+title("ENU Velocity vs. Time")
 xlim(t_plot_drop)
 
 fig_idx = new_fig(fig_idx);
@@ -132,6 +132,17 @@ xlim(t_plot_drop)
 
 fig_idx = new_fig(fig_idx);
 clf
+plot(t_plot, m_b_est(:, 1), 'DisplayName', 'X', 'LineWidth', 1.5); hold on
+plot(t_plot, m_b_est(:, 2), 'DisplayName', 'Y', 'LineWidth', 1.5);
+plot(t_plot, m_b_est(:, 3), 'DisplayName', 'Z', 'LineWidth', 1.5);
+xlabel("Time (s)")
+ylabel("Bias Estimate (gauss)")
+title("Magnetometer Bias Estimate vs Time")
+xlim([tspan(1), tspan(end)]);
+
+
+fig_idx = new_fig(fig_idx);
+clf
 plot(tspan, kf.accel_calc_all, 'LineWidth', 2); hold on
 legend("a_1", "a_2", "a_3")
 xlim([t_plot(1)+1, t_plot(end)])
@@ -158,13 +169,33 @@ title("Gyro Bias Estimates")
 
 fig_idx = new_fig(fig_idx);
 clf
+plot(t_plot, w_b_est, 'LineWidth', 1.5); hold on
+legend("b_1", "b_2", "b_3")
+xlabel("Time (s)")
+ylabel("Bias (rad/s)")
+xlim(t_plot_drop)
+
+title("Gyroscope Bias Estimates")
+
+fig_idx = new_fig(fig_idx);
+clf
 plot(t_plot, a_b_est, 'LineWidth', 1.5); hold on
 legend("b_1", "b_2", "b_3")
 xlabel("Time (s)")
 ylabel("Bias (m/s^2)")
 xlim([t_plot(1)+1, t_plot(end)])
 
-title("Acceleration Bias Estimates")
+title("Accelerometer Bias Estimates")
+
+fig_idx = new_fig(fig_idx);
+clf
+plot(t_plot, a_b_est, 'LineWidth', 1.5); hold on
+legend("b_1", "b_2", "b_3")
+xlabel("Time (s)")
+ylabel("Bias (m/s^2)")
+xlim(t_plot_drop)
+
+title("Accelerometer Bias Estimates")
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -281,7 +312,9 @@ clf
 drop_idx = t_plot > drop_time;
 x_pos = p_est(drop_idx, 1) - p_est(find(drop_idx, 1), 1);
 y_pos = p_est(drop_idx, 2) - p_est(find(drop_idx, 1), 2);
-z_pos = p_est(drop_idx, 3);
+z_pos = p_est(drop_idx, 3) - p_est(end, 3);
+
+z_pos(1)
 
 activation_alt = ft2m(data_in.system_data.logged_activation) + (380 - 128);
 activation_idx = find(z_pos < activation_alt, 1);
@@ -289,13 +322,13 @@ activation_idx = find(z_pos < activation_alt, 1);
 t_plot_drop_ = t_plot(drop_idx) - t_plot(find(drop_idx, 1));
 
 yyaxis left
-plot(t_plot_drop_, x_pos, '.-b', 'DisplayName', 'X', 'MarkerSize', 6); hold on;
-plot(t_plot_drop_, y_pos,  '.-g','DisplayName', 'Y', 'MarkerSize', 6); hold on;
+plot(t_plot_drop_, x_pos, '.-b', 'DisplayName', 'X (Left Axis)', 'MarkerSize', 6); hold on;
+plot(t_plot_drop_, y_pos,  '.-g','DisplayName', 'Y (Left Axis)', 'MarkerSize', 6); hold on;
 ylabel("X, Y Position (m)")
 
 yyaxis right
-plot(t_plot_drop_, z_pos, 'LineWidth', 1.5, 'DisplayName', 'z'); hold on;
-plot(t_plot_drop_(activation_idx), z_pos(activation_idx), 'rx', 'MarkerSize', 10, 'DisplayName', 'Activation');
+plot(t_plot_drop_, z_pos, 'LineWidth', 1.5, 'DisplayName', 'Z (Right Axis)'); hold on;
+plot(t_plot_drop_(activation_idx), z_pos(activation_idx), 'kx', 'MarkerSize', 10, 'LineWidth', 2, 'DisplayName', 'Main Parachute Activation');
 ylabel("Altitude (m)")
 
 xlabel("Time (s)")
