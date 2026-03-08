@@ -1,4 +1,3 @@
-function process_haars()
 result = questdlg('Select a .zip file to extract', 'Proceed?', 'Yes', 'Cancel', 'Yes');
 
 if strcmp(result, "Cancel")
@@ -101,4 +100,3 @@ for n = 1:num_files
 end
 
 rmdir(zip_out_dir_name, 's')
-end
