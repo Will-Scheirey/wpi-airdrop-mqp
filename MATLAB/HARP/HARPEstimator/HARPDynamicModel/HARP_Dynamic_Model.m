@@ -11,7 +11,7 @@ function results = HARP_Dynamic_Model(data_out)
         data_out.DZ_course (1,1) double = 302           % degrees
         data_out.num_parachutes (1,1) double = 1       % Number of parachutes
         data_out.parachute_deploy_time (1,1) double = 0  % Parachute deployment time
-        data_out.tspan = linspace(0, 90, 2000)
+        data_out.tspan = linspace(0, 500, 2000)
         data_out.visualize (1,1) logical = true
         data_out.w (1,1) double = 48 %dimensions of payload in inches
         data_out.l (1,1) double = 83
@@ -22,9 +22,17 @@ function results = HARP_Dynamic_Model(data_out)
         data_out.carp_data = []
     end
     %% STEP 2: Create Parachute System
-    parachute_system1 = Create_Parachute(2.5, 0.1);
 
-    parachute_system2 = Create_Parachute(22.5, 35);
+    data_out.m = data_out.data_out.system_data.payload_weight;
+
+    deploy_alt = ft2m(data_out.data_out.system_data.planned_activation);
+    deploy_idx = find((data_out.data_out.drop_estimates.pos(:, 3) - data_out.data_out.drop_estimates.pos(end, 3)) < deploy_alt, 1);
+    time_deploy = data_out.data_out.drop_t_plot(deploy_idx);
+
+    % fprintf("Deploy Time for 2nd Paracute: %0.2f seconds\n", time_deploy);
+
+    parachute_system1 = Create_Parachute(2.5, 0.1, time_deploy);
+    parachute_system2 = Create_Parachute(22.5, time_deploy + 1);
 
     %% STEP 3: Create Payload System
     payload = Create_Payload(data_out.w, data_out.l, data_out.h,data_out.m);
@@ -50,5 +58,6 @@ function results = HARP_Dynamic_Model(data_out)
  results = Harp_Dynamic_Model_Results(t, y);
 
 end
+
 
 

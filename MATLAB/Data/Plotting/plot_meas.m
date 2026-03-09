@@ -1,4 +1,4 @@
-function fig_idx = plot_meas(data_gps, data_accel, data_gyro, data_mag, data_baro, data_gps_vel, fig_idx, tspan)
+function fig_idx = plot_meas(data_gps, data_accel, data_gyro, data_mag, data_baro, data_gps_vel, fig_idx, tspan, t_plot_drop)
 
 if nargin < 8
     tspan = data_accel.time;
@@ -79,6 +79,21 @@ xlim([tspan(1), tspan(end)])
 xlabel("Time (s)")
 ylabel("Altitude Measurement (m)")
 title("Baro and GPS")
+
+
+if nargin >= 9
+figure(fig_idx); fig_idx = fig_idx + 1;
+clf
+plot(data_baro.time, data_baro.data(:, 1), 'DisplayName', 'Barometer', 'LineWidth', 1); hold on
+if ~isempty(data_gps)
+plot(data_gps.time, data_gps.data(:, 3), 'DisplayName', 'GPS', 'LineWidth', 1); hold on
+end
+legend
+xlim(t_plot_drop)
+xlabel("Time (s)")
+ylabel("Altitude Measurement (m)")
+title("Barometer and GPS Measurements During Drop")
+end
 
 if ~isempty(data_gps)
 figure(fig_idx); fig_idx = fig_idx + 1;

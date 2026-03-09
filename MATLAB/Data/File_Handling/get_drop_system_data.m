@@ -7,7 +7,9 @@ function drop_data = get_drop_system_data(full_dir)
     opts = setvaropts(opts, "Date", "Type", "datetime");
     opts = setvaropts(opts, "Date", "InputFormat", "MM/dd/uuuu");
 
+    warning('off')
     system_data = readtable(filename, opts);
+    warning('on')
     
     drop_num = get_drop_num(full_dir);
     drop_data_row = system_data(system_data.DropNumber == drop_num, :);
