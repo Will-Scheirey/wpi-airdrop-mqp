@@ -69,12 +69,12 @@ flight_traj  = flight_traj(80:end,:);
 planned_landing = planned_landing + ([harp_x, harp_y] - flight_traj(1, 1:2));
 
 flight_traj = flight_traj + ([harp_x, harp_y, harp_z] - flight_traj(1, :));
-plot3(flight_traj(:, 1), flight_traj(:, 2), flight_traj(:, 3), '-m', 'LineWidth', 1)
+plot3(flight_traj(:, 1), flight_traj(:, 2), flight_traj(:, 3), '-m', 'LineWidth', 2)
 
 %Dynamic Model Trajectory
-plot3(dynamic_model.trajectory(:, 1),dynamic_model.trajectory(:, 2),dynamic_model.trajectory(:, 3));
+plot3(dynamic_model.trajectory(:, 1),dynamic_model.trajectory(:, 2),dynamic_model.trajectory(:, 3), 'LineWidth', 2);
 
-plot_wind_traj(inputs.winds.profile(:, 1), inputs.winds.profile(:, 2) + 180, inputs.winds.profile(:, 3), flight_traj, 50, 1/2);
+% plot_wind_traj(inputs.winds.profile(:, 1), inputs.winds.profile(:, 2) + 180, inputs.winds.profile(:, 3), flight_traj, 50, 1/2);
 
 plot3(planned_landing(1), planned_landing(2), 0, 'rx', 'MarkerSize', 20, 'DisplayName', 'Planned Landing');
 
@@ -82,16 +82,18 @@ err = [pi_x, pi_y, pi_z] - flight_traj(end, :);
 fprintf("Position Error: %0.2f m - (%0.2f, %0.2f) ft", norm(err), err(1), err(2));
 
 % Labels
-text(pi_x, pi_y, pi_z + 500, 'PI', 'FontSize', 10, 'FontWeight', 'bold');
-text(harp_x, harp_y, harp_z + 500, 'HARP', 'FontSize', 10, 'FontWeight', 'bold');
+text(pi_x + 10, pi_y, pi_z, 'Point of Impact', 'FontSize', 10, 'FontWeight', 'bold');
+text(harp_x + 10, harp_y, harp_z, 'HARP', 'FontSize', 10, 'FontWeight', 'bold');
 
 xlabel('East (m)', 'FontSize', 10);
 ylabel('North (m)', 'FontSize', 10);
 zlabel('Altitude (m)', 'FontSize', 10);
 title('3D Trajectory View', 'FontSize', 12, 'FontWeight', 'bold');
-legend('Trajectory', 'PI', 'HARP', 'Estimated Trajectory','Dynamic Model Trajectory','Wind Vectors', 'Planned Landing','Location', 'best');
+legend('Trajectory', 'PI', 'HARP', 'Estimated Trajectory','Dynamic Model Trajectory', 'Planned Landing','Location', 'best');
+
 
 hold off;
+axis square
 
 %% SUBPLOT 2: Side View (East-Altitude)
 figure('Position', [50, 50, 1600, 1200]);

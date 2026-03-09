@@ -2,7 +2,7 @@
 clear; clc
 
 num_sec = 50;
-meas_freq = 50; % Number of measurements per second
+meas_freq = 20; % Number of measurements per second
 num_steps = num_sec * meas_freq + 1;
 
 % Only re-run the simulation if we need to
@@ -302,30 +302,34 @@ fig_idx = new_fig(fig_idx);
 plot(t_plot, x_est(:, kf.x_inds.b_v), 'LineWidth', 1)
 title("Velocity Bias Estimate")
 
-idx = kf.x_inds.P_E(3);
+idx = kf.x_inds.e(1);
 
 fig_idx = new_fig(fig_idx);
 clf
-p = plot_cov(p_err(:, 3), squeeze(covariances(idx, idx, 1:kf_dt_div:end)), t_plot);
-p.Marker = ".";
+p = plot_cov(e_err(:, 1), squeeze(covariances(idx, idx, 1:kf_dt_div:end)), t_plot);
+% p.Marker = ".";
 p.MarkerSize = 10;
 p.LineWidth = 1;
 legend
+ylabel("Error")
+xlabel("Time (s)")
+xlim([t_plot(1), t_plot(end)])
 
-title("Position X Error and Covariance")
+title("Quaternion Part 0 Error and Covariance")
+% 
+% fig_idx = new_fig(fig_idx);
+% clf
+% inno = squeeze(kf.inno_hist(3, :));
+% p = plot_cov(inno, squeeze(covariances(idx, idx, :)), t_kf);
+% % p.Marker = ".";
+% p.MarkerSize = 8;
+% p.LineWidth = 1;
+% legend
+% title("Position X Innovation and Covariance During Simulated Drop")
 
-fig_idx = new_fig(fig_idx);
-clf
-inno = squeeze(kf.inno_hist(3, :));
-p = plot_cov(inno, squeeze(covariances(idx, idx, :)), t_kf);
-p.Marker = ".";
-p.MarkerSize = 10;
-p.LineWidth = 1;
-legend
-title("Position X Innovation and Covariance")
 
 function p = plot_cov(err, cov, t)
-    p = plot(t, err, '-b', 'LineWidth', 1.5, 'DisplayName', 'Error'); hold on
-    plot(t, sqrt(cov), '--r', 'LineWidth', 1, 'DisplayName', 'Covariance');
-    plot(t, -sqrt(cov), '--r', 'LineWidth', 1, 'HandleVisibility', 'off');
+    p = plot(t, err, '-r', 'MarkerSize', 1.5, 'DisplayName', 'Error'); hold on
+    plot(t, sqrt(cov), '-b', 'LineWidth', 1, 'DisplayName', 'Covariance');
+    plot(t, -sqrt(cov), '-b', 'LineWidth', 1, 'HandleVisibility', 'off');
 end

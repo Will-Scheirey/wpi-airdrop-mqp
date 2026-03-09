@@ -39,7 +39,7 @@ function [R, Q, P0] = get_noise_params_sim(var, dt)
 
     % Quaternion noise: keep it simple and small.
     % Use an effective gyro variance (average axis variance).
-    w_var_eff = mean(var.gyro(:));              % (rad/s)^2
+    w_var_eff = mean(var.gyro(:)) * 5e4;              % (rad/s)^2
     Q_e = eye(4) * (dt^2) * w_var_eff;          % crude but consistent
 
     % Bias random-walk strengths (variance per step).

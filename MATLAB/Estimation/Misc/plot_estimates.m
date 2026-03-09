@@ -74,13 +74,13 @@ ylabel("Accuracy (m)")
 
 fig_idx = new_fig(fig_idx);
 clf
-plot(t_plot, v_est, 'LineWidth', 2); hold on
-plot(t_plot, vecnorm(v_est, 2, 2), 'LineWidth', 1.5)
+plot(t_plot - t_plot_drop(1), v_est, 'LineWidth', 2); hold on
+plot(t_plot - t_plot_drop(1), vecnorm(v_est, 2, 2), 'LineWidth', 1.5)
 legend("V_X", "V_Y", "V_{Altitude}", "Velocity Norm")
 xlabel("Time (s)")
 ylabel("Velocity (m/s)")
 title("ENU Velocity vs. Time")
-xlim(t_plot_drop)
+xlim([0, t_plot_drop(2) - t_plot_drop(1)])
 
 fig_idx = new_fig(fig_idx);
 clf
@@ -316,7 +316,7 @@ z_pos = p_est(drop_idx, 3) - p_est(end, 3);
 
 z_pos(1)
 
-activation_alt = ft2m(data_in.system_data.logged_activation) + (380 - 128);
+activation_alt = ft2m(data_in.system_data.logged_activation) + (160 - 128);
 activation_idx = find(z_pos < activation_alt, 1);
 
 t_plot_drop_ = t_plot(drop_idx) - t_plot(find(drop_idx, 1));
@@ -330,6 +330,8 @@ yyaxis right
 plot(t_plot_drop_, z_pos, 'LineWidth', 1.5, 'DisplayName', 'Z (Right Axis)'); hold on;
 plot(t_plot_drop_(activation_idx), z_pos(activation_idx), 'kx', 'MarkerSize', 10, 'LineWidth', 2, 'DisplayName', 'Main Parachute Activation');
 ylabel("Altitude (m)")
+
+xlim([0, t_plot_drop(2) - t_plot_drop(1)])
 
 xlabel("Time (s)")
 legend
