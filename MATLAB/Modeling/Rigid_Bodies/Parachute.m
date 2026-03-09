@@ -42,7 +42,7 @@ classdef Parachute < Rigid_Body
             obj.eta = eta;
 
             obj.Cd0_flow = 0.78;
-            obj.Cd_edge = 0.2832;
+            obj.Cd_edge = 0.325;
 
             if nargin >= 7
                 obj.porosity = porosity;
