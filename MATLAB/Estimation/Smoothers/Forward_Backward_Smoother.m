@@ -1,3 +1,7 @@
+%% ===================================
+%% WRITTEN WITH CHATGPT; DOES NOT CURRENTLY WORK
+%% ===================================
+
 classdef Forward_Backward_Smoother < Airdrop_Filter
     % Backward Information Filter + fusion smoother (two-filter smoother)
     % Uses forward EKF histories (x_f^+, P_f^+, F_k, Q_k) and runs a backward

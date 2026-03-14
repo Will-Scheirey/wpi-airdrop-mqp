@@ -102,13 +102,13 @@ drop_t_plot = t_plot(drop_idx_start:drop_idx_stop) - t_plot(drop_idx_start);
 
 time_utc = all_measurements.gps_all.GNSS.datetime_utc(end);
 
-[~, weather] = load_weather(time_utc);
+[~, weather] = load_weather_data(time_utc);
 weather.alt_agl(1) = 0;
 
 
 %% Get CARP Inputs
 
-system_data = get_drop_system_data(full_dir);
+system_data = load_system_data(full_dir);
 
 estimates = struct( ...
     'all', x_est, ...
