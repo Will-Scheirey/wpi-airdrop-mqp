@@ -314,8 +314,6 @@ x_pos = p_est(drop_idx, 1) - p_est(find(drop_idx, 1), 1);
 y_pos = p_est(drop_idx, 2) - p_est(find(drop_idx, 1), 2);
 z_pos = p_est(drop_idx, 3) - p_est(end, 3);
 
-z_pos(1)
-
 activation_alt = ft2m(data_in.system_data.logged_activation) + (160 - 128);
 activation_idx = find(z_pos < activation_alt, 1);
 
