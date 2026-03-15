@@ -13,7 +13,7 @@ function [data_accel, ...
 %
 % INPUTS:
 %   sensor_filename : Filename of the sensor CSV file
-%   smooth_window   : Filename of the GPS CSV file
+%   gps_filename    : Filename of the GPS CSV file
 %
 % OUTPUTS:
 %   data_accel           : Trimmed accelerometer data
