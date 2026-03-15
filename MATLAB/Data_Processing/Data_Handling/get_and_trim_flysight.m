@@ -16,17 +16,16 @@ function [data_accel, ...
 %   smooth_window   : Filename of the GPS CSV file
 %
 % OUTPUTS:
-%   data_accel           : Trimmed and aligned accelerometer data
-%   data_gyro            : Trimmed and aligned gyroscope data
-%   data_mag             : Trimmed and aligned magnetometer data
-%   data_gps             : Trimmed and aligned GPS position data
-%   data_baro            : Trimmed and aligned barometer data
-%   data_gps_vel         : Trimmed and aligned GPS velocity data
-%   data_flysight_sensor : Trimmed and aligned raw sensor data
-%   data_flysight_gps    : Trimmed and aligned raw GPS data
+%   data_accel           : Trimmed accelerometer data
+%   data_gyro            : Trimmed gyroscope data
+%   data_mag             : Trimmed magnetometer data
+%   data_gps             : Trimmed GPS position data
+%   data_baro            : Trimmed barometer data
+%   data_gps_vel         : Trimmed GPS velocity data
+%   data_flysight_sensor : Trimmed raw sensor data
+%   data_flysight_gps    : Trimmed raw GPS data
 %
 % See also LOAD_FLYSIGHT_DATA, TRIM_FLYSIGHT
-
 
 [data_accel,...
     data_gyro,...
