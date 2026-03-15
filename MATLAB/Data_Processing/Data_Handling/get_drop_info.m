@@ -1,5 +1,33 @@
 function drop_info = get_drop_info(data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, data_flysight_sensor, data_flysight_gps)
 
+% GET_DROP_INFO Gets information relating to an airdrop from flysight data
+%   This function uses sensor and GPS measurements to identify when a drop
+%   occurs, when the payload lands, and the GPS position reading on drop
+%   and landing.
+%
+%   The drop is identified when an acceleration of over 15 m/s^2 is
+%   sustained for 10 acceleration measurements. This can definitely be
+%   improved. Additionally, using uncorrected barometer data as the
+%   altitude for when the drop occurs is likely not ideal.
+%
+% INPUTS:
+%   data_accel           : Trimmed and aligned accelerometer data
+%   data_gyro            : Trimmed and aligned gyroscope data
+%   data_mag             : Trimmed and aligned magnetometer data
+%   data_gps             : Trimmed and aligned GPS position data
+%   data_baro            : Trimmed and aligned barometer data
+%   data_gps_vel         : Trimmed and aligned GPS velocity data
+%   data_flysight_sensor : Trimmed and aligned raw sensor data
+%   data_flysight_gps    : Trimmed and aligned raw GPS data
+%
+% OUTPUTS:
+%   drop_info : A struct of information relating to the drop
+%       .gps_drop  : GPS position when the drop occurs
+%       .vel_drop  : GPS velocity when the drop occurs
+%       .gps_land  : GPS position when the drop ends (landing)
+%       .time_drop : Timestamp when the drop occurs
+%       .time_land : Timestamp when the drop ends (landing)
+
 accel_mean_window = 10;
 accel_norm = movmean(vecnorm(data_accel.data, 2, 2), accel_mean_window, 1);
 accel_drop = 15;
