@@ -22,7 +22,7 @@ land_time = drop_info.time_land;
 [R, Q, P0] = get_noise_params(sensor_var, dt);
 
 %% Run the Kalman Filter
-kf = Airdrop_EKF(R, Q, 0, P0, dt);
+kf = Airdrop_EKF(R, Q, P0, dt);
 
 acc_gps = flight_measurements.acc_gps;
 

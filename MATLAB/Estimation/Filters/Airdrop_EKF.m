@@ -6,8 +6,21 @@ classdef Airdrop_EKF < Airdrop_Filter
 
     methods
 
-        function obj = Airdrop_EKF(R, Q, H0, P0, dt)
-            obj = obj@Airdrop_Filter(R, Q, H0, P0, dt);
+        function obj = Airdrop_EKF(R, Q, P0, dt)
+            % AIRDROP_EKF Creates an Aidrop_EKF object
+            %
+            % INPUTS: 
+            %   R  : The initial measurement noise covariance matrix
+            %   Q  : The initial process noise covariance matrix
+            %   P0 : The initial state estimate covariance matrix
+            %   dt : The constant timestep to use for propagation
+            %
+            % OUTPUTS:
+            %   obj : The new Airdrop_EKF object
+
+            % Just call the parent constructor; we don't need to do
+            % anything here
+            obj = obj@Airdrop_Filter(R, Q, P0, dt);
         end
 
         function [innovation, K, S] = update_impl(obj, y, y_pred, H, R_meas)
@@ -18,7 +31,7 @@ classdef Airdrop_EKF < Airdrop_Filter
             %   y      : The measurement
             %   y_pred : The predicted measurement
             %   H      : The measurement Jacobian
-            %   R_mesa : The measurement covariance matrix
+            %   R_meas : The measurement covariance matrix
             % 
             % OUTPUTS:
             %   innovation : The innovation (y - y_pred)

@@ -1,55 +1,64 @@
 classdef Airdrop_Filter < Abstract_Filter
-
+    % AIRDROP_FILTER Implements matrix equations for 6-DOF state estimation
+    %   This class implements all the equations for estimating the 6-DOF
+    %   states of the payload during an airdrop. The class also has a
+    %   function to run the filter through all of the measurements and
+    %   inputs from onboard sensor/GPS data collected during an airdrop.
+    %   
     properties
-        % --- Constants ---
+        % G_NORM Magnitude of constant gravitation acceleration [m/s^2]
         g_norm      = 9.80665;
+        % G_VEC_E Gravitational acceleration vectory in -ENU [m/s^2]
         g_vec_e
+        % DT Constant timestep for prediction
         dt
+        % I Identity matrix for filter equations
         I
 
-        % --- Measurement Matrices ---
+        % MEASUREMENT_RANGES Indices corresponding measurements
         measurement_ranges
-
-        % --- Filter Properties
-
+        % MEAS_DEFS Struct of indices and dimensions for measurement names
         meas_defs
+        
+        % IS_INITIALIZED Whether the filter has been initialized yet
         is_initialized
+        % NUM_STATES The number of states in the filter
         num_states
 
+        % X_CURR The current state estimate colum vector
         x_curr
+        % P_CURR The current state covariance estimate matrix
         P_curr
 
-        H
-        F
-
-        update_a_b
-        last_down
+        % LAST_U The most recent inputs for the system
         last_u
-
+        % M_REF_I The reference magnetic field vector
         m_ref_i
 
-        % --- Histories ---
+        % HIST_IDX The current index of historical data being saved
         hist_idx
+        % ACCEL_CALC_ALL History of calculated inertial accel vectors
         accel_calc_all
-        trust_accel_all
-        quat_meas_all
-        down_vec_all
-
+        % P_HIST History of estimated state covariance matrices
         P_hist
+        % X_HIST History of estimated states
         x_hist
+        % S_HIST History of estimated innovation covariance
         S_hist
-
+        % INNO_HIST History of measurement innovations
         inno_hist
-
-        update_bias
     end
 
     methods (Abstract)
+        % Abstract methods to be implemented by subclass
         update_impl(y, y_pred, H, R)
         predict_impl(u)
     end
 
     methods (Access = protected)
+        % These methods are for if a subclass needs operations performed
+        % before or after propagation steps
+
         function pre_step(obj, i)
             % Hook for subclasses. Default: no-op.
         end
@@ -60,27 +69,41 @@ classdef Airdrop_Filter < Abstract_Filter
     end
 
     methods
+        function obj = Airdrop_Filter(R, Q, P0, dt)
+            % AIRDROP_FILTER Creates an Aidrop_EKF object
+            %
+            % INPUTS: 
+            %   R  : The initial measurement noise covariance matrix
+            %   Q  : The initial process noise covariance matrix
+            %   P0 : The initial state estimate covariance matrix
+            %   dt : The constant timestep to use for propagation
+            %
+            % OUTPUTS:
+            %   obj : The new Airdrop_Filter object
 
-        function obj = Airdrop_Filter(R, Q, H0, P0, dt)
             obj.R = R;
             obj.Q = Q;
-            obj.H = H0;
 
             obj.P_curr = P0;
 
+            % Pre-allocate the identity matrix for future calculations
             obj.I = eye(size(P0));
 
             obj.dt = dt;
 
+            % Set up the gravity vector (here it is positive because the
+            % prediction equations have the gravity sign flipped. Using
+            % proper sign convention, this would be negative)
             obj.g_vec_e = [0; 0; obj.g_norm];
 
+            % Set the initial inputs to be 0
             obj.last_u = struct('accel', [0, 0, 0], 'gyro', [0, 0, 0]);
-            obj.last_down = [0; 0; 1];
-            obj.update_a_b = true;
 
+            % Initialize the state and measurement name indices
             obj.init_x_inds();
             obj.init_y_inds();
 
+            % Set initialized to false
             obj.is_initialized = false;
 
             obj.hist_idx = 1;
@@ -89,7 +112,12 @@ classdef Airdrop_Filter < Abstract_Filter
         % --- SETUP ---
 
         function init_x_inds(obj)
+            % INIT_X_INDS Sets up the state name indices
+            % 
+            % INPUTS:
+            %   obj : The Airdrop_Filter object
 
+            % Define the state names and dimensions
             state_blocks = {
                 "P_E", 3; ... % Position in Inertial Frame
                 "V_E", 3; ... % Velocity in Inertial Frame
@@ -102,6 +130,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 "b_v", 3; ... % GPS Vel Bias
                 };
 
+            % Create the state name indices
             state_idx = 1;
             for i=1:size(state_blocks,1)
                 state_name = state_blocks{i,1};
@@ -114,6 +143,12 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function init_y_inds(obj)
+            % INIT_Y_INDS Sets up the measurement name indices
+            % 
+            % INPUTS:
+            %   obj : The Airdrop_Filter object
+
+            % Define the measurement names, indices, and dimensions
             obj.meas_defs = struct( ...
                 "pos", struct("idx",1,"dim",3), ...
                 "mag", struct("idx",2,"dim",3), ...
@@ -130,22 +165,38 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function initialize(obj, stationary, accel_meas, gyro_meas, mag_meas, gps_meas, baro_meas, q_meas, V_e)
-            obj.update_bias = true;
-            pos_inds = obj.x_inds.P_E;
-
+            % INITIALIZE Initializes the filter for propagation
+            %   This function initializes important properties like initial
+            %   state estimates, the initial orientation, and the resulting
+            %   reference magnetic field reading. 
+            %
+            % INPUTS:
+            %   obj        : The Airdrop_Filter object
+            %   stationary : If the object is stationary for initialization
+            %   accel_meas : The initial acceleration measurement
+            %   gyro_meas  : The initial gyroscope measurement
+            %   mag_meas   : The initial magnetometer measurement
+            %   gps_meas   : The initial GPS position measurement
+            %   baro_meas  : The initial barometer altitude measurement
+            %   q_meas     : (Optional) The initial quaternion
+            %   V_e        : (Optional) The initial velocity
+            %
+            
+            % Create the state estimate vector
             obj.x_curr = zeros(obj.num_states, 1);
 
+            pos_inds = obj.x_inds.P_E;
             % Initialize position to the GPS measurement
             obj.x_curr(pos_inds(1:2)) = gps_meas(1:2);
 
             % Initialize altitude to the baro measurement
             obj.x_curr(pos_inds(3))   = baro_meas;
 
-
             % Initialize altitude bias to GPS altitude minus baro altitude
             obj.x_curr(obj.x_inds.b_p(3)) = gps_meas(3) - baro_meas;
 
-            if ~stationary, return; end
+            % If we are not stationary, we can't do anything else
+            if ~stationary, return; end 
 
             % Rescale accel to have the expected norm
             accel_meas_corr = obj.g_norm * accel_meas / norm(accel_meas);
@@ -155,35 +206,34 @@ classdef Airdrop_Filter < Abstract_Filter
                 q_meas = quat_from_acc_mag(accel_meas_corr, mag_meas);
             end
 
-            C_bi = body2enu_rotm(q_meas);     % body -> inertial (b2i)
+            % Create our reference magnetic field vectr
+            C_bi = body2enu_rotm(q_meas);
             m_b0 = mag_meas / norm(mag_meas);  % measured mag in body
 
-            % m_b = C_ib * m_i  =>  m_i = C_bi * m_b
             obj.m_ref_i = C_bi * m_b0;         % inertial reference mag
 
             % Initialize velocity and angular velocity to zero
             if nargin < 9, V_e = zeros(3,1); end
             obj.x_curr(obj.x_inds.V_E) = V_e;
-            % obj.x_curr(obj.x_inds.w_b) = zeros(3,1);
 
             % Initialize gyro bias to the current gyro readings
             obj.x_curr(obj.x_inds.b_g) = gyro_meas;
+
             % Initialize orientation
             obj.x_curr(obj.x_inds.e) = q_meas;
+            
             % Initialize accel bias to the measurement minus corrected
-            % obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
-            obj.x_curr(obj.x_inds.b_m) = zeros(3,1);
-            obj.x_curr(obj.x_inds.b_b) = 0;
+            obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
 
+            % Make sure we have a column vector
             obj.x_curr = obj.x_curr(:);
 
+            % Done initializing!
             obj.is_initialized = true;
 
+            % This internal function generates the NED quaternion
             function q_meas = quat_from_acc_mag(a_b, m_b)
                 d_b = -a_b / norm(a_b);
-                obj.last_down = d_b;
-
-                obj.down_vec_all(obj.hist_idx, :) = d_b;
 
                 u_b = -d_b;
 
@@ -203,7 +253,7 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         % --- GETTERS ---
-
+        % These are just utility functions to get states
         function P_E_out = get_P_E(obj)
             P_E_out = obj.x_curr(obj.x_inds.P_E);
         end
@@ -250,14 +300,27 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function run_filter(obj, y_all, u_all, timesteps, acc_gps_all, drop_time, direction, verbose, order)
-            %RUN_FILTER Run filter forward/backward with multiple async measurement streams.
+            % RUN_FILTER Run filter forward/backward with multiple async measurement streams.
+            %   PLEASE NOTE: This function was generated with ChatGPT. It
+            %   has been reviewed by a human for functionality, but has not
+            %   been modified and is assumed to work. As such, the code is
+            %   also not documented.
             %
             % direction: +1 for forward, -1 for backward
             % order: "predict_then_update" (default) or "update_then_predict"
             %
-            % Adds subclass hooks:
-            %   obj.pre_step(i)
-            %   obj.post_step(i)
+            % INPUTS:
+            %   obj         : The Aidrop_Filter object
+            %   y_all       : The table of all measurements
+            %   u_all       : The table of all inputs
+            %   timestamps  : The timestamps to output predictions for
+            %   acc_gps_all : List of all GPS accuracy estimates
+            %       NOTE: This is not currently used
+            %   drop_time   : The timestamp when the airdrop occurred
+            %   direction   : The direction to run the filter (+ or -)
+            %   verbose     : Whether to output debug information
+            %   order       : Whether to predict first or update first
+            %       Either "predict_then_update" or "update_then_predict"
 
             if ~obj.is_initialized
                 error("Initialize the filter before running!!");
@@ -299,9 +362,6 @@ classdef Airdrop_Filter < Abstract_Filter
             obj.S_hist = cell(num_steps, numel(y_all));
 
             obj.accel_calc_all  = zeros(num_steps, 3);
-            obj.trust_accel_all = NaN(num_steps, 1);
-            obj.down_vec_all    = NaN(num_steps, 3);
-            obj.quat_meas_all   = NaN(num_steps, 4);
 
             % Indices of timesteps in run order
             if direction > 0
@@ -451,33 +511,80 @@ classdef Airdrop_Filter < Abstract_Filter
         % --- FILTER MATH ---
 
         function [innovation, K, S] = update(obj, y, meas_idx, R_gps)
-            y_pred = obj.h(meas_idx);
-            my_H = obj.h_jacobian_states(meas_idx);
+            % UPDATE Runs the update step for the filter
+            %
+            % INPUTS:
+            %   obj      : The Aidrop_EKF object
+            %   y        : The measurement for this update
+            %   meas_idx : The index this measurement corresponds to
+            %   R_gps    : GPS variance (not currently used)
+            %
+            % OUTPUTS:
+            %   innovation : The innovation for this update step
+            %   K          : The Kalman gain matrix
+            %   S          : The innovation covariance estimate
 
+            % Generate the prediction and its jacobian
+            y_pred = obj.h(meas_idx);
+            H = obj.h_jacobian_states(meas_idx);
+
+            % Extract the right measurement nosie covariance
             range = obj.measurement_ranges{meas_idx};
             R_meas = obj.R(range, range);
 
-            [innovation, K, S] = obj.update_impl(y, y_pred, my_H, R_meas);
+            % Run the update implementation
+            [innovation, K, S] = obj.update_impl(y, y_pred, H, R_meas);
+
+            % Normalize the quaternion 
             obj.normalize_quat();
         end
+
         function predict(obj, u)
+            % PREDICT Runs the predict step for the filter
+            %   This function runs the predict step with the current
+            %   constant timestep; if no input exists for this current
+            %   timestep, the last input will be used.
+            %   
+            % INPUTS:
+            %   obj : The Aidrop_Filter object
+            %   u   : The IMU inputs for this step
+            %       Includes both acceleration and gyroscope measurements
+
+            % Make sure we have an input to use
             if isempty(u)
                 u = obj.last_u;
             else
                 obj.last_u = u;
             end
 
+            % Run the prediction implementation
             obj.predict_impl(u);
+
+            % Normalize the quaternion
             obj.normalize_quat();
         end
 
         function A = f_jacobian_states(obj, u)
+            % F_JACOBIAN_STATES Calculates the state derivative Jacobian
+            % 
+            % INPUTS:
+            %   obj : The Aidrop_Filter object
+            %   u   : The inputs for this step
+            %
+            % OUTPUTS:
+            %   A : The Jacobian
+            
+            % Extract the inputs (must be a table or a struct)
             a = u.accel(:);     a0  = a(1);  a1  = a(2);  a2  = a(3);
             w = u.gyro(:);      w0  = w(1);  w1  = w(2);  w2  = w(3);
+
+            % Get necessary states
             e = obj.get_e();    e0  = e(1);  e1  = e(2);  e2  = e(3);  e3 = e(4); 
             ba = obj.get_b_a(); ba0 = ba(1); ba1 = ba(2); ba2 = ba(3);
             bw = obj.get_b_g(); bw0 = bw(1); bw1 = bw(2); bw2 = bw(3);
             
+            % Hardcoded Jacobian (could write this neater, but don't want
+            % to risk copying wrong)
             A = [
                 0, 0, 0, 1, 0, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
                 0, 0, 0, 0, 1, 0,                                                   0,                                                   0,                                                   0,                                                   0,     0,     0,     0,                           0,                           0,                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
@@ -509,6 +616,16 @@ classdef Airdrop_Filter < Abstract_Filter
         end
 
         function dxdt = f(obj, u)
+            % F Calculates the state derivatives
+            % 
+            % INPUTS:
+            %   obj : The Aidrop_Filter object
+            %   u   : The inputs for this step
+            %
+            % OUTPUTS:
+            %   dxdt : The state derivative vector
+
+            % Get relevant states
             v = obj.get_V_E();  v0  = v(1);  v1  = v(2);  v2  = v(3);
             a = u.accel(:);     a0  = a(1);  a1  = a(2);  a2  = a(3);
             w = u.gyro(:);      w0  = w(1);  w1  = w(2);  w2  = w(3);
@@ -517,6 +634,7 @@ classdef Airdrop_Filter < Abstract_Filter
             bw = obj.get_b_g(); bw0 = bw(1); bw1 = bw(2); bw2 = bw(3);
             g = obj.g_vec_e;  g0  = g(1);  g1  = g(2);  g2  = g(3);
 
+            % Hardcoded state derivative vector
             dxdt = [
             v0;
             v1;
@@ -545,12 +663,19 @@ classdef Airdrop_Filter < Abstract_Filter
             0;
             0;
             ];
-
-            % ---- Logging (keep exactly what you had) ----
-            % obj.accel_calc_all(obj.hist_idx, :) = dV_dt.';
         end
 
         function H = h_jacobian_states(obj, meas_idx)
+            % H_JACOBIAN_STATES Calculates the measurement Jacobian
+            % 
+            % INPUTS:
+            %   obj        : The Aidrop_Filter object
+            %   meas_idx   : The corresponding index for this measurement
+            %
+            % OUTPUTS:
+            %   H : The Jacobian
+
+            % Find the measurement indices
             switch meas_idx
                 case 1, range = 1:3;
                 case 2, range = 4:6;
@@ -559,6 +684,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 otherwise, error("bad meas_idx");
             end
 
+            % Get the relevant states
             v = obj.get_V_E();  v0  = v(1);  v1  = v(2);  v2  = v(3);
             e = obj.get_e();    e0  = e(1);  e1  = e(2);  e2  = e(3);  e3 = e(4); 
             ba = obj.get_b_a(); ba0 = ba(1); ba1 = ba(2); ba2 = ba(3);
@@ -566,6 +692,8 @@ classdef Airdrop_Filter < Abstract_Filter
             g = obj.g_vec_e;  g0  = g(1);  g1  = g(2);  g2  = g(3);
             m0 = obj.m_ref_i; m00 = m0(1); m01 = m0(2); m02 = m0(3);
 
+            % Hardcoded Jacobian (could write this neater, but don't want
+            % to risk copying wrong)
             H = [
             1, 0, 0, 0, 0, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0;
             0, 1, 0, 0, 0, 0,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0;
@@ -579,10 +707,21 @@ classdef Airdrop_Filter < Abstract_Filter
             0, 0, 0, 0, 0, 1,                              0,                              0,                              0,                              0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0, -1;
             ];
 
+            % Extract only the prediction for this measurement
             H = H(range, :);
         end
 
         function y = h(obj, meas_idx)
+            % H Calculates the measurement prediction
+            % 
+            % INPUTS:
+            %   obj        : The Aidrop_Filter object
+            %   meas_idx   : The corresponding index for this measurement
+            %
+            % OUTPUTS:
+            %   y : The prediction
+
+            % Get relevant states
             p = obj.get_P_E();  p0  = p(1);  p1  = p(2);  p2  = p(3);
             v = obj.get_V_E();  v0  = v(1);  v1  = v(2);  v2  = v(3);
             e = obj.get_e();    e0  = e(1);  e1  = e(2);  e2  = e(3);  e3 = e(4); 
@@ -595,10 +734,12 @@ classdef Airdrop_Filter < Abstract_Filter
             g = obj.g_vec_e;  g0  = g(1);  g1  = g(2);  g2  = g(3);
             m0 = obj.m_ref_i; m00 = m0(1); m01 = m0(2); m02 = m0(3);
 
+            % The prediction
             y_all = [
             p0 - bp0;
             p1 - bp1;
             p2 - bp2;
+            % Rotate the reference inertial magnetic field into the body frame 
             m01*(2*e0*e3 + 2*e1*e2) - bm0 - m02*(2*e0*e2 - 2*e1*e3) + m00*(e0^2 + e1^2 - e2^2 - e3^2);
             m02*(2*e0*e1 + 2*e2*e3) - m00*(2*e0*e3 - 2*e1*e2) - bm1 + m01*(e0^2 - e1^2 + e2^2 - e3^2);
             m00*(2*e0*e2 + 2*e1*e3) - bm2 - m01*(2*e0*e1 - 2*e2*e3) + m02*(e0^2 - e1^2 - e2^2 + e3^2);
@@ -608,15 +749,25 @@ classdef Airdrop_Filter < Abstract_Filter
             v2 - bv2;
             ];
             
+            % Extract only the prediction for this measurement
             y = y_all(obj.measurement_ranges{meas_idx});
         end
 
         % --- UTILS ---
         function normalize_quat(obj)
+            % NORMALIZE_QUAT Normalizes the quaternion
+            % 
+            % INPUTS:
+            %   obj : The Aidrop_Filter object
+            %
+
             obj.x_curr(obj.x_inds.e) = obj.get_e() / norm(obj.get_e());
         end
 
         function [ptr_out, rows] = take_rows_in_window_dir(~, time_vec, ptr_in, tmin, tmax, dir)
+            % NOTE: This function was generated by ChatGPT. It has been
+            % reviewed for functionality, but not modified or documented.
+            
             % -------------------------------------------------------------------------
             % Helper: return indices in [tmin, tmax) and advance pointer, direction-aware.
             % Assumes time_vec is monotonic increasing (typical logged sensors).
