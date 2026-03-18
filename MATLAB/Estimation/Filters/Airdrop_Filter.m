@@ -31,10 +31,7 @@ classdef Airdrop_Filter < Abstract_Filter
         P_curr
 
         H
-        F
-
-        update_a_b
-        last_down
+        % LAST_U The most recent inputs for the system
         last_u
         % M_REF_I The reference magnetic field vector
         m_ref_i
@@ -107,8 +104,6 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % Set the initial inputs to be 0
             obj.last_u = struct('accel', [0, 0, 0], 'gyro', [0, 0, 0]);
-            obj.last_down = [0; 0; 1];
-            obj.update_a_b = true;
 
             % Initialize the state and measurement name indices
             obj.init_x_inds();
@@ -249,7 +244,6 @@ classdef Airdrop_Filter < Abstract_Filter
             % This internal function generates the NED quaternion
             function q_meas = quat_from_acc_mag(a_b, m_b)
                 d_b = -a_b / norm(a_b);
-                obj.last_down = d_b;
 
                 obj.down_vec_all(obj.hist_idx, :) = d_b;
 
@@ -549,6 +543,7 @@ classdef Airdrop_Filter < Abstract_Filter
             y_pred = obj.h(meas_idx);
             my_H = obj.h_jacobian_states(meas_idx);
 
+            % Extract the right measurement nosie covariance
             range = obj.measurement_ranges{meas_idx};
             R_meas = obj.R(range, range);
 
