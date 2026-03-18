@@ -43,8 +43,8 @@ classdef Forward_Backward_Smoother < Airdrop_Filter
     end
 
     methods
-        function obj = Forward_Backward_Smoother(R, Q, P0, dt)
-            obj = obj@Airdrop_Filter(R, Q, P0, dt);
+        function obj = Forward_Backward_Smoother(R, Q, H0, P0, dt)
+            obj = obj@Airdrop_Filter(R, Q, H0, P0, dt);
         end
 
         function set_forward_results(obj, x_f_plus, P_f_plus, F_hist, Q_hist)
