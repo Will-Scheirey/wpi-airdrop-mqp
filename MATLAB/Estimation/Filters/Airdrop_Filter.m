@@ -222,9 +222,6 @@ classdef Airdrop_Filter < Abstract_Filter
             % Initialize orientation
             obj.x_curr(obj.x_inds.e) = q_meas;
             
-            % Initialize accel bias to the measurement minus corrected
-            obj.x_curr(obj.x_inds.b_a) = accel_meas - accel_meas_corr;
-
             % Make sure we have a column vector
             obj.x_curr = obj.x_curr(:);
 
