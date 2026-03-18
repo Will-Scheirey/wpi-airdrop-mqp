@@ -1,5 +1,6 @@
 classdef Extended_Kalman_Filter < handle
-    %EXTENDED_KALMAN_FILTER Initial Implementation of an EKF
+    %EXTENDED_KALMAN_FILTER Summary of this class goes here
+    %   Detailed explanation goes here
 
     properties
         dt
@@ -47,6 +48,7 @@ classdef Extended_Kalman_Filter < handle
         function predict(obj, u)
             A   = obj.f_jacobian_states(u);
             Phi = eye(size(A)) + obj.dt * A;
+            % Phi = expm(obj.dt * A);
 
             Qd = obj.Q;
         
