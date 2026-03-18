@@ -110,11 +110,12 @@ t_end   = t_start + t_dur;
 
 %% Zero the Barometer
 zero_alt_mean_window = alt_mean_window;
-zero_alt = mean(data_baro.data(1:zero_alt_mean_window));
 
 % Zero the barometer by taking an average of the altitude measurements
 % before takeoff. This does mean that altitude is now relative to initial.
 data_baro      = data_baro_all;
+
+zero_alt = mean(data_baro.data(1:zero_alt_mean_window));
 data_baro.data = data_baro.data - zero_alt;
 
 %% Format Measurements
