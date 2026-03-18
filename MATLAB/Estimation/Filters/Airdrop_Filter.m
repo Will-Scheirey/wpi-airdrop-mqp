@@ -60,11 +60,20 @@ classdef Airdrop_Filter < Abstract_Filter
     end
 
     methods
+        function obj = Airdrop_Filter(R, Q, P0, dt)
+            % AIRDROP_FILTER Creates an Aidrop_EKF object
+            %
+            % INPUTS: 
+            %   R  : The initial measurement noise covariance matrix
+            %   Q  : The initial process noise covariance matrix
+            %   P0 : The initial state estimate covariance matrix
+            %   dt : The constant timestep to use for propagation
+            %
+            % OUTPUTS:
+            %   obj : The new Airdrop_Filter object
 
-        function obj = Airdrop_Filter(R, Q, H0, P0, dt)
             obj.R = R;
             obj.Q = Q;
-            obj.H = H0;
 
             obj.P_curr = P0;
 
