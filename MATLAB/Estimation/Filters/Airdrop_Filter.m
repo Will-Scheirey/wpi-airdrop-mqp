@@ -31,7 +31,10 @@ classdef Airdrop_Filter < Abstract_Filter
         P_curr
 
         H
-        % LAST_U The most recent inputs for the system
+        F
+
+        update_a_b
+        last_down
         last_u
         % M_REF_I The reference magnetic field vector
         m_ref_i
@@ -217,8 +220,7 @@ classdef Airdrop_Filter < Abstract_Filter
                 q_meas = quat_from_acc_mag(accel_meas_corr, mag_meas);
             end
 
-            % Create our reference magnetic field vectr
-            C_bi = body2enu_rotm(q_meas);
+            C_bi = body2enu_rotm(q_meas);     % body -> inertial (b2i)
             m_b0 = mag_meas / norm(mag_meas);  % measured mag in body
 
             obj.m_ref_i = C_bi * m_b0;         % inertial reference mag
@@ -545,16 +547,12 @@ classdef Airdrop_Filter < Abstract_Filter
 
             % Generate the prediction and its jacobian
             y_pred = obj.h(meas_idx);
-            H = obj.h_jacobian_states(meas_idx);
+            my_H = obj.h_jacobian_states(meas_idx);
 
-            % Extract the right measurement nosie covariance
             range = obj.measurement_ranges{meas_idx};
             R_meas = obj.R(range, range);
 
-            % Run the update implementation
-            [innovation, K, S] = obj.update_impl(y, y_pred, H, R_meas);
-
-            % Normalize the quaternion 
+            [innovation, K, S] = obj.update_impl(y, y_pred, my_H, R_meas);
             obj.normalize_quat();
         end
 
