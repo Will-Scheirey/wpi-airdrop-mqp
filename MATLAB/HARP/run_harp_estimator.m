@@ -1,4 +1,4 @@
-clear; clc;
+clear; clc; close all
 addpath(genpath("MATLAB"));
 addpath(genpath("weather"));
 addpath(genpath("haars_data"));
