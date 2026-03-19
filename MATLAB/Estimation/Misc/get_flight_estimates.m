@@ -50,7 +50,7 @@ if nargin < 2
     verbose = false;
 end
 
-smooth_window = 3;
+smooth_window = 1;
 alt_mean_window = 100;
 
 [dt, ...
@@ -95,6 +95,7 @@ b_b_est = x_est(:, kf.x_inds.b_b);
 
 t_plot = tspan(1:end-1);
 t_plot_drop = [drop_time, land_time];
+
 % Speed, heading angle, altitude, windspeed and direction
 
 drop_idx_start = find(t_plot > drop_time, 1);
@@ -151,7 +152,8 @@ data_out = struct( ...
     'drop_info', drop_info, ...
     'time_utc', time_utc, ...
     'weather', weather, ...
-    'system_data', system_data);
+    'system_data', system_data, ...
+    'sensor_var', sensor_var);
 
 planned_landing_lla = system_data.planned_impact_lat_lon;
 takeoff_lla = [flight_measurements.gps_all.GNSS.lat(1), flight_measurements.gps_all.GNSS.lon(1)];
