@@ -274,12 +274,8 @@ classdef Parachute_Model_Simple < Dynamic_Model
             f_c = -0.5 * obj.rho * obj.parachute.CdS(aoa_c) * obj.V_c * norm(obj.V_c);
 
             % If velocity is zero, normalizing will give nan
-            if any(isnan(f_p))
-                f_p = [0; 0; 0];
-            end
-            if any(isnan(f_c))
-                f_c = [0; 0; 0];
-            end
+            if any(isnan(f_p)), f_p = [0; 0; 0]; end
+            if any(isnan(f_c)), f_c = [0; 0; 0]; end
 
             obj.aoa_p_curr = aoa_p;
             obj.aoa_c_curr = aoa_c;
