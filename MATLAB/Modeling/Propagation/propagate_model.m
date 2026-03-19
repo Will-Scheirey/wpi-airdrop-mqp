@@ -1,16 +1,35 @@
 function [t, y, model_obj] = propagate_model(NameValueArgs)
-    
+    % PROPAGATE_MODEL Propagates a dynamic model
+    % 
+    % INPUTS:
+    %   NameValueArgs : Parameters for propagation
+    %
+    % OUTPUTS:
+    %   t         : The ode solver output time series
+    %   y         : The ode solver output states
+    %   model_obj : The dynamical model object used for propagation
     arguments
+        % USE_DRAG Whether to use drag in the simulation
         NameValueArgs.use_drag
+        % PAYLOAD The payload object
         NameValueArgs.payload
+        % PARACHUTE The parachute, or the drogue parachute for 2-stage
         NameValueArgs.parachute
+        % PARACHUTE2 The main parachute for 2-stage
         NameValueArgs.parachute2
+        % X0 Initial states
         NameValueArgs.x0
+        % TSPAN Desired output time series
         NameValueArgs.tspan
+        % MODEL A reference to the class of the dynamical model to use
         NameValueArgs.model
+        % RISER: Whether to incorporate the riser force
         NameValueArgs.riser
+        % VARIABLE_PARACHUTE_MASS : Whether to use variable parachute mass
         NameValueArgs.variable_parachute_mass
+        % DAMPING : Whether to include damping in the riser
         NameValueArgs.damping
+        % WEATHER : Weather for the drop
         NameValueArgs.weather
     end
 
@@ -27,7 +46,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'payload')
         payload = NameValueArgs.payload;
     else
-        % --- Payload ---
+        % --- Default Payload Properties ---
         a22_width  = in2m(48);    % [m]
         a22_length = in2m(83);    % [m]
         a22_height = in2m(43);    % [m]
@@ -49,7 +68,7 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
     if isfield(NameValueArgs, 'parachute')
         parachute = NameValueArgs.parachute;
     else
-         % --- Parachute ---
+         % --- Default Parachute Properties ---
         canopy_radius = in2m(50);       % [m]
         canopy_mass = 2;         % [kg]
         
@@ -111,13 +130,11 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         x0   = [
             P0;
             body2enu_rotm(e_p0) * V_p0;
-        
             e_p0;
             w_p0;
         
             P0_c
             body2enu_rotm(e_c0) * V_c0;
-        
             e_c0;
             w_c0;
             ];
@@ -135,13 +152,20 @@ function [t, y, model_obj] = propagate_model(NameValueArgs)
         model = @Parachute_Model_Simple;
     end
 
+    % If 'parachute2' has been set, we know the drop is for two-stage, so
+    % call to two-stage constructor. Otherwise if weather has been set, we
+    % know it is the wind model. In the future, it would be good to adjust
+    % this so the two-stage model can be run without wind, which it
+    % currently can't
+    
     if isfield(NameValueArgs, 'parachute2')
         model_obj = model(payload, parachute, NameValueArgs.parachute2, x0, NameValueArgs.weather);
     elseif isfield(NameValueArgs, 'weather')
-        model_obj = model(payload, parachute, NameValueArgs.weatherx);
+        model_obj = model(payload, parachute, NameValueArgs.weather);
     else
         model_obj = model(payload, parachute, x0);
     end
 
+    % Run the model
     [t, y] = model_obj.run_model(x0, tspan);
 end
