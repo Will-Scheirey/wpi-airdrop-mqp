@@ -1,5 +1,7 @@
 clear; clc; close all;
 
+% Propagates the dynaic model
+
 [t, y, model] = propagate_model('tspan', 0:0.01:100, ...
     'model', @Parachute_Model_Simple, ...
     'variable_parachute_mass', false, ...
@@ -8,52 +10,11 @@ clear; clc; close all;
 
 %% Other Stuff
 
+% Trims data to just during the drop (before we hit the ground)
 during_drop = y(:, 3) >= 0;
 
 t = t(during_drop);
 y = y(during_drop, :);
-
-% %% Send to FlightGear
-% 
-% lat0  = 42.273836;  % [deg]
-% long0 = -71.809809; % [deg]
-% h0    = 168.48;       % [m]
-% 
-% [lla_p] = enu2lla([y(:, 1:3)], [lat0, long0, h0], 'flat');
-% [heading, pitch, roll] = quat2angle(y(:, 7:10));
-% 
-% lla_p(:, 1:2) = deg2rad(lla_p(:, 1:2));
-% 
-% t_new = t * 5;
-% 
-% fg_sim(t_new, lla_p, [roll, pitch, heading]);
-% 
-% return
-
-
-%% Intermediate Values
-%{
-for i = 1:length(t)
-    model.ode_fcn(t(i), y(i, :)');
-    f_drag_c(i, :) = model.drag_force_c;
-    f_drag_p(i, :) = model.drag_force_p;
-
-    aoa_c(i)       = model.aoa_c_curr;
-    aoa_p(i)       = model.aoa_p_curr;
-end
-
-figure(1)
-clf
-plot(t, vecnorm(f_drag_c, 2, 2), 'DisplayName', 'Canopy Drag'); hold on
-plot(t, vecnorm(f_drag_p, 2, 2), 'DisplayName', 'Payload Drag')
-legend
-
-figure(2)
-clf
-plot(t, aoa_c, 'DisplayName', 'Canopy AOA'); hold on
-plot(t, aoa_p, 'DisplayName', 'Payload AOA')
-legend
-%}
 
 
 %% Plotting
