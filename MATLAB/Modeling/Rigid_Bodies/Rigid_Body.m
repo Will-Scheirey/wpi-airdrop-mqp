@@ -1,16 +1,26 @@
 classdef Rigid_Body
-    %AERODYNAMICOBJECT Class for a rigidbody experiencing aerodynamics
+    % RIGID_BODY Class for a rigidbody experiencing aerodynamics
     %   This class defines the most basic physical object that experiences
     %   aerodynamic forces and moments.
 
     properties
-        % --- Mass and Inertia ---
-        mass % Object mass           [kg]
-        inertia_tensor    % Object inertia tensor [N m]
+        % MASS Object mass
+        mass
+        % INERTIA_TENSOR Object moment of inertia tensor
+        inertia_tensor
     end
 
     methods
         function obj = Rigid_Body(mass, I)
+            % RIGID_BODY Contstructs an instance of this class
+            %
+            % INPUTS:
+            %   mass : Initial mass of the object
+            %   I    : Initial moment of inertia tensor
+            %
+            % OUTPUTS : The new Rigid_Body object
+
+            % If no arguments were passed, default mass and inerita to 0
             if nargin < 2
                 obj.mass = 0;
                 obj.inertia_tensor = 0;
@@ -23,24 +33,27 @@ classdef Rigid_Body
 
     methods
         % --- Basic Properties ---
+        % Mass of an object, like a parachute, may depend on the air
+        % density, so make this a function for future inheritence. By
+        % default, just return the initial mass and intertia
+
+        % Mass
         function m_out = m(obj, rho); m_out = obj.mass; end
+        % Moment of inertia
         function I_out = I(obj, rho); I_out = obj.inertia_tensor; end
         
         % --- Basic Aerodynamic Properties ---
+
+        % Reference area: defualt to 0, needs to be implemented by subclass
         function S_out = S(obj, aoa); S_out = 0; end
-        % might have to change Cd_out to reflect the changes made in the CL
-        % out portion
+
+        % Drag coefficient
         function Cd_out = Cd(obj, aoa); Cd_out = 0; end
-        %function Cl_out = Cl(obj, aoa); Cl_out = 0; end
-        function Cl_out = Cl(obj, aoa)
-          %   L/D = tan(aoa) = Cl/Cd  ->  Cl = Cd * tan(aoa)
-          if obj.is_deployed
-              Cd_curr = obj.Cd(aoa);
-              Cl_out = Cd_curr .* tan(aoa);
-          else
-              Cl_out = 0;  % No lift before deployment
-          end
-        end
+
+        % Lift coefficient
+        function Cl_out = Cl(obj, aoa); Cl_out = 0; end
+
+        % Helper functions for Cl*S and Cd*S
         function ClS_out = ClS(obj, aoa); ClS_out = obj.S(aoa)*obj.Cl(aoa); end
         function CdS_out = CdS(obj, aoa); CdS_out = obj.S(aoa)*obj.Cd(aoa); end
 

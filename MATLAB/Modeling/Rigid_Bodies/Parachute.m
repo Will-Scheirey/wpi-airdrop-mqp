@@ -83,6 +83,10 @@ classdef Parachute < Rigid_Body
             end
         end
 
+        function Cl_out = Cl(obj, aoa)
+              Cl_out = obj.Cd(aoa) .* tan(aoa);
+        end
+
         function S_out = S(obj, ~)
             if obj.is_deployed
                 S_out = obj.A;
