@@ -19,11 +19,12 @@ R_pos = [
 ].^2;
 
 % Magnetometer
-R_mag = blkdiag(sensor_var.mag(1), sensor_var.mag(2), sensor_var.mag(3)).^2;
-
+% R_mag = blkdiag(sensor_var.mag(1), sensor_var.mag(2), sensor_var.mag(3)).^2; 
+R_mag = (eye(3) * 1e0) .^2;
 % Had to hand-tune this (probably can be improved)
 % Barometer
-R_baro = (sensor_var.baro * 1e3)^2;
+% R_baro = (sensor_var.baro)^2;
+R_baro = 5 ^ 2;
 
 % Set this to be constant for now
 % GPS velocity
@@ -39,7 +40,8 @@ R = blkdiag( ...
     );
 
 % Acceleration noise - hand-tuned
-sigma_a = sqrt(sensor_var.accel(:)) * 1e3;
+% sigma_a = sqrt(sensor_var.accel(:));
+sigma_a = [1;1;1] * 1e-1;
 Sa = diag(sigma_a.^2);
 
 % Standard position and velocity process noise matrix
@@ -47,7 +49,8 @@ Q_PV = [ (dt^4/4)*Sa, (dt^3/2)*Sa;
          (dt^3/2)*Sa, (dt^2)*Sa ];
 
 % Quaternion process noise
-sigma_w = sqrt(norm(sensor_var.gyro));
+% sigma_w = sqrt(norm(sensor_var.gyro));
+sigma_w = 1e-1;
 Q_e = eye(4) * (dt*sigma_w)^2;
 
 % Hard to tune these
