@@ -26,6 +26,7 @@ classdef Parachute < Rigid_Body
 
         % CD0_FLOW Face-on drag coefficient
         Cd0_flow 
+        Cd_0
         % CD_EDGE Edge-on drag coefficient
         Cd_edge  
         % VARIABLE_MASS Whether to use variable mass
