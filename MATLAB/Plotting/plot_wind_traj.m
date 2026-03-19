@@ -1,4 +1,15 @@
 function plot_wind_traj(wind_alt_ft, wind_direction_deg, wind_speed_fps, trajectory_ft, step, scale)
+    % PLOT_WIND_TRAJ Plots a 3D trajectory with wind vectors using quiver
+    %
+    % INPUTS:
+    %   wind_alt_ft        : Wind altitudes corresponding to direction and speed
+    %   wind_direction_deg : Wind direction at altitudes
+    %   wind_speed_fps     : Wind speed at altitudes
+    %   trajectory_ft      : 3D trajectory 
+    %   step               : How many timesteps in between each quiver
+    %   scale              : Quiver scale
+
+    
     if nargin < 5
         step = 1;
     end

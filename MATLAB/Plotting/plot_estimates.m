@@ -1,5 +1,17 @@
 function fig_idx = plot_estimates(data_in, t_plot, tspan, estimate_name, fig_idx)
 
+    % PLOT_ESTIMATES Plots flight estimates
+    %
+    % INPUTS:
+    %   data_in       : The flight estimates
+    %   t_plot        : The time series to plot
+    %   tspan         : The time series for propagation
+    %   estimate_name : For future use if we include multiple estimates
+    %   fig_idx       : Index of the first figure to plot
+    %
+    % OUTPUTS:
+    %   fig_idx : The index of the last figure plotted by this function +1 
+
 if nargin < 5
     fig_idx = 1;
 end

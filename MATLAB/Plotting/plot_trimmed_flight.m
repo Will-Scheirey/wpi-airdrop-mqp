@@ -1,4 +1,6 @@
-dirn_ame = "DN172_Lt3_n12_08072025_side_2";
+% Plots measurements trimmed to just flight
+
+dir_name = "DN172_Lt3_n12_08072025_side_2";
 
 sensor_filename = fullfile(dir_name, "SENSOR.CSV");
 gps_filename = fullfile(dir_name, "TRACK.CSV");

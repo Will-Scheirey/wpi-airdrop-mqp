@@ -1,4 +1,8 @@
 clearvars -except drops; clc;
+
+% Plots and compares drops from a .mat file containing pre-processed drop
+% data
+
 if ~exist('drops', 'var')
     results_all = load("all_drops_results.mat");
     

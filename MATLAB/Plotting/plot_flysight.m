@@ -1,4 +1,4 @@
-clearvars -except data data_accel data_gyro data_mag data_gps data_baro data_gps_vel data_flysight_sensor data_flysight_gps; clc;
+% Plots flysight measurements and GPS on a map
 
 folder = uigetdir("haars_data");
 

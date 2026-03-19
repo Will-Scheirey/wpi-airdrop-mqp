@@ -1,5 +1,22 @@
 function fig_idx = plot_meas(data_gps, data_accel, data_gyro, data_mag, data_baro, data_gps_vel, fig_idx, tspan, t_plot_drop)
 
+% PLOT_MEAS Plots raw flysight measurements
+% 
+% INPUTS:
+%   data_gps     : GPS position data
+%   data_accel   : Accelerometer data
+%   data_gyro    : Gyroscope data
+%   data_mag     : Magnetometer data
+%   data_baro    : Barometer data
+%   data_gps_vel : GPS velocity data
+%   fig_idx      : The index of the first figure to be plotted
+%   tspan        : Timespan for plotting
+%   t_plot_drop  : Timespan for just the drop
+%
+% OUTPUTS:
+%   fig_idx : The index of the last figure plotted by this function +1 
+
+
 if nargin < 8
     tspan = data_accel.time;
 end

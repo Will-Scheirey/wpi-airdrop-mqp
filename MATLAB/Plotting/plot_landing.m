@@ -1,4 +1,8 @@
 clear; clc; close all
+
+% Plots planned and actual GPS landing locations for HAARS drops on a
+% certain day
+
 data_dir = "haars_data";
 
 if ~isfolder(data_dir)
