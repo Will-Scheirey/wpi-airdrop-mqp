@@ -1,8 +1,17 @@
 classdef Abstract_Filter < handle
+    % ABSTRACT_FILTER An abstracted filter class
+    %   This class just defines the most basic properties of a filter,
+    %   which are the same across both Kalman/information filters and
+    %   forward-backward smoothers
+    
     properties
+        % X_INDS Struct of indices corresponding with state names
+        %   Example: x_inds = struct('position', 1:3, 'altitude', 4)
         x_inds
 
+        % R Measurement covariance matrix
         R
+        % Q Process noise matrix
         Q
     end
 

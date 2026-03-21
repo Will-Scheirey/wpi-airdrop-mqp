@@ -48,7 +48,7 @@ function lar = computeLAR(inputs, deployedVector, ~)
                 lar.usableLength = 2 * sqrt(lar.adjustedRadius^2 - lar.offset^2);
             else
                 lar.usableLength = 0;
-                warning('Offset exceeds LAR radius!');
+                % warning('Offset exceeds LAR radius!');
             end
             
             lar.safetyPercentage = inputs.safety.percentage;
