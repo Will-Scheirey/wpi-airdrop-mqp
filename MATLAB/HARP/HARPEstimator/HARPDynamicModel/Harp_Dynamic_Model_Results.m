@@ -1,3 +1,42 @@
+% HARP_DYNAMIC_MODEL_RESULTS Extract landing and trajectory data from propagator output.
+%   Post-processes the raw time and state arrays from propagate_model to
+%   identify ground impact, extract the ENU trajectory, and compute final
+%   displacement metrics.
+%
+%   Body-frame velocities (states 4-6) are rotated to the ENU frame using
+%   the payload quaternion (states 7-10), though the resulting ENU velocity
+%   array is computed but not currently stored in the output struct.
+%
+% INPUTS:
+%   t : Nx1 time vector from propagate_model (s)
+%   y : NxM state matrix from propagate_model, where columns are:
+%         1-3   : Payload ENU position (m)
+%         4-6   : Payload body-frame velocity (m/s)
+%         7-10  : Payload orientation quaternion [w, x, y, z]
+%         11-13 : Payload angular velocity (rad/s)
+%         14-16 : Parachute ENU position (m)
+%         17-19 : Parachute body-frame velocity (m/s)
+%         20-23 : Parachute orientation quaternion
+%         24-26 : Parachute angular velocity (rad/s)
+%
+% OUTPUTS:
+%   prop : Struct containing:
+%            - t_plot      : Full time vector (s), identical to t
+%            - y_sim       : Full state matrix, identical to y
+%            - time        : Time vector from t=0 to ground impact (s)
+%            - trajectory  : Mx3 ENU position matrix to ground impact (m)
+%            - landing_time                  : Time of ground impact (s)
+%            - east_displacement             : East offset at landing (m)
+%            - north_displacement            : North offset at landing (m)
+%            - total_horizontal_displacement : Horizontal range at landing (m)
+%
+% NOTES:
+%   - Ground impact is defined as payload_altitude (column 3) first
+%     reaching <= 0. If the payload never reaches the ground within tspan,
+%     a warning is issued and the final time step is used.
+%   - ENU velocities are computed internally but not currently included in
+%     the output struct. Add if needed for post-processing.
+
 function prop = Harp_Dynamic_Model_Results(t, y)
 
 % Payload position is in columns 1-3 (ENU)

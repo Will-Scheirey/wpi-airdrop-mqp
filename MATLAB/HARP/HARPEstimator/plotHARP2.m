@@ -1,3 +1,47 @@
+% PLOTHARP2 Generates visualizations of HARP trajectory and results.
+%   Produces three separate figure windows comparing the HARP-estimated
+%   trajectory against the actual flight trajectory and planned landing:
+%     Figure 1 - 3D trajectory view with wind vectors
+%     Figure 2 - Side view (East vs. Altitude)
+%     Figure 3 - Top-down view (East vs. North)
+%
+%   All position units are converted from feet (HARP internals) to meters
+%   for display. The flight trajectory is offset so the release point (HARP)
+%   aligns with the origin.
+%
+% INPUTS:
+%   outputs         : HARP outputs structure from computeHARP, containing:
+%                       - harp.position_x/y  : HARP offset from PI (ft)
+%                       - harp.distance      : HARP distance from PI (ft)
+%                       - harp.bearing       : HARP bearing from PI (deg)
+%                       - hvVector           : high-velocity vector struct
+%                       - deployedVector     : deployed vector struct
+%                       - winds.profile      : wind profile array
+%                       - timing.groundspeed : aircraft groundspeed (kts)
+%   inputs          : HARP inputs structure from convertDataOutToInputs,
+%                     containing:
+%                       - altitude.dropIndicatedTrue : drop altitude (ft)
+%                       - mission.type               : 'HALO' or 'HAHO'
+%                       - aircraft.magneticCourse    : aircraft course (deg)
+%                       - winds.profile              : wind profile array
+%   flight_traj     : Nx3 matrix of actual flight trajectory in ENU (m),
+%                     as [East, North, Up] columns
+%   planned_landing : 1x2 vector of planned landing position in ENU (m),
+%                     as [East, North]
+%   dynamic_model   : Struct output from HARP_Dynamic_Model containing:
+%                       - trajectory : Mx3 ENU position array (m)
+%
+% OUTPUTS:
+%   None. Three figure windows are created.
+%
+% NOTES:
+%   - The first 79 rows of flight_traj are trimmed (flight_traj(80:end,:))
+%     to remove pre-drop aircraft data.
+%   - The mid-point altitude for HALO (mid_z) is a rough linear estimate
+%     (70% of drop altitude) and is not physically derived.
+%   - Position error between HARP-estimated PI and actual landing is printed
+%     to the command window.
+
 function plotHARP2(outputs, inputs, flight_traj, planned_landing, dynamic_model)
     % Plot HARP with 4 views: 3D trajectory, side view, top view, and wind vectors
     

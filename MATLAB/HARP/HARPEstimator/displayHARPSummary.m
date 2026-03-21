@@ -1,3 +1,28 @@
+% DISPLAYHARPSUMMARY Print a formatted summary of HARP computation results.
+%   Prints a summary of the HARP solution to the command
+%   window, including mission type, parachute info, altitude breakdowns,
+%   ballistic winds, vector distances, and the final HARP position and
+%   bearing from the Point of Impact (PI).
+%
+% INPUTS:
+%   outputs : HARP outputs structure returned by computeHARP, containing:
+%               - altitudes   : struct of computed altitude values (ft)
+%               - winds       : struct of ballistic wind vectors
+%               - hvVector    : struct of high-velocity drift values (HALO)
+%               - deployedVector : struct of deployed canopy drift values
+%               - ftd         : struct of forward travel distance values
+%               - harp        : struct of final HARP position values
+%               - timing      : struct of groundspeed and timing values
+%   inputs  : HARP inputs structure returned by convertDataOutToInputs,
+%             containing:
+%               - mission.type       : 'HALO' or 'HAHO'
+%               - parachute.type     : parachute model name string
+%               - parachute.weight   : system weight (lbs)
+%               - altitude.dropIndicatedTrue : drop altitude (ft)
+%
+% OUTPUTS:
+%   None. Results are printed to the command window via fprintf.
+
 function displayHARPSummary(outputs, inputs)
             % Display formatted HARP solution summary
             
