@@ -1,3 +1,62 @@
+% CARP_CALCULATOR Compute CARP solution from a parameter struct (legacy version).
+%   Calculates altitude, airspeed, time-of-fall, drift effect, and forward
+%   travel distance using hard-coded parachute ballistics and air density
+%   values. This is the original, simplified CARP calculator and does not
+%   use a full atmospheric model — see Carp_Calculator2 for the updated
+%   ISA-based version.
+%
+%   Several ballistics constants (RoF, VD, TFC, etc.) are hard-coded
+%   inside this function rather than read from the parachute database.
+%   Air density values (p_o, p) are also hard-coded and do not vary with
+%   altitude.
+%
+% INPUTS:
+%   params : Struct containing mission parameters, requiring:
+%              - drop_altitude            : Drop altitude AGL (ft)
+%              - terrain_elevation        : DZ terrain elevation MSL (ft)
+%              - dz_altimeter             : DZ altimeter setting (inHg)
+%              - true_altitude_temperature: Temperature at drop altitude (°C)
+%              - indicated_airspeed       : Aircraft IAS (kts)
+%              - surface_temperature      : Surface temperature at DZ (°C)
+%              - ballistic_wind           : Ballistic wind speed (kts)
+%              - drop_altitude_wind       : Wind speed at drop altitude (kts)
+%              - DZ_course                : DZ centerline course (°)
+%
+% OUTPUTS:
+%   carp : Struct containing computed CARP values:
+%            - terrain_elevation  : Terrain elevation, passed through (ft)
+%            - true_alt           : True altitude = drop_altitude + terrain_elevation (ft)
+%            - pav                : Pressure altitude variation (ft)
+%            - pressure_alt       : Pressure altitude (ft)
+%            - corrected_drop_alt : Drop altitude minus 5 ft correction (ft)
+%            - indicated_alt      : Indicated altitude (ft)
+%            - alt_above_PI       : Altitude above Point of Impact (ft)
+%            - stab_altitude      : Stabilization altitude (ft)
+%            - cas                : Calibrated airspeed (kts)
+%            - eas                : Equivalent airspeed (kts)
+%            - tas                : True airspeed (kts)
+%            - gs                 : Groundspeed (kts)
+%            - adj_rof            : Density-corrected rate of fall (ft/s)
+%            - tof                : Time of fall (s)
+%            - total_tof          : Total time of fall including TFC (s)
+%            - ftt                : Forward travel time (s)
+%            - ftd                : Forward travel distance (yards)
+%            - drift_eff          : Drift effect (yards)
+%            - dz_heading         : DZ heading with drift correction (°)
+%            - params             : Original input params struct
+%            - RoF, PI, VD, TFC  : Hard-coded ballistics constants used
+%
+% NOTES:
+%   - PI (Point of Impact) is hard-coded to 0 ft AGL and VD to 0 ft,
+%     meaning stabilization altitude equals altitude above PI.
+%   - wind_speed is hard-coded to 15 ft/s regardless of drop_altitude_wind.
+%   - drift_correction is hard-coded to 0.
+%   - The corrected_drop_alt applies a fixed 5 ft subtraction with no
+%     physical justification documented.
+%   - For a more physically accurate computation, use Carp_Calculator2.
+%
+% See also CARP_CALCULATOR2, CARP_ESTIMATOR, PRESSURE_ALTITUDE_VARIATION
+
 function carp = Carp_Calculator(params)
     % Extract parameters
     drop_altitude = params.drop_altitude;

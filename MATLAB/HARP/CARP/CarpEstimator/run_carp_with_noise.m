@@ -1,3 +1,20 @@
+% RUN_CARP_WITH_NOISE Run CARP simulations and plot trajectory and velocity comparisons.
+%   Loads flight data for a single drop, runs one or more Carp_Estimator
+%   simulations (Monte Carlo ready via num_sims), and produces two figures:
+%     Figure 1 - 3D trajectory plot comparing simulated, CARP landing point,
+%                actual landing point, and the measured flight trajectory
+%     Figure 2 - Three-panel velocity comparison (X, Y, Z) between the
+%                actual smoothed estimates and the simulated propagator output
+%
+%   Update 'drop_dir' to select the drop to analyse. Set num_sims > 1 to
+%   run a Monte Carlo ensemble (noise injection not yet implemented — all
+%   runs are currently identical).
+%
+% DEPENDENCIES:
+%   get_flight_estimates, Carp_Estimator, body2enu_rotm
+%
+% See also CARP_ESTIMATOR, CARP_CALCULATOR2, GET_FLIGHT_ESTIMATES
+
 clear; clc;
 addpath(genpath("MATLAB"));
 addpath(genpath("weather"));

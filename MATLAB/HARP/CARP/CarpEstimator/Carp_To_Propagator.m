@@ -1,3 +1,42 @@
+% CARP_TO_PROPAGATOR Convert CARP outputs to ENU initial conditions for the propagator.
+%   Transforms the aircraft state at the computed release point (altitude,
+%   groundspeed, heading) into the 26-element ENU state vector expected by
+%   propagate_model. Both the payload and parachute are initialized at or
+%   just above the release altitude with the aircraft's horizontal velocity.
+%
+%   The state vector layout is:
+%     States 1-3   : Payload ENU position (m)
+%     States 4-6   : Payload velocity in body frame (m/s)
+%     States 7-10  : Payload orientation quaternion [w,x,y,z] (XYZ Euler)
+%     States 11-13 : Payload angular velocity (rad/s), initialized to zero
+%     States 14-16 : Parachute ENU position (m), 1 m above payload
+%     States 17-19 : Parachute velocity in body frame (m/s)
+%     States 20-23 : Parachute orientation quaternion
+%     States 24-26 : Parachute angular velocity (rad/s), initialized to zero
+%
+% INPUTS:
+%   carp      : CARP results struct from Carp_Calculator2 (not directly used
+%               here — all values are taken from carp_data)
+%   carp_data : CARP data struct from get_flight_estimates, requiring:
+%                 - altitude    : Release altitude (ft)
+%                 - groundspeed : Aircraft groundspeed at release (kts)
+%                 - heading     : Aircraft true heading at release (°)
+%
+% OUTPUTS:
+%   x0 : 26x1 ENU initial state vector for propagate_model
+%
+% NOTES:
+%   - The carp argument is accepted but unused; all state information comes
+%     from carp_data. The argument may be a holdover from an earlier interface.
+%   - Heading sign convention: heading_rad = -deg2rad(heading) maps from
+%     navigation/compass convention to math/ENU convention.
+%   - Vertical velocity is assumed zero at release (level flight).
+%   - The parachute is placed 1 m above the payload and initialized with
+%     zero vertical velocity.
+%   - body2enu_rotm is applied to velocities, but since V_p0_for_state is
+%     already in ENU, the result remains in ENU (see "NO TRANSFORMATION" note).
+
+
 function x0 = Carp_To_Propagator(carp, carp_data)
     % Convert CARP outputs to ENU initial conditions for propagator (East
     % North Up)
