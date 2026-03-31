@@ -200,7 +200,7 @@ dt_mult = 1; % In case we want to use this in the future
 
 % Make sure we don't try to use GPS data if we don't have it
 if ~isempty(data_gps_all)
-    ekf_measurements = {data_gps, data_baro, data_vel};
+    ekf_measurements = {data_gps, data_mag, data_baro, data_vel};
     dt_min_gps       = min(diff(data_gps.time));
 
     dt_arr = [dt_min_accel, dt_min_gps, dt_min_mag, dt_min_gyro, dt_min_baro];

@@ -328,3 +328,16 @@ ylabel("Error")
 xlabel("Time (s)")
 xlim([t_plot(1), t_plot(end)])
 title("Quaternion Part 0 Error and Covariance")
+
+
+idx = 2;
+fig_idx = new_fig(fig_idx);
+clf
+p = plot_cov(p_err(:, 2), squeeze(covariances(idx, idx, 1:kf_dt_div:end)), t_plot);
+p.MarkerSize = 10;
+p.LineWidth = 1;
+legend
+ylabel("Error")
+xlabel("Time (s)")
+xlim([t_plot(1), t_plot(end)])
+title("Position X Error and Covariance")

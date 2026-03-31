@@ -253,7 +253,7 @@ plot(pos_inno_tstep(good_pos_inno), x_pos_inno)
 xlabel("Timestep")
 ylabel("Variance (rm/s)")
 title("X Position Variance and Innovation")
-% xlim([0, 26313])
+xlim([find(tspan > t_plot_drop(1), 1), find(tspan > t_plot_drop(2), 1)])
 ylim([-7, 7])
 legend("Variance", "Innovation")
 

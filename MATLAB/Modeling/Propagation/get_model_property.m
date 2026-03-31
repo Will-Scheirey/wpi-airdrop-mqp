@@ -32,7 +32,7 @@ function [varargout] = get_model_property(t, y, model, varargin)
             error("The property name %s does not exist for the class %s", property_name, class(model));
         end
             
-        property = get(model, property_name);
+        property = model.(property_name);
         varargout{n} = repmat(property, 1, num_steps)' * 0;
     end
 
@@ -42,7 +42,7 @@ function [varargout] = get_model_property(t, y, model, varargin)
 
         for n = 1:num_properties
             property_name = varargin{n};
-            varargout{n}(i, :) = get(model, property_name);
+            varargout{n}(i, :) = model.(property_name);
         end
     end
 end
