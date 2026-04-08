@@ -1,3 +1,47 @@
+% CARP_CALCULATOR2 Compute CARP solution using an ISA-based atmospheric model.
+%   Updated CARP calculator that derives actual air density at drop altitude
+%   using the International Standard Atmosphere (ISA) lapse rate model,
+%   rather than using hard-coded density values. Rate of fall is also
+%   derived from flight data rather than a fixed ballistics table value.
+%
+%   Results are in a mix of imperial and metric units — see field notes below.
+%
+% INPUTS:
+%   carp_data : Struct of flight and mission data, requiring:
+%                 - altitude     : Drop altitude (ft)
+%                 - airspeed     : Aircraft indicated airspeed (kts)
+%                 - groundspeed  : Aircraft groundspeed (kts) — used for gs directly
+%                 - heading      : Aircraft heading (°)
+%                 - wind_speed   : Wind speed (kts)
+%                 - time_of_fall : Measured time of fall for this drop (s)
+%
+% OUTPUTS:
+%   carp : Struct containing:
+%            - stab_altitude : Stabilization altitude = drop_altitude - VD (ft)
+%            - cas           : Calibrated airspeed (kts)
+%            - eas           : Equivalent airspeed (kts)
+%            - tas           : True airspeed (kts)
+%            - gs            : Groundspeed (kts)
+%            - adj_rof       : Density-corrected rate of fall (ft/s)
+%            - tof           : Time of fall from stabilization (s)
+%            - total_tof     : Total time of fall including TFC (s)
+%            - ftt           : Forward travel time (s)
+%            - ftd           : Forward travel distance (yards)
+%            - drift_eff     : Drift effect (yards)
+%            - dz_heading    : DZ heading, negated from carp_data.heading (°)
+%            - RoF           : Derived rate of fall = altitude / time_of_fall (ft/s)
+%            - VD            : Vertical distance constant used (ft)
+%            - TFC           : Time of fall constant used (s)
+%
+% NOTES:
+%   - RoF is computed as altitude / time_of_fall — this gives average descent
+%     rate over the full drop, not just the stabilized freefall segment.
+%   - VD is hard-coded to 370 ft; this should match the parachute type in use.
+%   - dz_heading = -carp_data.heading negates the heading; verify this sign
+%     convention is correct for the coordinate system in use.
+%   - The ISA model used: T = T_o + a*h, p = p_o*(T/T_o)^(-1 - g/(a*R))
+%     where h is altitude in meters, T_o = 288.16 K, a = -0.0065 K/m.
+
 function carp = Carp_Calculator2(carp_data)
 % Extract parameters
 drop_altitude = carp_data.altitude;

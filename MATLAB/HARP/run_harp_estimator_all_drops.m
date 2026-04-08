@@ -1,3 +1,27 @@
+% RUN_HARP_ESTIMATOR_ALLDROPS Batch-process all drop subdirectories in haars_data.
+%   Iterates over every subdirectory found in the 'haars_data' folder,
+%   runs the full HARP estimation and dynamic model pipeline on each drop,
+%   and saves all results to a single .mat file. Failed drops are caught
+%   gracefully and logged with their error messages so the loop continues.
+%
+%   Results are saved to: haars_data/all_drops_results.mat
+%
+%   Each entry in the results struct contains:
+%     .drop_dir      - Name of the drop subdirectory
+%     .data_out      - Raw flight data from get_flight_estimates
+%     .carp_data     - CARP sub-struct from data_out
+%     .inputs        - Converted HARP inputs struct
+%     .outputs       - HARP computation outputs struct
+%     .dynamic_model - High-fidelity propagator results struct
+%     .status        - 'success' or 'failed'
+%     .error         - Error message string (only present if status='failed')
+%
+% DEPENDENCIES (must be on the MATLAB path):
+%   get_flight_estimates      - Load and process raw flight data
+%   convertDataOutToInputs    - Convert data_out to HARP inputs format
+%   computeHARP               - Run HARP estimation pipeline
+%   HARP_Dynamic_Model        - Run high-fidelity trajectory propagator
+
 clear; clc;
 addpath(genpath("MATLAB"));
 addpath(genpath("weather"));

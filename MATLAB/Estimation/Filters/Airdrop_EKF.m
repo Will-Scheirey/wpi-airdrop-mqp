@@ -1,48 +1,71 @@
 classdef Airdrop_EKF < Airdrop_Filter
-
-    properties
-        F_hist
-        Q_hist
-    end
+    % AIRDROP_EKF Implemntation of the Airdrop_Filter class as an EKF
+    %   This class implements the basic EKF equations using a first-order
+    %   Taylor Series expansion of the matrix exponential. Higher-order
+    %   predictions may improve performance
 
     methods
 
-        function obj = Airdrop_EKF(R, Q, H0, P0, dt)
-            obj = obj@Airdrop_Filter(R, Q, H0, P0, dt);
+        function obj = Airdrop_EKF(R, Q, P0, dt)
+            % AIRDROP_EKF Creates an Aidrop_EKF object
+            %
+            % INPUTS: 
+            %   R  : The initial measurement noise covariance matrix
+            %   Q  : The initial process noise covariance matrix
+            %   P0 : The initial state estimate covariance matrix
+            %   dt : The constant timestep to use for propagation
+            %
+            % OUTPUTS:
+            %   obj : The new Airdrop_EKF object
+
+            % Just call the parent constructor; we don't need to do
+            % anything here
+            obj = obj@Airdrop_Filter(R, Q, P0, dt);
         end
 
         function [innovation, K, S] = update_impl(obj, y, y_pred, H, R_meas)
-            innovation = y - y_pred;
+            % UPDATE_IMPL Implements the basic EKF update equations
+            %
+            % INPUTS:
+            %   obj    : The EKF object
+            %   y      : The measurement
+            %   y_pred : The predicted measurement
+            %   H      : The measurement Jacobian
+            %   R_meas : The measurement covariance matrix
+            % 
+            % OUTPUTS:
+            %   innovation : The innovation (y - y_pred)
+            %   K          : The calculated Kalman gain matrix
+            %   S          : The innovation covariance matrix
 
+
+            % Calculate innovation covariance and Kalman gains
             S = R_meas + H*obj.P_curr*H';
-
             K = obj.P_curr * H' / S;
 
+            % Calculate innovation and run update step
+            innovation = y - y_pred;
             obj.x_curr = obj.x_curr + K * innovation;
-
             obj.P_curr = (obj.I - K*H) * obj.P_curr * (obj.I - K*H)' + K*R_meas*K';
         end
 
         function predict_impl(obj, u)
+            % PREDICT_IMPL Implements the basic EKF prediction equations
+            %
+            % INPUTS:
+            %   obj : The EKF object
+            %   u   : The inputs for the current step
+            %
+
+            % Calculate the jacobian and the state transition matrix 
             A   = obj.f_jacobian_states(u);
             Phi = eye(size(A)) + obj.dt * A;
-            % Phi = expm(A * obj.dt);
 
+            % For now just assume constant Qd
             Qd = obj.Q;
 
-            k = obj.hist_idx;
-            if isempty(obj.F_hist)
-                nx = size(Phi,1);
-
-                obj.F_hist = NaN(nx,nx,100000); % replace with real N allocation
-                obj.Q_hist = NaN(nx,nx,100000);
-            end
-            obj.F_hist(:,:,k) = Phi;
-            obj.Q_hist(:,:,k) = Qd;
-
+            % Run the state and covariance prediction step 
             obj.x_curr = obj.x_curr + obj.dt * obj.f(u);
-
-            % Discrete covariance propagation:
             obj.P_curr = Phi * obj.P_curr * Phi' + Qd;
         end
     end

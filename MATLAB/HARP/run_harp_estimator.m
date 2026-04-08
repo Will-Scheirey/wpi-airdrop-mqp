@@ -12,3 +12,6 @@ harp_estimates = get_harp_estimates(full_dir);
 %% Plotting and Display
 displayHARPSummary(harp_estimates);
 plotHARP2(harp_estimates);
+%%
+close all;
+Error(harp_estimates);

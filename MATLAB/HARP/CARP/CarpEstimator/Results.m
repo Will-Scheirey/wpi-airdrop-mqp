@@ -1,3 +1,50 @@
+% RESULTS Extract landing data and print drag diagnostics from propagator output.
+%   Post-processes the raw time and state arrays from propagate_model to
+%   identify ground impact, extract the ENU trajectory, compute landing
+%   displacement metrics, perform descent rate analysis, and print a
+%   terminal velocity and drag coefficient summary to the command window.
+%
+% INPUTS:
+%   carp      : CARP results struct from Carp_Calculator2, requiring:
+%                 - adj_rof : Density-corrected rate of fall (ft/s)
+%   t         : Nx1 time vector from propagate_model (s)
+%   y         : NxM state matrix from propagate_model, where columns are:
+%                 1-3   : Payload ENU position (m)
+%                 4-6   : Payload body-frame velocity (m/s)
+%                 7-10  : Payload orientation quaternion [w,x,y,z]
+%                 11-13 : Payload angular velocity (rad/s)
+%                 14+   : Parachute states
+%   model_obj : Model object from propagate_model. If it has a 'payload'
+%               field, drag diagnostics are printed; otherwise skipped.
+%   ~         : Fifth argument (num_parachutes) accepted but unused
+%
+% OUTPUTS:
+%   results : Struct — NOTE: the function populates a local 'prop' struct
+%             but returns it under the name 'results'. Fields include:
+%               - t_plot                        : Full time vector (s)
+%               - y_sim                         : Full state matrix
+%               - time                          : Time to ground impact (s)
+%               - trajectory                    : Mx3 ENU position to impact (m)
+%               - landing_time                  : Time of ground impact (s)
+%               - east_displacement             : East offset at landing (m)
+%               - north_displacement            : North offset at landing (m)
+%               - total_horizontal_displacement : Horizontal range (m)
+%
+% NOTES:
+%   - Ground impact is the first time step where payload altitude <= 0.
+%     If never reached, a warning is issued and the final time step is used.
+%   - ENU velocities (V_enu) are computed via quaternion rotation but are
+%     not stored in the output struct.
+%   - The terminal descent rate is averaged over the last 100 time steps
+%     before impact, which may include transient behaviour if the step
+%     count is small.
+%   - model_obj.payload.m is called as a function with density argument
+%     (m(1.225)) — this assumes mass is a function handle, not a scalar.
+%     Verify this matches the Box class interface.
+%   - The printed 'propagator' separator line lacks a matching header line.
+%
+
+
 function results = Results(carp, t, y, model_obj, ~)
 
 % Payload position is in columns 1-3 (ENU)

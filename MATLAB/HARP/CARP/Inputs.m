@@ -1,3 +1,22 @@
+% INPUTS Template script defining all input parameters for CARP computation.
+%   This script declares and documents every input variable required by the
+%   CARP pipeline. It is intended as a reference and starting point — values
+%   marked with 'X' or 'x' are placeholders that must be filled in before
+%   running any CARP calculations.
+%
+%   Variables are grouped by category:
+%     - Altitude parameters
+%     - Air density parameters
+%     - Parachute ballistics constants
+%     - Wind and navigation parameters
+%
+% NOTES:
+%   - Items 23, 24, 25, 31-35 from the standard CARP form are noted as
+%     not applicable to this project.
+%   - All placeholder values (X, x) must be replaced with real mission
+%     data or parachute ballistics table values before use.
+%
+
 close all; clear all; clc; 
 
 %%Inputs for the CARP Parameters
