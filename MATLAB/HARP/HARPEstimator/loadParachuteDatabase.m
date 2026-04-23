@@ -1,3 +1,34 @@
+% LOADPARACHUTEDATABASE Retrieve ballistic parameters for a parachute system.
+%   Looks up the ballistic and timing constants for a given parachute type
+%   from an internal database derived from AFMAN 11-231 online ballistics
+%   tables. The returned struct is used throughout the HARP computation
+%   pipeline.
+%
+%   Supported parachute types (case-insensitive):
+%     'MC-4'  - Ram-air canopy, gliding
+%     'MC-5'  - Ram-air canopy, gliding (higher forward drive than MC-4)
+%     'T-11'  - Static-line round canopy, non-gliding
+%     'G-15'  - Round cargo canopy, non-gliding
+%
+% INPUTS:
+%   parachuteType : String identifier for the parachute model (e.g. 'G-15')
+%   weight        : Total system weight in lbs (parachute + payload)
+%
+% OUTPUTS:
+%   parachute     : Struct containing ballistic parameters:
+%                     .type         - Parachute model name string
+%                     .weight       - System weight (lbs), passed through
+%                     .hvRoF        - High-velocity rate of fall (ft/sec)
+%                     .deployedRoF  - Deployed rate of fall (ft/sec)
+%                     .vd           - Vertical distance to stabilization (ft)
+%                     .dd           - Deployment distance (ft)
+%                     .dt           - Deployment time (sec)
+%                     .tfc          - Time of fall to canopy (sec)
+%                     .et           - Equipment time (sec)
+%                     .dq           - Door/queue delay time (sec)
+%                     .forwardDrive - Forward drive speed (kts); 0 if
+%                                     non-gliding
+
 function parachute = loadParachuteDatabase(parachuteType, weight)
     % Load parachute ballistics from database
     % Data from AFMAN 11-231 online ballistics tables

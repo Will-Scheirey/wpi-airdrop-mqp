@@ -1,6 +1,6 @@
 classdef Kalman_Filter < handle
-    %KALMANFILTER Summary of this class goes here
-    %   Detailed explanation goes here
+    %EXTENDED_FILTER Initial Implementation of a KF
+
 
     properties
         R

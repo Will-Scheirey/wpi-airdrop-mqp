@@ -1,3 +1,31 @@
+% COMPUTEBALLISTICWINDS Compute vectorial average ballistic winds for HARP.
+%   Derives the high-velocity (freefall) and deployed (canopy) ballistic
+%   wind vectors by either using pre-computed values from the inputs struct
+%   or computing them from a full wind profile. Also extracts the wind at
+%   drop altitude for timing computations.
+%
+%   For HAHO missions, the high-velocity ballistic wind is set to [0, 0]
+%   since there is no freefall phase.
+%
+% INPUTS:
+%   inputs    : HARP inputs struct. If inputs.winds contains pre-computed
+%               fields (hvBallistic, deployedBallistic, dropAltitude), they
+%               are used directly. Otherwise, inputs.winds.profile is
+%               required:
+%                 - winds.profile : Nx3 array of [altitude(ft), direction(°),
+%                                   speed(kts)] wind profile data
+%                 - mission.type  : 'HALO' or 'HAHO'
+%   altitudes : Altitude struct from computeAltitudes, requiring:
+%                 - absoluteActuation : Absolute actuation altitude (ft); HALO
+%                 - stabilization     : Stabilization altitude (ft)
+%                 - dropAbsolute      : Drop absolute altitude (ft)
+%
+% OUTPUTS:
+%   winds : Struct containing:
+%             - hvBallistic       : 1x2 [direction(°), speed(kts)] for HV phase
+%             - deployedBallistic : 1x2 [direction(°), speed(kts)] for canopy phase
+%             - dropAltitude      : 1x2 [direction(°), speed(kts)] at drop altitude
+
 function winds = computeBallisticWinds(inputs, altitudes)
             % Compute vectorial average of winds
             

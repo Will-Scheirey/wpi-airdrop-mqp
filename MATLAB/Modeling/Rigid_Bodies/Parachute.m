@@ -1,37 +1,72 @@
 classdef Parachute < Rigid_Body
-    %PARACHUTE_RIGID_HEMI Summary of this class goes here
-    %   Detailed explanation goes here
+    % PARACHUTE A parachute rigidbody with riser and aerodynamic properties
+    %  This class assumes a perfectly-rigid, hemispherical parachute
 
     properties
-        R          % Radius
-        A          % Area
-        V          % Volume
-        l0         % Riser rest length
-        k_riser    % Riser spring stiffness
-        c_riser    % Riser spring damping coefficient
-        P_attach_B % Attachment point of riser in body frame
-        porosity   % Parachute porosity
-        eta % Parachute efficiency
+        % R Parachute Radius
+        R
+        % A Parachute drag area
+        A
+        % V Inflated parachute volume
+        V
+        % L0 Riser rest length
+        l0
+        % K_RISER Riser spring stiffness
+        k_riser
+        % C_RISER Riser spring damping coefficient
+        c_riser
+        % P_ATTACH_B  Attachment point of riser in body frame
+        P_attach_B
+        % POROSITY Parachute porosity
+        porosity
+        % ETA Parachute efficiency
+        eta 
+        % MC Canopy mass
+        mc
 
-        mc         % Canopy mass
-
-        Cd_0
+        % CD0_FLOW Face-on drag coefficient
         Cd0_flow 
+        Cd_0
+        % CD_EDGE Edge-on drag coefficient
         Cd_edge  
-        variable_ma
-        is_deployed    % NEW: deployment flag
+        % VARIABLE_MASS Whether to use variable mass
+        variable_mass
+        % IS_DEPLOYED Whether the parachute is deployed / should have drag
+        is_deployed
+        % T_DEPLOY The time in flight when the parachute should be deployed
         t_deploy
+        % T_CUT The time in flight when the parachute should be cut
         t_cut
     end
 
     methods
-        function obj = Parachute(R, mc, l0, k, c, eta, porosity, drag, variable_ma)
+        function obj = Parachute(R, mc, l0, k, c, eta, porosity, drag, variable_mass)
+            % PARACHUTE Constructs a new instance of this class
+            % 
+            % INPUTS:
+            %   R             : Parachute radius
+            %   mc            : Canopy mass
+            %   l0            : Resting riser spring length
+            %   k             : Riser spring stiffness
+            %   c             : Riser damping coefficient
+            %   eta           : Canopy efficiency
+            %   porosity      : Canopy porosity
+            %   drag          : Whether to use drag
+            %   variable_mass : Whether to use variable mass (air density)
+            %
+            % OUTPUTS:
+            %   obj : The new Parachute object
+
             obj = obj@Rigid_Body();
             obj.R = R;
-            obj.A = 2*pi*R^2; % now consists of fabric area instead of flat circular area
+            % Fabric surface area for a hemisphere
+            obj.A = 2*pi*R^2;
+            % Hemisphere volume
             obj.V = 2/3*pi*R^3;
+
             obj.l0 = l0;
 
+            % Relatively arbitrary
             obj.P_attach_B = [R*1.5; 0; 0];
 
             obj.k_riser = k;
@@ -41,8 +76,9 @@ classdef Parachute < Rigid_Body
 
             obj.eta = eta;
 
-            obj.Cd0_flow = 2.00;
-            obj.Cd_edge = 0.2832;
+            % Tuneable
+            obj.Cd0_flow = 0.78;
+            obj.Cd_edge = 0.325;
 
             if nargin >= 7
                 obj.porosity = porosity;
@@ -61,25 +97,33 @@ classdef Parachute < Rigid_Body
             end
 
             if nargin >= 9
-                obj.variable_ma = variable_ma;
+                obj.variable_mass = variable_mass;
             else
-                obj.variable_ma = false;
+                obj.variable_mass = false;
             end
+
             % Default to deployed immediately
             obj.is_deployed = false;
             obj.t_deploy = 0;
+            obj.t_cut = inf;
         end
+
+        % --- Overrided functions ---
 
         function Cd_out = Cd(obj, aoa)
             if obj.is_deployed
-                % tuneable Drag coefficient values for edge on vs flow facing values
+
                 c = cos(aoa);
                 s = sin(aoa);
-                Cd_out = obj.eta * (obj.Cd0_flow * (c.^2) + obj.Cd_edge * (s.^2));
+                Cd_out = obj.eta * (obj.Cd0_flow * (s.^2) + obj.Cd_edge * (c.^2));
               
             else
                 Cd_out = 0;  % No drag before deployment
             end
+        end
+
+        function Cl_out = Cl(obj, aoa)
+              Cl_out = obj.Cd(aoa) .* tan(aoa);
         end
 
         function S_out = S(obj, ~)
@@ -93,12 +137,13 @@ classdef Parachute < Rigid_Body
         function ma_out = added_mass(obj, rho)
             p = obj.porosity;
 
+            % Standard equation (source ?)
             ka = 1.068 * (1.465*p - 0.25975*p^2 + 1.2626*p^3); % Added mass coefficient
             ma_out = ka* rho * obj.V; % Added mass
         end
 
         function m_out = m(obj, rho)
-            if ~obj.variable_ma
+            if ~obj.variable_mass
                 rho = 1.225;
             end
 
@@ -106,7 +151,7 @@ classdef Parachute < Rigid_Body
         end
 
         function I_out = I(obj, rho)
-            if ~obj.variable_ma
+            if ~obj.variable_mass
                 rho = 1.225;
             end
             m = obj.m(rho);

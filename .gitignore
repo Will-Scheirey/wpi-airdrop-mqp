@@ -6,3 +6,5 @@ Python/Datasets/**/*.csv
 /haars_data
 *.mp4
 /weather
+
+Airdrop_System.csv

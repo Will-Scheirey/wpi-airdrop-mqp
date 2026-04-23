@@ -1,3 +1,60 @@
+% CONVERTDATAOUTTOINPUTS Convert raw flight data struct to HARP inputs format.
+%   Maps fields from the data_out structure (produced by get_flight_estimates)
+%   into the standardized inputs struct expected by computeHARP. Applies
+%   defaults and issues warnings for optional fields that are missing.
+%
+%   Several fields are hard-coded or defaulted within this function for the
+%   current operational context (e.g. mission type forced to 'HALO', DZ
+%   altimeter defaulted to 29.92 inHg, parachute type fixed to 'G-15').
+%
+% INPUTS:
+%   data_out : Raw flight/mission data struct from get_flight_estimates,
+%              requiring at minimum:
+%                - system_data.total_weight    : Total system weight (lbs)
+%                - system_data.payload_weight  : Payload weight (lbs)
+%                - system_data.dz_alt          : DZ elevation MSL (ft)
+%                - system_data.planned_activation : Actuation altitude AGL (ft)
+%                - carp.altitude               : Drop altitude (ft)
+%                - carp.airspeed               : Aircraft airspeed (kts)
+%                - carp.heading                : Aircraft heading (°)
+%                - carp.drop_temp              : Temperature at drop altitude (°C)
+%                - carp.activation_temp        : Temperature at actuation altitude (°C)
+%                - carp.land_location          : Planned landing coordinates
+%                - weather.temperature         : Temperature profile array (°C)
+%                - weather.profile or winds.profile : Wind profile data
+%
+%              Optional fields (defaults applied with warnings if absent):
+%                - dz.terrain_elevation        : DZ terrain elevation (ft)
+%                - weather.d_value             : D-value altitude correction (ft)
+%                - safety.factor               : Safety altitude buffer (ft), default 2000
+%                - safety.percentage           : LAR safety factor (0-1), default 0.80
+%                - dz.centerline               : DZ centerline course (°)
+%                - dz.offset                   : DZ lateral offset from PI (ft)
+%
+% OUTPUTS:
+%   inputs : Standardized HARP inputs struct with fields:
+%              - mission   : type ('HALO'/'HAHO'), method ('crew'/'auto')
+%              - parachute : Ballistic params from loadParachuteDatabase
+%              - altitude  : dropIndicatedTrue, dzAltimeter, piElevation,
+%                            landing_location, dzTerrain, dValue, actuationAGL
+%              - temps     : drop, surface, actuation temperatures (°C)
+%              - winds     : profile array or pre-computed ballistic winds
+%              - aircraft  : airspeed (kts), magneticCourse (°)
+%              - safety    : factor (ft), percentage (0-1)
+%              - dz        : centerline (°), offset (ft)
+%
+% NOTES:
+%   - Mission type is unconditionally set to 'HALO' at the top of this
+%     function, overriding any value in data_out.mission.type.
+%   - Parachute type is hard-coded to 'G-15'. Update this line to support
+%     other parachute types dynamically.
+%   - The DZ altimeter is defaulted to 29.92 inHg (standard atmosphere)
+%     regardless of actual field conditions.
+%   - Some commented-out code remains from earlier development (e.g. the
+%     temps block guard). These can be cleaned up once stable.
+%
+% See also LOADPARACHUTEDATABASE, COMPUTEHARP, HARPCOMPUTER
+
 function inputs = convertDataOutToInputs(data_out)
             % Convert data_out structure to HARP inputs format
            
@@ -55,7 +112,7 @@ function inputs = convertDataOutToInputs(data_out)
                 inputs.altitude.dzTerrain = data_out.dz.terrain_elevation;
             else
                 inputs.altitude.dzTerrain = inputs.altitude.piElevation;
-                warning('DZ terrain elevation not specified, using PI elevation');
+                % warning('DZ terrain elevation not specified, using PI elevation');
             end
             
             % D-value
@@ -63,7 +120,7 @@ function inputs = convertDataOutToInputs(data_out)
                 inputs.altitude.dValue = data_out.weather.d_value;
             else
                 inputs.altitude.dValue = 0;
-                warning('D-value not specified, using 0');
+                % warning('D-value not specified, using 0');
             end
             
             % Actuation altitude (HALO only)
@@ -136,19 +193,19 @@ function inputs = convertDataOutToInputs(data_out)
                     inputs.safety.factor = data_out.safety.factor;
                 else
                     inputs.safety.factor = 2000;
-                    warning('Safety factor not specified, using default 2000 ft');
+                    % warning('Safety factor not specified, using default 2000 ft');
                 end
                 
                 if isfield(data_out.safety, 'percentage')
                     inputs.safety.percentage = data_out.safety.percentage;
                 else
                     inputs.safety.percentage = 0.80;
-                    warning('Safety percentage not specified, using default 80%%');
+                    % warning('Safety percentage not specified, using default 80%%');
                 end
             else
                 inputs.safety.factor = 2000;
                 inputs.safety.percentage = 0.80;
-                warning('Safety parameters not specified, using defaults');
+                % warning('Safety parameters not specified, using defaults');
             end
             
             %% DZ INFORMATION
