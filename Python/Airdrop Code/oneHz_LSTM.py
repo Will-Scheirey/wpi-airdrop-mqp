@@ -1,202 +1,150 @@
-from tensorflow.python.keras.metrics import Metric
-from sklearn.metrics import mean_squared_error
-from keras import backend as K  # (kept in case you use it elsewhere)
-from matplotlib import pyplot as plt
-from matplotlib import gridspec
-import tensorflow as tf
-import pandas as pd
-import numpy as np
-import matplotlib
-import itertools
-import time
-import sys
 import os
 
-sys.path.append("/Users/paigerust/wpi-airdrop-mqp/Python/Datasets")
-from Python.ml_plotter import plot_moving_avg_final
-from Python.ml_plotter import plot_metrics_final
+import tensorflow as tf
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+from matplotlib import gridspec
+from sklearn.metrics import mean_squared_error
+import re
+from pathlib import Path
 
-epochs = 50     # duration of training
+print("GPUs visible to TF:", tf.config.list_physical_devices("GPU"))
+
+LOOKBACK = 25
+STRIDE = 10
+TRAIN_VAL_SPLIT = 0.2
+
+epochs = 20     # duration of training
 show_figs = 1
-save_figs = 0
-training_increments = [0.6]  # we found comparable results using ratios down to ~40:60
+save_figs = 1
 use_moving_avg_metrics = 1
-use_all_cols = 1            # whether to include accelerometer data or only roll + pitch
+use_all_full = 1            # whether to include accelerometer data or only roll + pitch
 payload_cols = [], []
 predicted_wspd, actual_wspd = [], []
 
-base_loc = os.path.dirname(os.path.realpath(__file__))
-data_loc = base_loc + "/MATLAB\ Data"
+base_loc = "/home/pmrust/MQP"
+data_loc = base_loc + "/haars_data"
 
-if use_all_cols:
-    payload_cols  = ['roll', 'pitch', 'acc_x', 'acc_y', 'acc_z']
+job_id = os.environ.get("SLURM_JOB_ID", "local")
+plot_flight_dir = f"plots/flights/lstm_{job_id}"
+plot_loss_dir = f"plots/loss/lstm_{job_id}"
+os.makedirs(plot_flight_dir, exist_ok=True)
+os.makedirs(plot_loss_dir, exist_ok=True)
+
+if use_all_full:
+    payload_cols  = ['alt_msl_m', 'wx_dps', 'wy_dps', 'a_h1_ms2', 'a_h2_ms2', 'a_v_ms2']
 else:
-    mav_cols  = ['mav_roll', 'mav_pitch']
+    payload_cols = ['alt_msl_m', 'wx_dps', 'wy_dps']
 
-plt.rcParams["font.family"] = "Helvetica"
-plt.rcParams['font.size']   = 12
 
 def main():
-    '''
-    Example data for 1 drone with corresponding wind data provided
-    '''
-    drone_attitude = np.array(pd.read_csv(data_loc + "/032620-concat-mav.csv")[mav_cols])
-    ground_truth_wspd = np.array(pd.read_csv(data_loc + "/032620-concat-mav.csv")['sonic_wind'])
-    ground_truth_wdir = np.array(pd.read_csv(data_loc + "/032620-concat-mav.csv")['sonic_wind_dir'])
+    aug5_data = data_loc + "/08-05-2025"
+    aug7_data = data_loc = "/08-07-2025"
 
-    title = "1 Hz March Mavic"
+    data_out = open(f'metrics/lstm_{job_id}.txt', 'a')
 
-    for m in range(len(mav_cols)):
-        drone_attitude[:, m] = scale(drone_attitude[:, m])
+    aug5_flights = build_flights(aug5_data)
+    aug7_flights = build_flights(aug7_data)
 
-    trials = [(drone_attitude, ground_truth_wspd, title, ground_truth_wdir)]
+    aug5_flight_data = []
+    for f in aug5_flights:
+        X, y_wspd, y_wdir, _ = load_flight(f["sensor_path"], f["wind_path"], f["title"])
+        aug5_flight_data.append({
+            "title": f["title"],
+            "X": X,
+            "y_wspd": y_wspd,
+            "y_wdir": y_wdir,
+        })
+    print(f"Loaded {len(aug5_flight_data)} flights from August 5, 2025")
 
-    '''
-    For each tuple in trials, trains a model on given data and plots predictions on test data
-    '''
-    models = []
-    trial_metrics = []
-    trial_results = []  # contains predictions and ground truths
-    best_training_increment = 0
-    best_rmse = 1e4
-    preds = []
-    prediction_df = pd.DataFrame()
-    drone_type = 1
-    labels_found = 0
-    actual_wspd, validation_wind_dir = [], []
-    has_dir = 1
+    aug7_flight_data = []
+    for f in aug7_flights:
+        X, y_wspd, y_wdir, _ = load_flight(f["sensor_path"], f["wind_path"], f["title"])
+        aug7_flight_data.append({
+            "title": f["title"],
+            "X": X,
+            "y_wspd": y_wspd,
+            "y_wdir": y_wdir,
+        })
+    print(f"Loaded {len(aug7_flight_data)} flights from August 7, 2025")
 
-    while (trials):
-        if has_dir:
-            Data, Labels, Title, drone_dir = trials.pop(0)
-        else:
-            Data, Labels, Title = trials.pop(0)
-        Labels = Labels[~np.isnan(Labels)]
-        trial_metrics = []
-        for ti in training_increments:
-            train_split = int(10 * ti)
-            idx = train_split * len(Data) // 10
-            trainData, trainLabels = np.expand_dims(Data[:idx], 1), Labels[:idx]
-            testData, testLabels = np.expand_dims(Data[idx:], 1), Labels[idx:]
+    for test_group in range(aug5_flight_data):
+        test_data = aug5_flight_data[test_group]
 
-            print("length of training: " + str(len(Labels) * ti))
-            print("length of validation: " + str(len(Labels) - len(Labels) * ti))
-            print("training) wind min: %.03f wind max: %.03f wind mean: %.02f" % (min(Labels[idx:]), max(Labels[idx:]), np.mean(Labels[idx:])))
-            print("validation) wind min: %.03f wind max: %.03f wind mean: %.02f" % (min(Labels[:idx]), max(Labels[:idx]), np.mean(Labels[:idx])))
+        train_data = [flight_data[i] for i in range(NUM_FLIGHTS) if i != test_group]
 
-            try:
-                drone_dir = drone_dir[idx:]
-                validation_wind_dir = ground_truth_wdir[idx:]
-            except:
-                pass
+        Title = f"TEST={test_data['title']} (train on {NUM_FLIGHTS} flights)"
 
-            model = buildLSTM(Data.shape[1])
-            models.append((model, Title))
+        X_train_list = [data["X"] for data in train_data]
+        X_all_list = [data["X"] for data in train_data] + [test_data["X"]]
 
-            # Ensure labels and data lengths match
-            if testLabels.shape[0] != testData.shape[0]:
-                pad_n = testData.shape[0] - testLabels.shape[0]
-                last = testLabels[-1]
-                testLabels = np.pad(testLabels, (0, pad_n), mode='constant', constant_values=last)
+        X_all_norm, mu, sigma = normalize_data(X_train_list, X_all_list)
 
-            train(model, trainData, trainLabels, testData, testLabels, Title)
-            metrics = plot_predictions(model, testData, trainLabels, testLabels, Title, ti, save_fig=0)
+        X_w_all, y_w_all = [], []
+        for i, data in enumerate(train_data):
+            data["X_norm"] = X_all_norm[i]
+            test_data["X_norm"] = X_all_norm[-1]
 
-            if (metrics[1] < best_rmse):
-                best_rmse = metrics[1]
-                best_training_increment = ti
+            X_w, y_w = make_windows(data["X_norm"], data["y_wspd"], data["y_wdir"], lookback=LOOKBACK, stride=STRIDE)
+            X_w_all.append(X_w)
+            y_w_all.append(y_w)
 
-            trial_metrics.append(metrics)
-            drone_wspd_pred = model.predict(testData, verbose=0)[:, 0]
-            preds.append(drone_wspd_pred)
-            trial_results.append((drone_wspd_pred, Title))
+        X_w = np.concatenate(X_w_all, axis=0)
+        y_w = np.concatenate(y_w_all, axis=0)
 
-            if has_dir:
-                if labels_found == 0:
-                    actual_wspd = testLabels
-                    labels_found = 1
-                pred_u, pred_v = split_wspd(drone_wspd_pred, drone_dir)
-                try:
-                    actual_u, actual_v = split_wspd(actual_wspd, validation_wind_dir)
-                except:
-                    actual_u, actual_v = split_wspd(list(itertools.chain.from_iterable(actual_wspd)), validation_wind_dir)
+        X_train, y_train, X_val, y_val = train_val_split(X_w, y_w, TRAIN_VAL_SPLIT)
 
-                print("actual turb var: ")
-                a_u, a_v = find_turb_var(actual_u, actual_v)
+        X_test, y_test = make_windows(test_data["X_norm"], test_data["y_wspd"], test_data["y_wdir"], lookback=LOOKBACK, stride=STRIDE)
 
-                print("predicted turb var: ")
-                p_u, p_v = find_turb_var(pred_u, pred_v)
+        model = build_LSTM(numFeatures=X_train.shape[-1])
+        train(model, epoch, X_train, y_train, X_val, y_val, Title)
 
-                print("u turb diff: %.03f\nv turb diff: %.03f" % (a_u - p_u, a_v - p_v))
+        pred_test = model.predict(X_test, verbose=0).squeeze()
+        pred_full = model.predict(X_w, verbose=0).squeeze()
 
-        if has_dir:
-            drone_pre = ""
-            transposedColumns = []
-            drone_cols = []
+        y_test = np.asarray(y_test).squeeze()
+        y_w = np.asarray(y_w).squeeze()
 
-            if drone_type == -1:
-                drone_cols = solo_cols
-                drone_pre = "solo"
-            else:
-                drone_cols = mav_cols
-                drone_pre = "mav"
+        n = min(len(pred_test), len(y_test))
+        pred_test = pred_test[:n]
+        y_test = y_test[:n]
 
-            for d, dc in enumerate(drone_cols):  # 0-5
-                transposedCol = []
-                for dp in testData:  # 0-851
-                    transposedCol.append(dp[0][d])
-                transposedColumns.append(transposedCol)
+        m = min(len(pred_full), len(y_w))
+        pred_full = pred_full[:m]
+        y_w = y_w[:m]
 
-            label_df = pd.DataFrame(data=[], columns=drone_cols)
-            pred_cols = [f'{drone_pre}_predicted_wspd', f'{drone_pre}_est_wdir', 'sonic_wspd', 'sonic_wdir']
-            prediction_df = pd.DataFrame(data=[], columns=drone_cols + pred_cols)
-            pred_data = (drone_wspd_pred, drone_dir, actual_wspd, validation_wind_dir)
+        # MODEL ANALYSIS
+        model_analysis(y_w, pred_full, Title, data_out)
 
-            # store prediction data
-            for tc in range(len(transposedColumns)):
-                col_data = list(transposedColumns[tc][:])
-                col_label = drone_cols[tc]
-                col_df = pd.DataFrame({col_label: col_data})
-                label_df[col_label] = col_data
-                prediction_df[col_label] = col_data
+        if show_figs:
+            dt = 0.077
+            fs = 1.0 / dt
+            t_test_min = ((np.arange(n) * STRIDE + (LOOKBACK - 1)) * dt) / 60.0
+            plt.figure(figsize=(10, 3))
 
-            try:
-                pred_df = pd.DataFrame({
-                    f'{drone_pre}_predicted_wspd': drone_wspd_pred,
-                    f'{drone_pre}_est_wdir': drone_dir,
-                    'sonic_wspd': actual_wspd,
-                    'sonic_wdir': validation_wind_dir
-                })
-            except:
-                pred_df = pd.DataFrame({
-                    f'{drone_pre}_predicted_wspd': drone_wspd_pred,
-                    f'{drone_pre}_est_wdir': drone_dir,
-                    'sonic_wspd': list(itertools.chain.from_iterable(actual_wspd)),
-                    'sonic_wdir': list(itertools.chain.from_iterable(validation_wind_dir))
-                })
+            plt.plot(t_test_min, y_test,
+                    label="True wind speed",
+                    linewidth=1.5)
 
-            label_df = pd.concat([label_df, pred_df], ignore_index=True)
-            prediction_df = pd.concat([prediction_df, pred_df], ignore_index=True)
+            plt.plot(t_test_min, pred_test,
+                    label="Predicted wind speed",
+                    linewidth=1.5,
+                    alpha=0.9)
 
-            # Save
-            prediction_df.to_csv(os.getcwd() + f"{drone_pre}-march-lstm-validation.csv", sep=",", index=False)
+            plt.xlabel("Time (minutes)")
+            plt.ylabel("Wind speed (m/s)")
+            plt.title(f"Test flight: {Title}")
+            plt.legend()
+            plt.grid(True, linestyle="--", alpha=0.5)
 
-        drone_type *= -1
-
-    title = "LSTM march comp"
-    labels = ["Mavic Wspd", "True Wspd"]
-    y_lims = [0, 11]
-
-    try:
-        plot_single_moving_avg(preds[0], list(itertools.chain.from_iterable(actual_wspd)), labels, "Windspeed (m s$^{-1}$)", y_lims, title, show_metrics=1)
-    except:
-        plot_single_moving_avg(preds[0], actual_wspd, labels, "Windspeed (m s$^{-1}$)", y_lims, title, show_metrics=1)
-
-    plt.clf()
-    plt.cla()
-    plt.close()
-    dataLength = len(trainLabels) + len(testLabels)
-    plot_metrics_final(trial_metrics, training_increments, dataLength, f"{Title} metric spread ")
+            plt.tight_layout()
+            safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", Title)
+            plt.savefig(os.path.join(plot_flight_dir, f"{safe_title}.png"), dpi=300)
+            plt.close()
+    data_out.close()
 
 def plot_single_moving_avg(t1, ground_truth, labels, y_label, y_lims, title, show_metrics):
     window_length = 10
@@ -228,7 +176,7 @@ def plot_single_moving_avg(t1, ground_truth, labels, y_label, y_lims, title, sho
     drone_metrics = [MBE(gt_avg, t1_avg), np.sqrt(mean_squared_error(gt_avg, t1_avg))]
 
     if show_metrics:
-        metric_label = ('Drone RMSE:   %.02f m s$^{-1}$  Drone MBE:   %.02f m s$^{-1}$' %
+        metric_label = ('Payload RMSE:   %.02f m s$^{-1}$  Payload MBE:   %.02f m s$^{-1}$' %
                         (drone_metrics[1], drone_metrics[0]))
         axes[0].annotate(
             metric_label,
@@ -324,17 +272,94 @@ def plot_mult_moving_avg(t1, t2, ground_truth, labels, y_label, y_lims, title, s
 
     plt.close()
 
-def buildLSTM(numFeatures):
-    # Explicit Input fixes the Keras warning and keeps variable-length timesteps
-    inp = tf.keras.Input(shape=(None, numFeatures))  # (timesteps, features)
-    x = tf.keras.layers.LSTM(420, return_sequences=True)(inp)
-    x = tf.keras.layers.LSTM(180, return_sequences=True)(x)
-    x = tf.keras.layers.LSTM(90, return_sequences=True, dropout=0.96)(x)  # high dropout as in your original
-    x = tf.keras.layers.LSTM(48, activation='relu')(x)
-    out = tf.keras.layers.Dense(1)(x)
+def build_flights(output_folder):
+    out = Path(output_folder)
+
+    # Index by base_name
+    imu = {}
+    wind = {}
+
+    def base_from(prefix, path: Path):
+        m = re.match(rf"{re.escape(prefix)}_(.*)\.csv$", path.name)
+        return m.group(1) if m else None
+
+    for p in out.glob("imu_*.csv"):
+        b = base_from("imu", p)
+        if b: imu[b] = p
+
+    for p in out.glob("wind_*.csv"):
+        b = base_from("wind", p)
+        if b: wind[b] = p
+
+    bases = sorted(set(imu) & set(wind))
+
+    flights = []
+    for b in bases:
+        flights.append({
+            "title": b,
+            "sensor_path": str(imu[b]),
+            "wind_path": str(wind[b]),
+        })
+
+    return flights
+
+
+def load_flight(sensor_csv, wind_csv, title):
+    X = np.array(pd.read_csv(sensor_csv)[payload_cols])
+    y_wspd = np.array(pd.read_csv(wind_csv)['wind_speed_mps'])
+    y_wdir = np.array(pd.read_csv(wind_csv)['wind_dir_deg'])
+
+    n = min(len(X), len(y_wspd), len(y_wdir))
+    return X[:n], y_wspd[:n], y_wdir[:n], title
+
+'''
+Standard Scaling:
+Scales data columns by taking each row, subtracting the column mean from it,
+and dividing it by the column standard deviation
+'''
+def normalize_data(X_train, X_total):
+    X_cat = np.concatenate(X_train, axis=0)
+    mu = np.mean(X_cat, axis=0)
+    sigma = np.std(X_cat, axis=0)
+
+    X_tfm = []
+    for i in X_total:
+        X_tfm.append((i - mu)/sigma)
+
+    return X_tfm, mu, sigma
+
+def make_windows(X, y, lookback, stride):
+    X_w, y_w = [], []
+    T = min(len(X), len(y))
+    X = X[:T]
+    y = y[:T]
+
+    for t in range(lookback, T, stride):
+        X_w.append(X[t - lookback:t])
+        y_w.append(y[t - 1])
+
+    return np.asarray(X_w), np.asarray(y_w).reshape(-1, 1)
+
+def train_val_split(X, y, fraction):
+    idx = np.random.permutation(len(X))
+
+    split = int((1-fraction)*len(idx))
+    train_idx, val_idx = idx[:split], idx[split:]
+
+    return X[train_idx], y[train_idx], X[val_idx], y[val_idx]
+
+def build_LSTM(numFeatures):
+    inp = tf.keras.Input(shape=(LOOKBACK, numFeatures))  # (timesteps, features)
+    x = tf.keras.layers.Conv1D(filters=32, kernel_size=5, padding="same", activation="relu")(inp)
+    x = tf.keras.layers.LSTM(64, kernel_regularizer=tf.keras.regularizers.l1(1e-3), return_sequences=True)(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    x = tf.keras.layers.LSTM(32, kernel_regularizer=tf.keras.regularizers.l1(1e-3), return_sequences=False)(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    x = tf.keras.layers.Dense(32, kernel_regularizer=tf.keras.regularizers.l1(1e-3), activation="relu")(x)
+    out = tf.keras.layers.Dense(2)(x)
 
     model = tf.keras.Model(inp, out)
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=4e-5)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-3)
 
     # TF-native RMSE metric
     def rmse_tf(y_true, y_pred):
@@ -343,12 +368,37 @@ def buildLSTM(numFeatures):
     model.compile(optimizer=optimizer, loss='mse', metrics=[rmse_tf])
     return model
 
+def model_LSTM(numFeatures):
+
+    # march model 420-180-90d92-42-lr4e-5
+    inp = tf.keras.Input(shape=(LOOKBACK, numFeatures))
+    x = tf.keras.layers.LSTM(420, return_sequences=True)(inp)
+    x = tf.keras.layers.LSTM(180, return_sequences=True)(x)
+    x = tf.keras.layers.LSTM(90, return_sequences=True, dropout=0.96)(x) # dropout used to combat overfitting in one flight during June
+    #multi_step_model.add(tf.keras.layers.LSTM(90, return_sequences=True))
+    x = tf.keras.layers.LSTM(48, activation='relu')(x)
+
+
+    #multi_step_model.add(LeakyReLU(alpha=0.05))activation=tf.nn.tanh)
+    out = tf.keras.layers.Dense(2)(x)
+    model = tf.keras.Model(inp, out)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=4e-5)
+    
+    def rmse_tf(y_true, y_pred):
+        return tf.sqrt(tf.reduce_mean(tf.square(y_pred - y_true)))
+
+    model.compile(optimizer=optimizer, loss = 'mse')
+
+    return model
+
+# kernel_regularizer=tf.keras.regularizers.l1(1e-3)
 '''
 Trains the model on given data
 '''
-def train(multi_step_model, trainData, trainLabels, testData, testLabels, Title):
-    t = multi_step_model.fit(trainData, trainLabels, epochs=epochs, batch_size=16,
-                             validation_data=(testData, testLabels))
+def train(multi_step_model, epoch, trainData, trainLabels, testData, testLabels, Title):
+    callback = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10)
+    t = multi_step_model.fit(trainData, trainLabels, epochs=epoch, batch_size=16,
+                             validation_data=(testData, testLabels), callbacks=[callback])
     plt.plot(t.history['loss'])
     plt.plot(t.history['val_loss'])
     plt.title(Title + ' train vs validation loss')
@@ -356,8 +406,30 @@ def train(multi_step_model, trainData, trainLabels, testData, testLabels, Title)
     plt.xlabel('epoch')
     plt.legend(['train', 'validation'], loc='upper right', ncol=2)
     if show_figs:
-        plt.show()
+        safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", Title)
+        plt.savefig(os.path.join(plot_loss_dir, f"{safe_title}_FULL_Y.png"), dpi=300)
     plt.close()
+
+
+def model_analysis(y_test, y_pred, Title, data_out):
+    # TrueWspdVar, PredWspdVar, MBE, MSE, RMSE
+    metrics = [
+        np.std(y_test) ** 2,
+        np.std(y_pred) ** 2,
+        MBE(y_test, y_pred),
+        mean_squared_error(y_test, y_pred),
+        np.sqrt(mean_squared_error(y_test, y_pred))
+    ]
+
+    data_out.write(f"{Title} \n")
+    data_out.write(f"{'true wind speed variance':34s}: {metrics[0]:4.2f}\n")
+    data_out.write(f"{'predicted wind speed variance':34s}: {metrics[1]:4.2f}\n")
+    data_out.write(f"{'MBE':34s}: {metrics[2]:4.2f}\n")
+    data_out.write(f"{'MSE':34s}: {metrics[3]:4.2f}\n")
+    data_out.write(f"{'RMSE':34s}: {metrics[4]:4.2f}\n")
+    data_out.write(f"{'true turbulence intensity':34s}: {findTurbulence(y_test):4.2f}\n")
+    data_out.write(f"{'predicted turbulence intensity':34s}: {findTurbulence(y_pred):4.2f}\n")
+    data_out.write(f"{'turbulence intensity diff':34s}: {findTurbulence(y_test) - findTurbulence(y_pred):4.2f}\n")
 
 '''
 Plots the predictions for the given model on the given data
@@ -393,26 +465,6 @@ def plot_predictions(multi_step_model, testData, trainLabels, testLabels, Title,
         axes[1].plot(range(bf, bf + td), y, label='True Wspd', color='#c334e3', alpha=0.8, linewidth=1.1)
         axes[1].plot(range(bf, bf + td), predictions, label='Predicted Wspd', color='Navy', linewidth=0.8)
 
-        # TrueWspdVar, PredWspdVar, MBE, MSE, RMSE
-        metrics = [
-            np.std(y) ** 2,
-            np.std(predictions) ** 2,
-            MBE(y, predictions),
-            mean_squared_error(y, predictions),
-            np.sqrt(mean_squared_error(y, predictions))
-        ]
-
-        print("-----------LSTM (%1d training) ------------\n%s\n" % (training_increment * 100, Title))
-        print('{:34s}: {:4.2f}'.format("true wind speed variance", metrics[0]))
-        print('{:34s}: {:4.2f}'.format("predicted wind speed variance", metrics[1]))
-        print('{:34s}: {:4.2f}'.format("MBE", metrics[2]))
-        print('{:34s}: {:4.2f}'.format("MSE", metrics[3]))
-        print('{:34s}: {:4.2f}'.format("RMSE", metrics[4]))
-
-        print('{:34s}: {:4.2f}'.format("true turbulence intensity", findTurbulence(y)))
-        print('{:34s}: {:4.2f}'.format("predicted turbulence intensity", findTurbulence(predictions)))
-        print('{:34s}: {:4.2f}'.format(" turbulence intensity diff ", findTurbulence(y) - findTurbulence(predictions)))
-
         fig.tight_layout()
 
         # Set labels
@@ -438,16 +490,10 @@ def plot_predictions(multi_step_model, testData, trainLabels, testLabels, Title,
             return moving_metrics
         return metrics
 
+
 def findTurbulence(ws):
     return round(np.std(ws) / np.mean(ws), 3)
 
-'''
-Standard Scaling:
-Scales data columns by taking each row, subtracting the column mean from it,
-and dividing it by the column standard deviation
-'''
-def scale(d):
-    return (d - np.mean(d)) / np.std(d)
 
 def MBE(y_true, y_pred):
     '''
@@ -462,6 +508,7 @@ def MBE(y_true, y_pred):
     diff = (y_pred - y_true)
     mbe = diff.mean()
     return round(mbe, 3)
+
 
 '''
 1D turbulence utility functions
@@ -497,3 +544,4 @@ def split_wspd(wspd, wdir):
 
 if __name__ == "__main__":
     main()
+

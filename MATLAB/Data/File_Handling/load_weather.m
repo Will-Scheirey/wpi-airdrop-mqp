@@ -1,9 +1,10 @@
 function [weather_data, the_weather] = load_weather(the_time)
-weather_dir = 'weather';
+weather_dir = '/Users/paigerust/Desktop/MQP/weather';
 
 files = dir(weather_dir);
 
 day_dir = [];
+dir_date = [];
 
 for i = 1:length(files)
     if contains(files(i).name, '.')
@@ -21,17 +22,13 @@ if isempty(dir_date)
     error("There is no weather data for the specified date!")
 end
 
-day_dir = fullfile(weather_dir, day_dir.name);
-
-day_data_dir = fullfile(day_dir, 'data');
+day_dir_path  = fullfile(weather_dir, day_dir.name);
+day_data_dir  = fullfile(day_dir_path, 'data');
+radar_dir     = fullfile(day_data_dir, 'radar');
 
 if ~isfolder(day_data_dir)
     error("There is no data file for the specified date!")
 end
-
-day_files = dir(day_data_dir);
-
-radar_dir = fullfile(day_data_dir, 'radar');
 
 if ~isfolder(radar_dir)
     error("There is no radar data file for the specified date!")
@@ -78,7 +75,8 @@ for i = 1:length(weather_files)
         'TimeZone','UTC');
     file_time.Year = the_time.Year;
 
-    weather_data{i} = struct('time', file_time, 'data', readtable(filename));
+    full_file = fullfile(file.folder, filename);
+    weather_data{i} = struct('time', file_time, 'data', readtable(full_file));
 end
 % --- Combine (if we have at least 2 files) ---
 if numel(weather_data) >= 2
