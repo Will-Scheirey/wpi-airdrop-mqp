@@ -1,3 +1,3 @@
 #include "libraries.hpp"
 
-void cropped_match(cv::Mat&);
+bool cropped_match(cv::Mat&);

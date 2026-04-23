@@ -2,178 +2,207 @@
 #include "crop.cpp"
 #include "grid.cpp"
 #include "frame.cpp"
+#include "csv.cpp"
+
+/*
+
+./main \
+/Users/paigerust/Desktop/MQP/haars_videos/sat_view_worc.png \
+/Users/paigerust/Desktop/MQP/haars_videos/DN172_Lt3_n12_08072025_side/video_out.mov \
+/Users/paigerust/Desktop/MQP/haars_videos/DN172_Lt3_n12_08072025_side/coords_out.csv \
+--load_csv /Users/paigerust/Desktop/MQP/haars_videos/DN172_Lt3_n12_08072025_side/coords_in.csv \
+--load_truth logs/gps_DN172_Lt3_n12_08072025_side.csv
+
+
+*/
 
 #define N_FEATURES 100
 
 static int window_index = 0;
-const int window = 5;
 
 static std::vector<cv::Point2f> sat_points, payload_points;
-std::vector<cv::Point2d> all_coords;
+std::vector<cv::Point2d> all_coords, true_coords;
+std::vector<double> truth_timestamps, coord_timestamps;
 
 static bool have_last = false;
 static bool have_prev = false;
+bool have_truth = false;
+static bool have_csv = false;
 static cv::Point2d last_valid(0.0, 0.0), prev_valid(0.0, 0.0);
 
 void push_coord(std::vector<cv::Point2d>&, const cv::Point2d&);
 void push_frame(std::vector<cv::Mat>&, const cv::Mat&);
 
-int main (void) {
+std::ofstream rms_out("rms_out.csv");
+
+int main (int argc, char** argv) {
+    grid_sizing();
     std::cout << std::fixed << std::setprecision(5);
+    cv::Mat img_sat;
+    cv::VideoCapture video_in; cv::VideoWriter video_out;
+    std::ofstream coords_out;
 
-    cv::Mat img_sat = cv::imread("/Users/paigerust/Desktop/MQP/fg_cv_test_1/sat_view.png", -1);
-    cv::cvtColor(img_sat, img_sat, cv::COLOR_BGRA2BGR);
+    if (argc > 1) {
+        img_sat = cv::imread(argv[1]);
+        cv::cvtColor(img_sat, img_sat, cv::COLOR_BGRA2BGR);
+        char *compare;
 
-    cv::VideoCapture vid_fg("/Users/paigerust/Desktop/MQP/fg_cv_test_1/fg_cv_vid_1.mov");
+        video_out.open(argv[2], cv::VideoWriter::fourcc('a', 'v', 'c', '1'), 60.0, img_sat.size());
+        coords_out.open(argv[3]);
+        coords_out << std::fixed << std::setprecision(5);
+        coords_out << "timestamp" << "," << "latitude" << "," << "longitude" << std::endl;
 
-    int frame_count = static_cast<int>(vid_fg.get(cv::CAP_PROP_FRAME_COUNT));
-    double fps = vid_fg.get(cv::CAP_PROP_FPS);
-    int frame_width = static_cast<int>(vid_fg.get(cv::CAP_PROP_FRAME_WIDTH));
-    int frame_height = static_cast<int>(vid_fg.get(cv::CAP_PROP_FRAME_HEIGHT));
+        compare = argv[4];
+        bool csv = strcmp(compare, "--load_csv");
+        bool video = strcmp(compare, "--load_video");
+        if (!csv) {
+            have_csv = true;
+            std::string csv_path = argv[5];
 
-    std::cout << "Frame count: " << frame_count << "\n";
-    std::cout << "FPS: " << fps << "\n";
+            if (!load_coords_csv(csv_path, all_coords, &coord_timestamps)) {
+                return -1;
+            }
+        } else if (!video) {
+            video_in.open(argv[5]);
+        }
 
-    cv::VideoWriter vid_out("/Users/paigerust/Desktop/MQP/fg_cv_test_1/fg_cv_out_1.mov", cv::VideoWriter::fourcc('a', 'v', 'c', '1'), fps, cv::Size(frame_width, frame_height));
-    cv::Mat frame_fg;
+        bool truth;
+        compare = argv[6];
+        if (compare) truth = strcmp(compare, "--load_truth");
+        else truth = false;
+        if (!truth) {
+            have_truth = true;
+            std::string truth_path = argv[7]; 
 
-    std::ofstream coord_out;
-    coord_out.open("logs/coordinate_log.csv");
-    coord_out << std::fixed << std::setprecision(5);
-
-    coord_out << "timestamp" << "," << "latitude" << "," << "longitude" << std::endl;
-
-    if (!vid_fg.isOpened()) {
-        std::cerr << "Error: Could not open video file.\n";
+            if (!load_coords_csv(truth_path, true_coords, &truth_timestamps)) {
+                return -1;
+            }
+        }
+    }
+    int frame_count; double fps;
+    if (!video_out.isOpened()) {
+        std::cerr << "Error: Could not open video_out file.\n";
         return -1;
     }
 
-    cv::Ptr<cv::ORB> ORB = cv::ORB::create(N_FEATURES);
+    if (video_in.isOpened()) {
+        frame_count = static_cast<int>(video_in.get(cv::CAP_PROP_FRAME_COUNT));
+        fps = video_in.get(cv::CAP_PROP_FPS);
 
-    std::vector<cv::KeyPoint> sat_kp, payload_kp;
-    cv::Mat sat_desc, payload_desc;
-    ORB->detectAndCompute(img_sat, cv::noArray(), sat_kp, sat_desc);
+        std::cout << "Frame count: " << frame_count << "\n";
+        std::cout << "FPS: " << fps << "\n";
+    
+        cv::Ptr<cv::ORB> ORB = cv::ORB::create(N_FEATURES);
 
-    std::vector<cv::Mat> window_frames;
-    std::vector<cv::Point2d> window_coords;
+        std::vector<cv::KeyPoint> sat_kp, payload_kp;
+        cv::Mat sat_desc, payload_desc;
+        ORB->detectAndCompute(img_sat, cv::noArray(), sat_kp, sat_desc);
 
-    double video_timestamp = 0.0;
+        std::vector<cv::Mat> window_frames;
+        std::vector<cv::Point2d> window_coords;
 
-    for (int i = 0; i < frame_count; i++) {
-        bool compute = false;
+        double video_timestamp = 0.0;
+        const double true_fps = 5.0;
+        const int stride = std::max(1, (int)std::lround(fps / true_fps));
 
-        vid_fg >> frame_fg;
-        if (frame_fg.empty()) {
-            std::cerr << "No frame loaded.\n";
-            break;
-        }
+        cv::Mat frame;
+        if (!have_csv) {
+            cv::Mat frame;
+            for (int i = 0; i < frame_count; ++i) {
+                video_in >> frame;
+                if (frame.empty()) break;
 
-        video_timestamp += 1.0 / fps;
+                if (i % stride != 0) continue;
+                std::cout << i << std::endl;
 
-        cv::BFMatcher matcher(cv::NORM_HAMMING);
-        std::vector<std::vector<cv::DMatch>> knnMatches;
-        cv::Mat inlierMask, H;
-        ORB->detectAndCompute(frame_fg, cv::noArray(), payload_kp, payload_desc);
+                video_timestamp += 1.0 / true_fps;
 
-        if (payload_desc.empty() || sat_desc.empty()) {
-            compute = false;
-        } else {
-            matcher.knnMatch(sat_desc, payload_desc, knnMatches, 2);
+                cv::BFMatcher matcher(cv::NORM_HAMMING);
+                std::vector<std::vector<cv::DMatch>> knnMatches;
+                cv::Mat inlierMask, H;
+                ORB->detectAndCompute(frame, cv::noArray(), payload_kp, payload_desc);
 
-            const float threshold = 0.75;
-            std::vector<cv::DMatch> goodMatches;
-            for (int j = 0; j < knnMatches.size(); j++) {
-                if (knnMatches[j].size() == 2 && knnMatches[j][0].distance < threshold * knnMatches[j][1].distance) {
-                    goodMatches.push_back(knnMatches[j][0]);
+                bool compute = false;
+                if (payload_desc.empty() || sat_desc.empty()) compute = false;
+                else {
+                    matcher.knnMatch(sat_desc, payload_desc, knnMatches, 2);
+
+                    const float threshold = 0.75;
+                    std::vector<cv::DMatch> goodMatches;
+                    for (int j = 0; j < knnMatches.size(); j++) {
+                        if (knnMatches[j].size() == 2 && knnMatches[j][0].distance < threshold * knnMatches[j][1].distance) {
+                            goodMatches.push_back(knnMatches[j][0]);
+                        }
+                    }
+                    if (goodMatches.size() >= 4) {
+                        sat_points.clear();
+                        payload_points.clear();
+                        sat_points.reserve(goodMatches.size());
+                        payload_points.reserve(goodMatches.size());
+
+                        for (const auto &m : goodMatches) {
+                            sat_points.push_back(sat_kp[m.queryIdx].pt);
+                            payload_points.push_back(payload_kp[m.trainIdx].pt);
+                        }
+                        H = cv::findHomography(payload_points, sat_points, cv::RANSAC, 5.0, inlierMask);
+
+                        compute = !H.empty();
+                    } else std::cerr << "Not enough matches (" << goodMatches.size() << ") to compute homography.\n";
                 }
-            }
-            if (goodMatches.size() >= 4) {
-                sat_points.clear();
-                payload_points.clear();
-                sat_points.reserve(goodMatches.size());
-                payload_points.reserve(goodMatches.size());
 
-                for (const auto &m : goodMatches) {
-                    sat_points.push_back(sat_kp[m.queryIdx].pt);
-                    payload_points.push_back(payload_kp[m.trainIdx].pt);
+                cv::Point2d sample(0.0, 0.0);
+                if (compute) {
+                    cv::Mat warped;
+                    cv::warpPerspective(frame, warped, H, img_sat.size());
+
+                    cv::Mat cropped = warped.clone();
+                    if (!cropped_match(cropped)) {
+                        compute = false;
+                    } else if (cropped.rows > img_sat.rows || cropped.cols > img_sat.cols) {
+                        compute = false;
+                    } else {
+                        sample = get_coordinates(cropped, img_sat);
+
+                        push_frame(window_frames, cropped);
+                        push_coord(window_coords, sample);
+
+                        prev_valid = last_valid;
+                        have_prev = have_last;
+                        last_valid = sample;
+                        have_last = true;
+                    }
+                } else {
+                    if (have_last) sample = last_valid;
+                    else sample = {0.0, 0.0};
                 }
-                H = cv::findHomography(payload_points, sat_points, cv::RANSAC, 5.0, inlierMask);
 
-                compute = !H.empty();
-            } else {
-                std::cerr << "Not enough matches (" << goodMatches.size() << ") to compute homography.\n";
+                if (window_coords.size() < WINDOW) window_coords.push_back(sample);
+                else window_coords[window_index] = sample;
+                coords_out << video_timestamp << "," << sample.x << "," << sample.y << std::endl;
+                window_index = (window_index + 1) % WINDOW;
 
+                cv::Point2d averaged_coordinate = average_coords(window_coords);
+                all_coords.push_back(averaged_coordinate);
             }
         }
-
-        if (compute) {
-            cv::Mat warped;
-            cv::warpPerspective(frame_fg, warped, H, img_sat.size());
-
-            cv::Mat cropped = warped.clone();
-            cropped_match(cropped);
-
-            cv::Point2d coord = get_coordinates(cropped, img_sat);
-
-            push_frame(window_frames, cropped);
-            push_coord(window_coords, coord);
-            coord_out << video_timestamp << "," << coord.x << "," << coord.y << std::endl;
-
-            prev_valid = last_valid;
-            have_prev = have_last;
-            last_valid = coord;
-            have_last = true;
-
-            window_index = (window_index + 1) % window;
-        } else {
-            if (have_prev && have_last) {
-                cv::Point2d interp = last_valid + (last_valid - prev_valid);
-
-                if (window_coords.size() < window) window_coords.push_back(interp);
-                else window_coords[window_index] = interp;
-
-                prev_valid = last_valid;
-                last_valid = interp;
-                have_prev = true;
-                have_last = true;
-
-                window_index = (window_index + 1) % window;
-            } else if (have_last) {
-                cv::Point2d interp = last_valid;
-
-                if (window_coords.size() < window) window_coords.push_back(interp);
-                else window_coords[window_index] = interp;
-
-                window_index = (window_index + 1) % window;
-            }
-            coord_out << video_timestamp << "," << "NaN" << "," << "NaN" << std::endl;
-        }
-
-        cv::Point2d averaged_coordinate = average_coords(window_coords);
-        all_coords.push_back(averaged_coordinate);
-        std::cout << "=========================================================\n";
-        std::cout << "Estimated Latitude:\t" << averaged_coordinate.x << "\n";
-        std::cout << "Estimated Longitude:\t" << averaged_coordinate.y << "\n";
     }
 
-    flight_statistics(img_sat, vid_out);
+    interpolate(all_coords);
+    flight_statistics(img_sat, video_out, have_truth);
 
-    vid_fg.release();
-    vid_out.release();
+    if (video_in.isOpened()) video_in.release();
+    video_out.release();
     cv::destroyAllWindows();
 
     return 0;
 }
 
 void push_coord(std::vector<cv::Point2d>& window_coords, const cv::Point2d& coord) {
-    if (window_coords.size() < window) window_coords.push_back(coord);
+    if (window_coords.size() < WINDOW) window_coords.push_back(coord);
     else window_coords[window_index] = coord;
 }
 
 void push_frame(std::vector<cv::Mat>& window_frames, const cv::Mat& frame){
-    if (window_frames.size() < window) window_frames.push_back(frame);
+    if (window_frames.size() < WINDOW) window_frames.push_back(frame);
     else window_frames[window_index] = frame;
 }
-
-
-
