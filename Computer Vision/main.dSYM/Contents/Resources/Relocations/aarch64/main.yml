@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     '/Users/paigerust/wpi-airdrop-mqp/Computer Vision/main'
-relocations:     []
-...

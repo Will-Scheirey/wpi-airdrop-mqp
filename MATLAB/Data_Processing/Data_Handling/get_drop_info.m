@@ -33,8 +33,8 @@ function drop_info = get_drop_info(data_accel, data_gyro, data_mag, data_gps, da
 accel_mean_window = 10;
 accel_norm = movmean(vecnorm(data_accel.data, 2, 2), accel_mean_window, 1);
 
-% Assume drop is when accel > 15 m/s^2
-accel_drop = 15;
+% Assume drop is when accel > 12 m/s^2
+accel_drop = 12;
 % Assuming landing is when vel < 2 m/s
 vel_land = 2;
 

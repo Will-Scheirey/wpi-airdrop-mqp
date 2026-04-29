@@ -38,6 +38,7 @@ function [dt, ...
 %% Generate Filenames
 sensor_filename = fullfile(full_dir, "SENSOR.CSV");
 gps_filename = fullfile(full_dir, "TRACK.CSV");
+cv_filename = fullfile(full_dir, "/path/to/computer_vision_GPS.csv");
 
 %% Load Data and Trim
 [data_accel,...
@@ -47,7 +48,7 @@ gps_filename = fullfile(full_dir, "TRACK.CSV");
     data_baro,...
     data_gps_vel,...
     data_flysight_sensor,...
-    data_flysight_gps] = load_flysight_data(sensor_filename, gps_filename, false);
+    data_flysight_gps] = load_flysight_data(sensor_filename, gps_filename, cv_filename, true);
 
 [data_stationary, data_moving] = trim_flysight(data_accel, data_gyro, data_mag, data_gps, data_baro, data_gps_vel, data_flysight_sensor, data_flysight_gps);
 

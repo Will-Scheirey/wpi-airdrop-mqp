@@ -1,23 +1,19 @@
 #include "libraries.hpp"
-#include "crop.cpp"
 #include "grid.cpp"
 #include "frame.cpp"
 #include "csv.cpp"
 
 /*
-
+------------SAMPLE INPUT------------
 ./main \
-/Users/paigerust/Desktop/MQP/haars_videos/sat_view_worc.png \
-/Users/paigerust/Desktop/MQP/haars_videos/DN172_Lt3_n12_08072025_side/video_out.mov \
-/Users/paigerust/Desktop/MQP/haars_videos/DN172_Lt3_n12_08072025_side/coords_out.csv \
---load_csv /Users/paigerust/Desktop/MQP/haars_videos/DN172_Lt3_n12_08072025_side/coords_in.csv \
---load_truth logs/gps_DN172_Lt3_n12_08072025_side.csv
-
-
+/path/to/satellite_image.png \
+/path/to/output_video.mov \
+/path/to/output_coordinate_log.csv \
+--load_video /path/to/input_video.mov \ OR --load_csv /path/to/input_gps.csv \
+--load_truth /path/to/ground_truth_gps.csv
 */
 
-#define N_FEATURES 100
-
+//----------GLOBAL VARIABLES----------
 static int window_index = 0;
 
 static std::vector<cv::Point2f> sat_points, payload_points;
@@ -30,24 +26,31 @@ bool have_truth = false;
 static bool have_csv = false;
 static cv::Point2d last_valid(0.0, 0.0), prev_valid(0.0, 0.0);
 
+std::ofstream rmse_out("rmse_out.csv");
+std::ofstream error_out("error_out.csv");
+
+//----------FUNCTION DECLARATIONS----------
 void push_coord(std::vector<cv::Point2d>&, const cv::Point2d&);
 void push_frame(std::vector<cv::Mat>&, const cv::Mat&);
 
-std::ofstream rms_out("rms_out.csv");
-
 int main (int argc, char** argv) {
+    // Initialize grid given satellite image characteristics
     grid_sizing();
     std::cout << std::fixed << std::setprecision(5);
     cv::Mat img_sat;
     cv::VideoCapture video_in; cv::VideoWriter video_out;
     std::ofstream coords_out;
 
+    // Read command-line inputs
     if (argc > 1) {
         img_sat = cv::imread(argv[1]);
         cv::cvtColor(img_sat, img_sat, cv::COLOR_BGRA2BGR);
         char *compare;
 
+        // Open output video from path
         video_out.open(argv[2], cv::VideoWriter::fourcc('a', 'v', 'c', '1'), 60.0, img_sat.size());
+
+        // Open coordinate output CSV from path
         coords_out.open(argv[3]);
         coords_out << std::fixed << std::setprecision(5);
         coords_out << "timestamp" << "," << "latitude" << "," << "longitude" << std::endl;
@@ -55,36 +58,42 @@ int main (int argc, char** argv) {
         compare = argv[4];
         bool csv = strcmp(compare, "--load_csv");
         bool video = strcmp(compare, "--load_video");
-        if (!csv) {
+        // Check if GPS coordinates are being loaded from a CSV or if a video is being passed in for GPS coordinate generation
+        if (!csv) { // Load from CSV
             have_csv = true;
             std::string csv_path = argv[5];
 
+            // Load CSV contents into vectors
             if (!load_coords_csv(csv_path, all_coords, &coord_timestamps)) {
                 return -1;
             }
-        } else if (!video) {
+        } else if (!video) { // Load from video
             video_in.open(argv[5]);
         }
 
+        // Check if ground truth payload GPS coordinates are provided
         bool truth;
         compare = argv[6];
         if (compare) truth = strcmp(compare, "--load_truth");
         else truth = false;
         if (!truth) {
             have_truth = true;
-            std::string truth_path = argv[7]; 
+            std::string truth_path = argv[7];
 
+            // Load CSV contents into vectors
             if (!load_coords_csv(truth_path, true_coords, &truth_timestamps)) {
                 return -1;
             }
         }
     }
+
     int frame_count; double fps;
     if (!video_out.isOpened()) {
         std::cerr << "Error: Could not open video_out file.\n";
         return -1;
     }
 
+    // Calculate estimated payload GPS for each input video frame
     if (video_in.isOpened()) {
         frame_count = static_cast<int>(video_in.get(cv::CAP_PROP_FRAME_COUNT));
         fps = video_in.get(cv::CAP_PROP_FPS);
@@ -101,27 +110,31 @@ int main (int argc, char** argv) {
         std::vector<cv::Mat> window_frames;
         std::vector<cv::Point2d> window_coords;
 
+        // If input video is not at the same FPS as data was streamed, down-sample input video to correct framerate
         double video_timestamp = 0.0;
         const double true_fps = 5.0;
         const int stride = std::max(1, (int)std::lround(fps / true_fps));
 
         cv::Mat frame;
-        if (!have_csv) {
+        if (!have_csv) { // Only compute coordinates if GPS coordinate CSV was not provided
             cv::Mat frame;
+            // Iterate through each frame of input video
             for (int i = 0; i < frame_count; ++i) {
                 video_in >> frame;
                 if (frame.empty()) break;
 
+                // Skip duplicated frames
                 if (i % stride != 0) continue;
                 std::cout << i << std::endl;
-
                 video_timestamp += 1.0 / true_fps;
 
+                // Compare and match features between satellite and payload camera images
                 cv::BFMatcher matcher(cv::NORM_HAMMING);
                 std::vector<std::vector<cv::DMatch>> knnMatches;
                 cv::Mat inlierMask, H;
                 ORB->detectAndCompute(frame, cv::noArray(), payload_kp, payload_desc);
 
+                // Only compute homography matrix if matches between images were identified
                 bool compute = false;
                 if (payload_desc.empty() || sat_desc.empty()) compute = false;
                 else {
@@ -134,6 +147,7 @@ int main (int argc, char** argv) {
                             goodMatches.push_back(knnMatches[j][0]);
                         }
                     }
+                    // Only compute GPS coordinate if more than 4 matches between images were found
                     if (goodMatches.size() >= 4) {
                         sat_points.clear();
                         payload_points.clear();
@@ -150,17 +164,23 @@ int main (int argc, char** argv) {
                     } else std::cerr << "Not enough matches (" << goodMatches.size() << ") to compute homography.\n";
                 }
 
+                // Warp payload camera image into satellite image frame
                 cv::Point2d sample(0.0, 0.0);
                 if (compute) {
                     cv::Mat warped;
                     cv::warpPerspective(frame, warped, H, img_sat.size());
 
+                    // Crop payload camera image into largest bounding square
                     cv::Mat cropped = warped.clone();
+                    // Exit matching if image could not be cropped
                     if (!cropped_match(cropped)) {
                         compute = false;
-                    } else if (cropped.rows > img_sat.rows || cropped.cols > img_sat.cols) {
+                    } 
+                    // Exit matching if cropped image does not fit into satellite image (erroneous crop)
+                    else if (cropped.rows > img_sat.rows || cropped.cols > img_sat.cols) {
                         compute = false;
                     } else {
+                        // Add GPS coordinates to estimated payload GPS coordinate vector
                         sample = get_coordinates(cropped, img_sat);
 
                         push_frame(window_frames, cropped);
@@ -172,10 +192,13 @@ int main (int argc, char** argv) {
                         have_last = true;
                     }
                 } else {
+                    // If no new GPS coordinates were calculated, duplicate and store previous GPS coordinate
                     if (have_last) sample = last_valid;
+                    // If previous GPS coordinate is not available, store zeros
                     else sample = {0.0, 0.0};
                 }
 
+                // Compute estimated payload GPS coordinate average if a window's worth of estimates is stored
                 if (window_coords.size() < WINDOW) window_coords.push_back(sample);
                 else window_coords[window_index] = sample;
                 coords_out << video_timestamp << "," << sample.x << "," << sample.y << std::endl;
@@ -187,9 +210,11 @@ int main (int argc, char** argv) {
         }
     }
 
+    // Fill in gaps in payload GPS coordinate estimation and print flight statistics to output video
     interpolate(all_coords);
     flight_statistics(img_sat, video_out, have_truth);
 
+    // Close videos and images
     if (video_in.isOpened()) video_in.release();
     video_out.release();
     cv::destroyAllWindows();
@@ -197,11 +222,31 @@ int main (int argc, char** argv) {
     return 0;
 }
 
+/*
+***************************************************************************************************
+PUSH_COORD Adds new estimated payload GPS coordinate to window of GPS coordinates
+
+INPUTS:
+    window_coords   : Vector of estimated payload GPS coordinates
+    coord           : Estimated payload GPS coordinate to be added at the end of the window
+FUNCTION RETURNS NO OUTPUTS
+***************************************************************************************************
+*/
 void push_coord(std::vector<cv::Point2d>& window_coords, const cv::Point2d& coord) {
     if (window_coords.size() < WINDOW) window_coords.push_back(coord);
     else window_coords[window_index] = coord;
 }
 
+/*
+***************************************************************************************************
+PUSH_FRAME Adds new payload camera frame to window of frames
+
+INPUTS:
+    window_frames   : Vector of payload camera frames
+    frame           : Payload camera frame to be added at the end of the window
+FUNCTION RETURNS NO OUTPUTS
+***************************************************************************************************
+*/
 void push_frame(std::vector<cv::Mat>& window_frames, const cv::Mat& frame){
     if (window_frames.size() < WINDOW) window_frames.push_back(frame);
     else window_frames[window_index] = frame;
